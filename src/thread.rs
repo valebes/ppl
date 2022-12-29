@@ -28,7 +28,6 @@ impl Error for ThreadError {
     }
 }
 
-
 pub struct Thread {
     id: usize,
     thread: Option<thread::JoinHandle<()>>,
@@ -52,7 +51,7 @@ impl Thread {
     pub fn start(&mut self) -> std::result::Result<(), ThreadError> {
         if self.job.is_none() {
             return Err(ThreadError::new("Thread already started."));
-        } 
+        }
         let f = std::mem::replace(&mut self.job, None).unwrap();
 
         self.thread = Some(thread::spawn(move || {

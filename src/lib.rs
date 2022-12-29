@@ -1,5 +1,5 @@
-pub mod thread;
 pub mod channel;
-pub mod task;
 pub mod node;
 pub mod pipeline;
+pub mod task;
+pub mod thread;

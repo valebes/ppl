@@ -3,15 +3,23 @@ use crate::node::{node::Node, out_node::OutNode};
 pub struct Pipeline<TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     first_block: OutNode<TOut, TCollected, TNext>,
 }
-impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static> Pipeline<TOut, TCollected, TNext> {
+impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static>
+    Pipeline<TOut, TCollected, TNext>
+{
     pub fn new(first_block: OutNode<TOut, TCollected, TNext>) -> Pipeline<TOut, TCollected, TNext> {
         Pipeline { first_block }
     }
     pub fn start(&mut self) {
-        self.first_block.start();
+        let err = self.first_block.start();
+        if err.is_err() {
+            panic!("Error: Cannot start thread!");
+        }
     }
 
-}  
+    pub fn collect(self) -> Option<TCollected> {
+        Node::<TOut, TCollected>::collect(self.first_block)
+    }
+}
 
 #[macro_export]
 macro_rules! pipeline_propagate {
@@ -45,4 +53,3 @@ macro_rules! pipeline {
         }
     };
 }
-    

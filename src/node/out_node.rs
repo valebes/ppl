@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use log::{trace, warn};
 
@@ -8,7 +8,6 @@ use crate::task::Task;
 use crate::thread::{Thread, ThreadError};
 
 use super::node::Node;
-
 
 /*
 Public API
@@ -21,25 +20,39 @@ pub struct OutNode<TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     thread: Thread,
     next_node: Arc<TNext>,
     phantom: PhantomData<(TOut, TCollected)>,
-
 }
 
-
-impl<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> Node<TIn, TCollected> for OutNode<TOut, TCollected, TNext>  {
+impl<
+        TIn: Send,
+        TOut: Send + 'static,
+        TCollected,
+        TNext: Node<TOut, TCollected> + Send + Sync + 'static,
+    > Node<TIn, TCollected> for OutNode<TOut, TCollected, TNext>
+{
     fn send(&self, _input: Task<TIn>) -> Result<(), ChannelError> {
         Ok(())
     }
 
-    fn collect(self) -> Option<TCollected> {
+    fn collect(mut self) -> Option<TCollected> {
+        let err = self.wait();
+        if err.is_err() {
+            panic!("Error: Cannot wait thread.");
+        }
         match Arc::try_unwrap(self.next_node) {
             Ok(nn) => nn.collect(),
-            Err(_) => panic!("Error: Cannot collect results."),
+            Err(_) => panic!("Error: Cannot collect results"),
         }
     }
 }
 
-impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static> OutNode<TOut, TCollected, TNext> {
-    pub fn new(id: usize, handler: Box<dyn Out<TOut> + Send + Sync>, next_node: TNext) -> Result<OutNode<TOut, TCollected, TNext>, ()> {
+impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static>
+    OutNode<TOut, TCollected, TNext>
+{
+    pub fn new(
+        id: usize,
+        handler: Box<dyn Out<TOut> + Send + Sync>,
+        next_node: TNext,
+    ) -> Result<OutNode<TOut, TCollected, TNext>, ()> {
         trace!("Created a new OutNode!");
 
         let next_node = Arc::new(next_node);
@@ -83,8 +96,12 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
             }
         }
     }
-    
+
     pub fn start(&mut self) -> std::result::Result<(), ThreadError> {
         self.thread.start()
+    }
+
+    pub fn wait(&mut self) -> std::result::Result<(), ThreadError> {
+        self.thread.wait()
     }
 }

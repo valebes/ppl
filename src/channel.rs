@@ -1,4 +1,11 @@
-use std::{sync::{mpsc::{channel, Receiver, RecvError, SendError, Sender, TryRecvError}, Mutex}, fmt, error::Error};
+use std::{
+    error::Error,
+    fmt,
+    sync::{
+        mpsc::{channel, Receiver, RecvError, SendError, Sender, TryRecvError},
+        Mutex,
+    },
+};
 
 #[derive(Debug)]
 pub struct ChannelError {
@@ -71,30 +78,23 @@ impl<T: Send> Channel<T> {
         let err = self.tx.send(msg);
         match err {
             Ok(()) => Ok(()),
-            Err(e) => {
-                Err(ChannelError::new(&e.to_string()))
-            }
+            Err(e) => Err(ChannelError::new(&e.to_string())),
         }
     }
 
-    pub fn receive(&self) ->  Result<T, ChannelError> {
+    pub fn receive(&self) -> Result<T, ChannelError> {
         if self.blocking {
             let err = self.rx.block_receive();
             match err {
                 Ok(msg) => Ok(msg),
-                Err(e) => {
-                    Err(ChannelError::new(&e.to_string()))
-                }
+                Err(e) => Err(ChannelError::new(&e.to_string())),
             }
         } else {
             let err = self.rx.receive();
             match err {
                 Ok(msg) => Ok(msg),
-                Err(e) => {
-                    Err(ChannelError::new(&e.to_string()))
-                }
+                Err(e) => Err(ChannelError::new(&e.to_string())),
             }
         }
-
     }
 }

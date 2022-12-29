@@ -5,8 +5,16 @@
    Fibonacci number.
 */
 
-use pspp::{node::{out_node::{Out, OutNode}, inout_node::{InOut, InOutNode}, in_node::{In, InNode}}, pipeline, pipeline_propagate, pipeline::Pipeline};
-
+use pspp::{
+    node::{
+        in_node::{In, InNode},
+        inout_node::{InOut, InOutNode},
+        out_node::{Out, OutNode},
+    },
+    pipeline,
+    pipeline::Pipeline,
+    pipeline_propagate,
+};
 
 struct Source {
     streamlen: usize,
@@ -55,6 +63,7 @@ impl In<u64, usize> for Sink {
     }
 
     fn finalize(&mut self) -> Option<usize> {
+        println!("End");
         Some(self.counter)
     }
 }
@@ -63,9 +72,17 @@ impl In<u64, usize> for Sink {
 fn fibonacci_pipe() {
     env_logger::init();
 
-    let p = pipeline![Box::new(Source{streamlen: 20, counter: 0}),
-                      Box::new(Worker{}),
-                      Box::new(Sink{counter: 20})];
+    let p = pipeline![
+        Box::new(Source {
+            streamlen: 20,
+            counter: 0
+        }),
+        Box::new(Worker {}),
+        Box::new(Sink { counter: 0 })
+    ];
 
-    
+    let res = p.collect();
+    if res.is_some() {
+        println!("Result: {:?}", res);
+    }
 }

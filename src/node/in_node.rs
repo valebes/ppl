@@ -1,11 +1,14 @@
-use std::sync::{Mutex, Arc};
+use std::sync::{Arc, Mutex};
 
 use log::{trace, warn};
 
-use crate::{channel::{Channel, ChannelError}, task::Task, thread::{Thread, ThreadError}};
+use crate::{
+    channel::{Channel, ChannelError},
+    task::Task,
+    thread::{Thread, ThreadError},
+};
 
 use super::node::Node;
-
 
 /*
 Public API
@@ -21,19 +24,21 @@ pub struct InNode<TIn: Send, TCollected> {
     result: Arc<Mutex<Option<TCollected>>>,
 }
 
-impl<TIn: Send, TCollected> Node<TIn, TCollected> for InNode<TIn, TCollected> {
+impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
+    for InNode<TIn, TCollected>
+{
     fn send(&self, input: Task<TIn>) -> Result<(), ChannelError> {
         self.channel.send(input)
     }
 
     fn collect(mut self) -> Option<TCollected> {
-        let err = self.thread.wait();
+        let err = self.wait();
         if err.is_err() {
-            return None; // TODO: return error
+            panic!("Error: Cannot wait thread.");
         }
         let tmp = self.result.lock();
         if tmp.is_err() {
-            panic!("Error: Cannot collect results.");
+            panic!("Error: Cannot collect results in.");
         }
 
         let mut res = tmp.unwrap();
@@ -46,8 +51,11 @@ impl<TIn: Send, TCollected> Node<TIn, TCollected> for InNode<TIn, TCollected> {
 }
 
 impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
-    pub fn new(id: usize, handler: Box<dyn In<TIn, TCollected> + Send + Sync>, blocking: bool) -> Result<InNode<TIn, TCollected>, ThreadError>
-    {
+    pub fn new(
+        id: usize,
+        handler: Box<dyn In<TIn, TCollected> + Send + Sync>,
+        blocking: bool,
+    ) -> Result<InNode<TIn, TCollected>, ThreadError> {
         trace!("Created a new InNode!");
 
         let channel = Arc::new(Channel::new(blocking));
@@ -55,7 +63,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
         let ch = Arc::clone(&channel);
         let bucket = Arc::clone(&result);
-        
+
         let thread = Thread::new(
             id,
             move || {
@@ -85,7 +93,10 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         Ok(node)
     }
 
-    fn rts(mut node: Box<dyn In<TIn, TCollected>>, channel: &Channel<Task<TIn>>) -> Option<TCollected> {
+    fn rts(
+        mut node: Box<dyn In<TIn, TCollected>>,
+        channel: &Channel<Task<TIn>>,
+    ) -> Option<TCollected> {
         loop {
             let input = channel.receive();
             match input {
@@ -106,5 +117,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         node.finalize()
     }
 
-
+    pub fn wait(&mut self) -> std::result::Result<(), ThreadError> {
+        self.thread.wait()
+    }
 }

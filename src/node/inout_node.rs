@@ -1,8 +1,12 @@
-use std::{sync::{Arc}, marker::PhantomData};
+use std::{marker::PhantomData, sync::Arc};
 
 use log::{trace, warn};
 
-use crate::{channel::{Channel, ChannelError}, task::Task, thread::{Thread, ThreadError}};
+use crate::{
+    channel::{Channel, ChannelError},
+    task::Task,
+    thread::{Thread, ThreadError},
+};
 
 use super::node::Node;
 
@@ -18,24 +22,44 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     channel: Arc<Channel<Task<TIn>>>,
     next_node: Arc<TNext>,
     phantom: PhantomData<(TOut, TCollected)>,
-
 }
 
-impl<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> Node<TIn, TCollected> for InOutNode<TIn, TOut, TCollected, TNext>  {
+impl<
+        TIn: Send + 'static,
+        TOut: Send + 'static,
+        TCollected,
+        TNext: Node<TOut, TCollected> + Send + Sync + 'static,
+    > Node<TIn, TCollected> for InOutNode<TIn, TOut, TCollected, TNext>
+{
     fn send(&self, input: Task<TIn>) -> Result<(), ChannelError> {
         self.channel.send(input)
     }
 
-    fn collect(self) -> Option<TCollected> {
+    fn collect(mut self) -> Option<TCollected> {
+        let err = self.wait();
+        if err.is_err() {
+            panic!("Error: Cannot wait thread.");
+        }
         match Arc::try_unwrap(self.next_node) {
             Ok(nn) => nn.collect(),
-            Err(_) => panic!("Error: Cannot collect results."),
+            Err(_) => panic!("Error: Cannot collect results inout."),
         }
     }
 }
 
-impl<TIn: Send + 'static, TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Sync + Send + 'static> InOutNode<TIn, TOut, TCollected, TNext> {
-    pub fn new(id: usize, handler: Box<dyn InOut<TIn, TOut> + Send + Sync>, next_node: TNext, blocking: bool) -> Result<InOutNode<TIn, TOut, TCollected, TNext>, ThreadError> {
+impl<
+        TIn: Send + 'static,
+        TOut: Send + 'static,
+        TCollected,
+        TNext: Node<TOut, TCollected> + Sync + Send + 'static,
+    > InOutNode<TIn, TOut, TCollected, TNext>
+{
+    pub fn new(
+        id: usize,
+        handler: Box<dyn InOut<TIn, TOut> + Send + Sync>,
+        next_node: TNext,
+        blocking: bool,
+    ) -> Result<InOutNode<TIn, TOut, TCollected, TNext>, ThreadError> {
         trace!("Created a new InOutNode!");
 
         let channel_in = Arc::new(Channel::new(blocking));
@@ -107,4 +131,7 @@ impl<TIn: Send + 'static, TOut: Send + 'static, TCollected, TNext: Node<TOut, TC
         }
     }
 
+    pub fn wait(&mut self) -> std::result::Result<(), ThreadError> {
+        self.thread.wait()
+    }
 }
