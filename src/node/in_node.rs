@@ -16,7 +16,6 @@ pub trait In<TIn: 'static + Send, TOut> {
 }
 
 pub struct InNode<TIn: Send, TCollected> {
-    id: usize,
     thread: Thread,
     channel: Arc<Channel<Task<TIn>>>,
     result: Arc<Mutex<Option<TCollected>>>,
@@ -47,7 +46,7 @@ impl<TIn: Send, TCollected> Node<TIn, TCollected> for InNode<TIn, TCollected> {
 }
 
 impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
-    pub fn new(id: usize, handler: Box<dyn In<TIn, TCollected> + Send>, blocking: bool) -> Result<InNode<TIn, TCollected>, ThreadError>
+    pub fn new(id: usize, handler: Box<dyn In<TIn, TCollected> + Send + Sync>, blocking: bool) -> Result<InNode<TIn, TCollected>, ThreadError>
     {
         trace!("Created a new InNode!");
 
@@ -56,10 +55,11 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
         let ch = Arc::clone(&channel);
         let bucket = Arc::clone(&result);
+        
         let thread = Thread::new(
             id,
             move || {
-                let res = Self::rts(handler, &ch);
+                let res = InNode::rts(handler, &ch);
                 if res.is_some() {
                     let err = bucket.lock();
                     if err.is_ok() {
@@ -74,7 +74,6 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         );
 
         let mut node = InNode {
-            id,
             thread: thread,
             channel: channel,
             result,
@@ -107,7 +106,5 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         node.finalize()
     }
 
-    pub fn id(&self) -> usize {
-        self.id
-    }
+
 }

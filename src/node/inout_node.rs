@@ -14,7 +14,6 @@ pub trait InOut<TIn, TOut> {
 }
 
 pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
-    id: usize,
     thread: Thread,
     channel: Arc<Channel<Task<TIn>>>,
     next_node: Arc<TNext>,
@@ -36,7 +35,7 @@ impl<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> Node<TIn,
 }
 
 impl<TIn: Send + 'static, TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Sync + Send + 'static> InOutNode<TIn, TOut, TCollected, TNext> {
-    pub fn new(id: usize, handler: Box<dyn InOut<TIn, TOut> + Send>, next_node: TNext, blocking: bool) -> Result<InOutNode<TIn, TOut, TCollected, TNext>, ThreadError> {
+    pub fn new(id: usize, handler: Box<dyn InOut<TIn, TOut> + Send + Sync>, next_node: TNext, blocking: bool) -> Result<InOutNode<TIn, TOut, TCollected, TNext>, ThreadError> {
         trace!("Created a new InOutNode!");
 
         let channel_in = Arc::new(Channel::new(blocking));
@@ -54,7 +53,6 @@ impl<TIn: Send + 'static, TOut: Send + 'static, TCollected, TNext: Node<TOut, TC
         );
 
         let mut node = InOutNode {
-            id,
             channel: channel_in,
             thread: thread,
             next_node: next_node,
@@ -107,10 +105,6 @@ impl<TIn: Send + 'static, TOut: Send + 'static, TCollected, TNext: Node<TOut, TC
                 }
             }
         }
-    }
-
-    pub fn id(&self) -> usize {
-        self.id
     }
 
 }

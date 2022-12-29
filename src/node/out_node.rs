@@ -18,7 +18,6 @@ pub trait Out<TOut: 'static + Send> {
 }
 
 pub struct OutNode<TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
-    id: usize,
     thread: Thread,
     next_node: Arc<TNext>,
     phantom: PhantomData<(TOut, TCollected)>,
@@ -40,7 +39,7 @@ impl<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> Node<TIn,
 }
 
 impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static> OutNode<TOut, TCollected, TNext> {
-    pub fn new(id: usize, handler: Box<dyn Out<TOut> + Send>, next_node: TNext) -> Result<OutNode<TOut, TCollected, TNext>, ()> {
+    pub fn new(id: usize, handler: Box<dyn Out<TOut> + Send + Sync>, next_node: TNext) -> Result<OutNode<TOut, TCollected, TNext>, ()> {
         trace!("Created a new OutNode!");
 
         let next_node = Arc::new(next_node);
@@ -56,7 +55,6 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         );
 
         let node = OutNode {
-            id,
             thread: thread,
             next_node: next_node,
             phantom: PhantomData,
@@ -86,10 +84,6 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
     
-    pub fn id(&self) -> usize {
-        self.id
-    }
-
     pub fn start(&mut self) -> std::result::Result<(), ThreadError> {
         self.thread.start()
     }

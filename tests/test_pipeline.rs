@@ -5,7 +5,7 @@
    Fibonacci number.
 */
 
-use pspp::node::{out_node::{Out, OutNode}, inout_node::{InOut, InOutNode}, in_node::{In, InNode}};
+use pspp::{node::{out_node::{Out, OutNode}, inout_node::{InOut, InOutNode}, in_node::{In, InNode}}, pipeline, pipeline_propagate, pipeline::Pipeline};
 
 
 struct Source {
@@ -63,11 +63,9 @@ impl In<u64, usize> for Sink {
 fn fibonacci_pipe() {
     env_logger::init();
 
-    let sink = InNode::new(3, Box::new(Sink { counter: 0 }), false).unwrap();
-    let worker = InOutNode::new(2, Box::new(Worker {}), sink, false).unwrap();
-    let source = OutNode::new(1, Box::new(Source {
-        streamlen: 45,
-        counter: 0,
-    }), worker).unwrap();
+    let p = pipeline![Box::new(Source{streamlen: 20, counter: 0}),
+                      Box::new(Worker{}),
+                      Box::new(Sink{counter: 20})];
+
     
 }

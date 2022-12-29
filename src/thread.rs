@@ -28,28 +28,18 @@ impl Error for ThreadError {
     }
 }
 
-trait FnBox {
-    fn call_box(self: Box<Self>);
-}
-
-impl<F: FnOnce()> FnBox for F {
-    fn call_box(self: Box<F>) {
-        (*self)()
-    }
-}
-
 
 pub struct Thread {
     id: usize,
     thread: Option<thread::JoinHandle<()>>,
-    job: Option<Box<dyn FnOnce() + Send + 'static>>,
+    job: Option<Box<dyn FnOnce() + Send + Sync + 'static>>,
     pin: bool,
 }
 
 impl Thread {
     pub fn new<F>(id: usize, f: F, pinning: bool) -> Thread
     where
-        F: FnOnce() -> () + Send + 'static,
+        F: FnOnce() -> () + Send + Sync + 'static,
     {
         Thread {
             id: id,
@@ -62,11 +52,12 @@ impl Thread {
     pub fn start(&mut self) -> std::result::Result<(), ThreadError> {
         if self.job.is_none() {
             return Err(ThreadError::new("Thread already started."));
-        }
-        let job = self.job.take().unwrap();
+        } 
+        let f = std::mem::replace(&mut self.job, None).unwrap();
+
         self.thread = Some(thread::spawn(move || {
             info!("{:?} started", thread::current().id());
-            (job)();
+            (f)();
             info!("{:?} now will end.", thread::current().id());
         }));
         Ok(())
