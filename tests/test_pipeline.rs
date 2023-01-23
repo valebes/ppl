@@ -14,9 +14,8 @@ use pspp::{
         inout_monode::*,
     },
     pipeline,
+    pipeline_propagate,
     pipeline::Pipeline,
-    pipeline::Parallel,
-    parallel_propagate, parallel,
 };
 
 use std::{marker::PhantomData, sync::Arc};
@@ -58,6 +57,9 @@ impl InOut<i32, u64> for Worker {
     fn run(&mut self, input: i32) -> Option<u64> {
         Some(fibonacci_reccursive(input))
     }
+    fn number_of_replicas(&self) -> usize {
+        4
+    }
 }
 
 struct Sink {
@@ -79,12 +81,12 @@ impl In<u64, usize> for Sink {
 fn fibonacci_pipe() {
     env_logger::init();
 
-    let p = parallel![
+    let p = pipeline![
         Box::new(Source {
-            streamlen: 20,
+            streamlen: 45,
             counter: 0
         }),
-        (Box::new(Worker {}), 4),
+        Box::new(Worker {}),
         Box::new(Sink { counter: 0 })
     ];
 

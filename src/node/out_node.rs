@@ -29,7 +29,7 @@ impl<
         TNext: Node<TOut, TCollected> + Send + Sync + 'static,
     > Node<TIn, TCollected> for OutNode<TOut, TCollected, TNext>
 {
-    fn send(&self, _input: Task<TIn>) -> Result<(), ChannelError> {
+    fn send(&self, _input: Task<TIn>, rec_id: usize) -> Result<(), ChannelError> {
         Ok(())
     }
 
@@ -42,6 +42,10 @@ impl<
             Ok(nn) => nn.collect(),
             Err(_) => panic!("Error: Cannot collect results"),
         }
+    }
+
+    fn get_num_of_replicas(&self) -> usize {
+1
     }
 }
 
@@ -77,23 +81,28 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     }
 
     fn rts(mut node: Box<dyn Out<TOut>>, nn: &TNext) {
+        let mut counter = 0;
         loop {
+            if counter >= nn.get_num_of_replicas() {
+                counter = 0;
+            }
             let res = node.run();
             match res {
                 Some(output) => {
-                    let err = nn.send(Task::NewTask(output));
+                    let err = nn.send(Task::NewTask(output),counter);
                     if err.is_err() {
                         warn!("Error: {}", err.unwrap_err())
                     }
                 }
                 None => {
-                    let err = nn.send(Task::Terminate);
+                    let err = nn.send(Task::Terminate,counter);
                     if err.is_err() {
                         warn!("Error: {}", err.unwrap_err())
                     }
                     break;
                 }
             }
+            counter = counter + 1;
         }
     }
 

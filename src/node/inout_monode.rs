@@ -24,7 +24,7 @@ impl<
         TNext: Node<TOut, TCollected> + Send + Sync + 'static,
     > Node<TIn, TCollected> for InOutMoNode<TIn, TOut, TCollected, TNext>
 {
-    fn send(&self, input: Task<TIn>) -> Result<(), ChannelError> {
+    fn send(&self, input: Task<TIn>, rec_id: usize) -> Result<(), ChannelError> {
         self.channel.send(input)
     }
 
@@ -49,6 +49,10 @@ impl<
             },
             Err(_) => panic!("Error: Cannot collect results inout."),
         }
+    }
+
+    fn get_num_of_replicas(&self) -> usize {
+        1
     }
 }
 
@@ -117,12 +121,12 @@ impl<
                             Task::NewTask(arg) => {
                                 let res = node.run(arg);
                                 if res.is_some() {
-                                    let err = it.send(Task::NewTask(res.unwrap())); // todo: move task and not clone it
+                                    let err = it.send(Task::NewTask(res.unwrap()),0); // todo: move task and not clone it
                                     if err.is_err() {
                                         warn!("Error: {}", err.unwrap_err())
                                     }
                                 } else if res.is_none() {
-                                    let err = it.send(Task::Dropped); // todo: move task and not clone it
+                                    let err = it.send(Task::Dropped,0); // todo: move task and not clone it
                                     if err.is_err() {
                                         warn!("Error: {}", err.unwrap_err())
                                     }
@@ -144,7 +148,7 @@ impl<
             }
             if stop {
                 for it in next_nodes.iter() {
-                    let err = it.send(Task::Terminate);
+                    let err = it.send(Task::Terminate,0);
                     if err.is_err() {
                         warn!("Error: {}", err.unwrap_err())
                     }

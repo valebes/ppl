@@ -27,7 +27,7 @@ pub struct InNode<TIn: Send, TCollected> {
 impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
     for InNode<TIn, TCollected>
 {
-    fn send(&self, input: Task<TIn>) -> Result<(), ChannelError> {
+    fn send(&self, input: Task<TIn>, rec_id: usize) -> Result<(), ChannelError> {
         self.channel.send(input)
     }
 
@@ -47,6 +47,10 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
         } else {
             return res.take();
         }
+    }
+
+    fn get_num_of_replicas(&self) -> usize {
+        1
     }
 }
 
