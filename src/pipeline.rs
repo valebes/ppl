@@ -21,7 +21,6 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     }
 }
 
-
 #[macro_export]
 macro_rules! pipeline_propagate {
     ($s1:expr) => {
@@ -54,6 +53,3 @@ macro_rules! pipeline {
         }
     };
 }
-
-
-

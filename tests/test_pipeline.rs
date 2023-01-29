@@ -12,8 +12,8 @@ use pspp::{
         out_node::{Out, OutNode},
     },
     pipeline,
-    pipeline_propagate,
     pipeline::Pipeline,
+    pipeline_propagate,
 };
 
 struct Source {

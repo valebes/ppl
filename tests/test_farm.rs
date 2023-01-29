@@ -12,8 +12,8 @@ use pspp::{
         out_node::{Out, OutNode},
     },
     pipeline,
-    pipeline_propagate,
     pipeline::Pipeline,
+    pipeline_propagate,
 };
 
 struct Source {
@@ -61,7 +61,7 @@ impl InOut<i32, u64> for WorkerA {
 struct WorkerB {}
 impl InOut<u64, u64> for WorkerB {
     fn run(&mut self, input: u64) -> Option<u64> {
-       Some(input * 5)
+        Some(input * 5)
     }
     fn number_of_replicas(&self) -> usize {
         2
@@ -72,7 +72,7 @@ impl InOut<u64, u64> for WorkerB {
 struct WorkerC {}
 impl InOut<u64, u64> for WorkerC {
     fn run(&mut self, input: u64) -> Option<u64> {
-       Some(input / 5)
+        Some(input / 5)
     }
     fn number_of_replicas(&self) -> usize {
         2
@@ -110,5 +110,5 @@ fn fibonacci_farm() {
     ];
 
     let res = p.collect();
-    assert_eq!(res.unwrap(),45);
+    assert_eq!(res.unwrap(), 45);
 }

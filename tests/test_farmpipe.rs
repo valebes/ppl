@@ -9,8 +9,8 @@ use pspp::{
         out_node::{Out, OutNode},
     },
     pipeline,
-    pipeline_propagate,
     pipeline::Pipeline,
+    pipeline_propagate,
 };
 
 struct Source {
@@ -28,7 +28,6 @@ impl Out<i32> for Source {
     }
 }
 
-
 #[derive(Clone)]
 struct WorkerA {}
 impl InOut<i32, i32> for WorkerA {
@@ -44,7 +43,7 @@ impl InOut<i32, i32> for WorkerA {
 struct WorkerB {}
 impl InOut<i32, i32> for WorkerB {
     fn run(&mut self, input: i32) -> Option<i32> {
-       Some(input * 5)
+        Some(input * 5)
     }
     fn number_of_replicas(&self) -> usize {
         2
@@ -55,7 +54,7 @@ impl InOut<i32, i32> for WorkerB {
 struct WorkerC {}
 impl InOut<i32, i32> for WorkerC {
     fn run(&mut self, input: i32) -> Option<i32> {
-       Some(input / 5)
+        Some(input / 5)
     }
     fn number_of_replicas(&self) -> usize {
         2
@@ -93,5 +92,5 @@ fn farm() {
     ];
 
     let res = p.collect();
-    assert_eq!(res.unwrap(),2);
+    assert_eq!(res.unwrap(), 2);
 }

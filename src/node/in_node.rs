@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}}, collections::BTreeMap};
 
 use log::{trace, warn};
 
@@ -16,11 +16,18 @@ Public API
 pub trait In<TIn: 'static + Send, TOut> {
     fn run(&mut self, input: TIn);
     fn finalize(&mut self) -> Option<TOut>;
+    fn ordered(&self) -> bool {
+        true
+    }
 }
 
 pub struct InNode<TIn: Send, TCollected> {
     thread: Thread,
     channel: Arc<Channel<Task<TIn>>>,
+    ordered: bool,
+    storage: Mutex<BTreeMap<usize, Task<TIn>>>,
+    dropped: AtomicUsize,
+    counter: AtomicUsize,
     result: Arc<Mutex<Option<TCollected>>>,
 }
 
@@ -28,7 +35,54 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
     for InNode<TIn, TCollected>
 {
     fn send(&self, input: Task<TIn>, rec_id: usize) -> Result<(), ChannelError> {
-        self.channel.send(input)
+        match input {
+            Task::NewTask(e, order) => {
+                if self.ordered
+                    && order != self.counter.load(Ordering::SeqCst)
+                {
+                    self.save_to_storage(Task::NewTask(e, rec_id), order);
+                    self.send_pending();
+                } else {
+                    let res = self.channel.send(Task::NewTask(
+                        e,
+                        order - self.dropped.load(Ordering::SeqCst),
+                    ));
+                    if res.is_err() {
+                        panic!("Error: Cannot send message!");
+                    }
+                    let old_c = self.counter.load(Ordering::SeqCst);
+                    self.counter.store(old_c + 1, Ordering::SeqCst);
+                }
+            }
+            Task::Dropped(order) => {
+                if self.ordered
+                    && order != self.counter.load(Ordering::SeqCst)
+                {
+                    self.save_to_storage(Task::Dropped(order), order);
+                    self.send_pending();
+                } else {
+                    let old_c = self.counter.load(Ordering::SeqCst);
+                    self.counter.store(old_c + 1, Ordering::SeqCst);
+
+                    let old_d = self.dropped.load(Ordering::SeqCst);
+                    self.dropped.store(old_d + 1, Ordering::SeqCst);
+                }
+            }
+            Task::Terminate(order) => {
+                if self.ordered
+                    && order != self.counter.load(Ordering::SeqCst)
+                {
+                    self.save_to_storage(Task::Terminate(order), order);
+                    self.send_pending();
+                } else {
+                    let res = self.channel.send(Task::Terminate(order));
+                    if res.is_err() {
+                        panic!("Error: Cannot send message!");
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     fn collect(mut self) -> Option<TCollected> {
@@ -64,6 +118,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
         let channel = Arc::new(Channel::new(blocking));
         let result = Arc::new(Mutex::new(None));
+        let ordered = handler.ordered();
 
         let ch = Arc::clone(&channel);
         let bucket = Arc::clone(&result);
@@ -88,6 +143,10 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         let mut node = InNode {
             thread: thread,
             channel: channel,
+            ordered: ordered,
+            storage: Mutex::new(BTreeMap::new()),
+            dropped: AtomicUsize::new(0),
+            counter: AtomicUsize::new(0),
             result,
         };
         let err = node.thread.start();
@@ -123,5 +182,51 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
     pub fn wait(&mut self) -> std::result::Result<(), ThreadError> {
         self.thread.wait()
+    }
+
+    fn save_to_storage(&self, task: Task<TIn>, order: usize) {
+        let mtx = self.storage.lock();
+
+        match mtx {
+            Ok(mut queue) => {
+                queue.insert(order, task);
+            }
+            Err(_) => panic!("Error: Cannot lock the storage!"),
+        }
+    }
+
+    fn send_pending(&self) {
+        let mtx = self.storage.lock();
+
+        match mtx {
+            Ok(mut queue) => {
+                let mut c = self.counter.load(Ordering::SeqCst);
+                while (queue.contains_key(&c)) {
+                    let msg = queue.remove(&c).unwrap();
+                    match msg {
+                        Task::NewTask(e, rec_id) => {
+                            let err = self.send(Task::NewTask(e, c), rec_id);
+                            if err.is_err() {
+                                panic!("Error: Cannot send message!");
+                            }
+                        }
+                        Task::Dropped(e) => {
+                            let err = self.send(Task::Dropped(e), 0);
+                            if err.is_err() {
+                                panic!("Error: Cannot send message!");
+                            }
+                        }
+                        Task::Terminate(e) => {
+                            let err = self.send(Task::Terminate(e), 0);
+                            if err.is_err() {
+                                panic!("Error: Cannot send message!");
+                            }
+                        }
+                    }
+                    c = self.counter.load(Ordering::SeqCst);
+                }
+            }
+            Err(_) => panic!("Error: Cannot lock the storage!"),
+        }
     }
 }
