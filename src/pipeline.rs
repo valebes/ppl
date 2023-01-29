@@ -1,4 +1,4 @@
-use crate::node::{node::Node, out_node::*, out_monode::*};
+use crate::node::{node::Node, out_node::*};
 
 pub struct Pipeline<TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     first_block: OutNode<TOut, TCollected, TNext>,

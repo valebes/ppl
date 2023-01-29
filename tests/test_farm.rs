@@ -1,5 +1,5 @@
 /*
-   Fibonacci pipeline.
+   Fibonacci farm
    Is generated a sequence of i from 1 to 45.
    Each worker of the farm compute the i-th
    Fibonacci number.
@@ -47,10 +47,35 @@ pub fn fibonacci_reccursive(n: i32) -> u64 {
 }
 
 #[derive(Clone)]
-struct Worker {}
-impl InOut<i32, u64> for Worker {
+struct WorkerA {}
+impl InOut<i32, u64> for WorkerA {
     fn run(&mut self, input: i32) -> Option<u64> {
         Some(fibonacci_reccursive(input))
+    }
+    fn number_of_replicas(&self) -> usize {
+        2
+    }
+}
+
+#[derive(Clone)]
+struct WorkerB {}
+impl InOut<u64, u64> for WorkerB {
+    fn run(&mut self, input: u64) -> Option<u64> {
+       Some(input * 5)
+    }
+    fn number_of_replicas(&self) -> usize {
+        2
+    }
+}
+
+#[derive(Clone)]
+struct WorkerC {}
+impl InOut<u64, u64> for WorkerC {
+    fn run(&mut self, input: u64) -> Option<u64> {
+       Some(input / 5)
+    }
+    fn number_of_replicas(&self) -> usize {
+        2
     }
 }
 
@@ -70,18 +95,20 @@ impl In<u64, usize> for Sink {
 }
 
 #[test]
-fn fibonacci_pipe() {
+fn fibonacci_farm() {
     env_logger::init();
 
     let p = pipeline![
         Box::new(Source {
-            streamlen: 20,
+            streamlen: 45,
             counter: 0
         }),
-        Box::new(Worker {}),
+        Box::new(WorkerA {}),
+        Box::new(WorkerB {}),
+        Box::new(WorkerC {}),
         Box::new(Sink { counter: 0 })
     ];
 
     let res = p.collect();
-    assert_eq!(res.unwrap(), 20);
+    assert_eq!(res.unwrap(),45);
 }

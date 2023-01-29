@@ -104,13 +104,13 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         loop {
             let input = channel.receive();
             match input {
-                Ok(Task::NewTask(arg)) => {
+                Ok(Task::NewTask(arg, _)) => {
                     node.run(arg);
                 }
-                Ok(Task::Dropped) => {
+                Ok(Task::Dropped(_)) => {
                     //TODO: Manage dropped
                 }
-                Ok(Task::Terminate) => {
+                Ok(Task::Terminate(_)) => {
                     break;
                 }
                 Err(e) => {

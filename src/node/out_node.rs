@@ -81,6 +81,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     }
 
     fn rts(mut node: Box<dyn Out<TOut>>, nn: &TNext) {
+        let mut order = 0;
         let mut counter = 0;
         loop {
             if counter >= nn.get_num_of_replicas() {
@@ -89,13 +90,14 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
             let res = node.run();
             match res {
                 Some(output) => {
-                    let err = nn.send(Task::NewTask(output),counter);
+                    let err = nn.send(Task::NewTask(output, order),counter);
                     if err.is_err() {
                         warn!("Error: {}", err.unwrap_err())
                     }
+                    order = order + 1;
                 }
                 None => {
-                    let err = nn.send(Task::Terminate,counter);
+                    let err = nn.send(Task::Terminate(order),counter);
                     if err.is_err() {
                         warn!("Error: {}", err.unwrap_err())
                     }

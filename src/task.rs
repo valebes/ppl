@@ -1,5 +1,5 @@
 pub enum Task<T: Send> {
-    NewTask(T),
-    Dropped,
-    Terminate,
+    NewTask(T, usize),
+    Dropped(usize),
+    Terminate(usize),
 }

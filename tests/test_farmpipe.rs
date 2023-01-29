@@ -1,8 +1,5 @@
 /*
-   Fibonacci pipeline.
-   Is generated a sequence of i from 1 to 45.
-   Each worker of the farm compute the i-th
-   Fibonacci number.
+  Farm of pipeline.
 */
 
 use pspp::{
@@ -31,34 +28,45 @@ impl Out<i32> for Source {
     }
 }
 
-pub fn fibonacci_reccursive(n: i32) -> u64 {
-    if n < 0 {
-        panic!("{} is negative!", n);
+
+#[derive(Clone)]
+struct WorkerA {}
+impl InOut<i32, i32> for WorkerA {
+    fn run(&mut self, input: i32) -> Option<i32> {
+        Some(input)
     }
-    match n {
-        0 => panic!("zero is not a right argument to fibonacci_reccursive()!"),
-        1 | 2 => 1,
-        3 => 2,
-        /*
-        50    => 12586269025,
-        */
-        _ => fibonacci_reccursive(n - 1) + fibonacci_reccursive(n - 2),
+    fn number_of_replicas(&self) -> usize {
+        2
     }
 }
 
 #[derive(Clone)]
-struct Worker {}
-impl InOut<i32, u64> for Worker {
-    fn run(&mut self, input: i32) -> Option<u64> {
-        Some(fibonacci_reccursive(input))
+struct WorkerB {}
+impl InOut<i32, i32> for WorkerB {
+    fn run(&mut self, input: i32) -> Option<i32> {
+       Some(input * 5)
+    }
+    fn number_of_replicas(&self) -> usize {
+        2
+    }
+}
+
+#[derive(Clone)]
+struct WorkerC {}
+impl InOut<i32, i32> for WorkerC {
+    fn run(&mut self, input: i32) -> Option<i32> {
+       Some(input / 5)
+    }
+    fn number_of_replicas(&self) -> usize {
+        2
     }
 }
 
 struct Sink {
     counter: usize,
 }
-impl In<u64, usize> for Sink {
-    fn run(&mut self, input: u64) {
+impl In<i32, usize> for Sink {
+    fn run(&mut self, input: i32) {
         println!("{}", input);
         self.counter = self.counter + 1;
     }
@@ -70,18 +78,20 @@ impl In<u64, usize> for Sink {
 }
 
 #[test]
-fn fibonacci_pipe() {
+fn farm() {
     env_logger::init();
 
     let p = pipeline![
         Box::new(Source {
-            streamlen: 20,
+            streamlen: 2,
             counter: 0
         }),
-        Box::new(Worker {}),
+        Box::new(WorkerA {}),
+        Box::new(WorkerB {}),
+        Box::new(WorkerC {}),
         Box::new(Sink { counter: 0 })
     ];
 
     let res = p.collect();
-    assert_eq!(res.unwrap(), 20);
+    assert_eq!(res.unwrap(),2);
 }
