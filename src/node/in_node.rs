@@ -17,7 +17,7 @@ pub trait In<TIn: 'static + Send, TOut> {
     fn run(&mut self, input: TIn);
     fn finalize(&mut self) -> Option<TOut>;
     fn ordered(&self) -> bool {
-        true
+        false
     }
 }
 
@@ -26,7 +26,6 @@ pub struct InNode<TIn: Send, TCollected> {
     channel: Arc<Channel<Task<TIn>>>,
     ordered: bool,
     storage: Mutex<BTreeMap<usize, Task<TIn>>>,
-    dropped: AtomicUsize,
     counter: AtomicUsize,
     result: Arc<Mutex<Option<TCollected>>>,
 }
@@ -45,7 +44,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
                 } else {
                     let res = self.channel.send(Task::NewTask(
                         e,
-                        order - self.dropped.load(Ordering::SeqCst),
+                        order,
                     ));
                     if res.is_err() {
                         panic!("Error: Cannot send message!");
@@ -61,20 +60,24 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
                     self.save_to_storage(Task::Dropped(order), order);
                     self.send_pending();
                 } else {
-                    let old_c = self.counter.load(Ordering::SeqCst);
-                    self.counter.store(old_c + 1, Ordering::SeqCst);
+                    if self.ordered {
+                        let old_c = self.counter.load(Ordering::SeqCst);
+                        self.counter.store(old_c + 1, Ordering::SeqCst);
+                    }
 
-                    let old_d = self.dropped.load(Ordering::SeqCst);
-                    self.dropped.store(old_d + 1, Ordering::SeqCst);
                 }
             }
             Task::Terminate(order) => {
                 if self.ordered
                     && order != self.counter.load(Ordering::SeqCst)
                 {
+                    println!("Terminate{}", order);
+
                     self.save_to_storage(Task::Terminate(order), order);
                     self.send_pending();
                 } else {
+                    println!("Terminating..");
+
                     let res = self.channel.send(Task::Terminate(order));
                     if res.is_err() {
                         panic!("Error: Cannot send message!");
@@ -145,7 +148,6 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
             channel: channel,
             ordered: ordered,
             storage: Mutex::new(BTreeMap::new()),
-            dropped: AtomicUsize::new(0),
             counter: AtomicUsize::new(0),
             result,
         };

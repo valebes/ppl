@@ -37,7 +37,6 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     next_node: Arc<TNext>,
     ordered: bool,
     storage: Mutex<BTreeMap<usize, Task<TIn>>>,
-    dropped: AtomicUsize,
     counter: AtomicUsize,
     phantom: PhantomData<(TOut, TCollected)>,
 }
@@ -71,13 +70,17 @@ impl<
                     }
                     let res = self.channels[rec_id].send(Task::NewTask(
                         e,
-                        order - self.dropped.load(Ordering::SeqCst),
+                        order,
                     ));
                     if res.is_err() {
                         panic!("Error: Cannot send message!");
                     }
-                    let old_c = self.counter.load(Ordering::SeqCst);
-                    self.counter.store(old_c + 1, Ordering::SeqCst);
+
+                    if self.channels.len() == 1  && self.ordered {
+                        let old_c = self.counter.load(Ordering::SeqCst);
+                        self.counter.store(old_c + 1, Ordering::SeqCst);
+                    }
+
                 }
             }
             Task::Dropped(order) => {
@@ -89,11 +92,21 @@ impl<
                     self.save_to_storage(Task::Dropped(order), order);
                     self.send_pending();
                 } else {
-                    let old_c = self.counter.load(Ordering::SeqCst);
-                    self.counter.store(old_c + 1, Ordering::SeqCst);
+                    if self.channels.len() == 1  && self.ordered {
+                        let old_c = self.counter.load(Ordering::SeqCst);
+                        self.counter.store(old_c + 1, Ordering::SeqCst);
+                    }
 
-                    let old_d = self.dropped.load(Ordering::SeqCst);
-                    self.dropped.store(old_d + 1, Ordering::SeqCst);
+                    let mut rec_id = rec_id;
+                    if rec_id >= self.threads.len() {
+                        rec_id = rec_id % self.threads.len();
+                    }
+                    let res = self.channels[rec_id].send(Task::Dropped(
+                        order));
+                    if res.is_err() {
+                        panic!("Error: Cannot send message!");
+                    }
+
                 }
             }
             Task::Terminate(order) => {
@@ -101,16 +114,19 @@ impl<
                     && self.ordered
                     && order != self.counter.load(Ordering::SeqCst)
                 {
-                    println!("Terminate{}", order);
                     self.save_to_storage(Task::Terminate(order), order);
                     self.send_pending();
                 } else {
-                    println!("Terminating..");
                     for ch in &self.channels {
                         let err = ch.send(Task::Terminate(order));
                         if err.is_err() {
                             panic!("Error: Cannot send message!");
                         }
+                    }
+
+                    // Only if replicas > 1
+                    if self.channels.len() > 1  && self.ordered {
+                        self.counter.store(order, Ordering::SeqCst)
                     }
                 }
             }
@@ -179,7 +195,6 @@ impl<
             next_node: next_node,
             ordered: handler.ordered(),
             storage: Mutex::new(BTreeMap::new()),
-            dropped: AtomicUsize::new(0),
             counter: AtomicUsize::new(0),
             phantom: PhantomData,
         };
@@ -246,9 +261,10 @@ impl<
                 return Err(err.unwrap_err());
             }
         }
+        let c = self.counter.load(Ordering::SeqCst);
         let err = self.next_node.send(
             Task::Terminate(
-                self.counter.load(Ordering::SeqCst) - self.dropped.load(Ordering::SeqCst),
+                c,
             ),
             0,
         );

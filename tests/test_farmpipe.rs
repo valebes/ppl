@@ -43,7 +43,12 @@ impl InOut<i32, i32> for WorkerA {
 struct WorkerB {}
 impl InOut<i32, i32> for WorkerB {
     fn run(&mut self, input: i32) -> Option<i32> {
-        Some(input * 5)
+        if input % 2 == 0 {
+            Some(input)
+        }
+        else {
+            None
+        }
     }
     fn number_of_replicas(&self) -> usize {
         2
@@ -54,7 +59,7 @@ impl InOut<i32, i32> for WorkerB {
 struct WorkerC {}
 impl InOut<i32, i32> for WorkerC {
     fn run(&mut self, input: i32) -> Option<i32> {
-        Some(input / 5)
+        Some(input / 2)
     }
     fn number_of_replicas(&self) -> usize {
         2
@@ -82,7 +87,7 @@ fn farm() {
 
     let p = pipeline![
         Box::new(Source {
-            streamlen: 2,
+            streamlen: 1000,
             counter: 0
         }),
         Box::new(WorkerA {}),
@@ -92,5 +97,5 @@ fn farm() {
     ];
 
     let res = p.collect();
-    assert_eq!(res.unwrap(), 2);
+    assert_eq!(res.unwrap(), 500);
 }
