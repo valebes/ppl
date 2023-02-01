@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 
 use crate::{
     channel::{Channel, ChannelError},
-    task::{Task, Message},
+    task::{Message, Task},
     thread::{Thread, ThreadError},
 };
 
@@ -69,7 +69,7 @@ impl<
                             if res.is_err() {
                                 panic!("Error: Cannot send message!");
                             }
-        
+
                             let old_c = self.counter.load(Ordering::SeqCst);
                             self.counter.store(old_c + 1, Ordering::SeqCst);
                         }
@@ -90,7 +90,7 @@ impl<
                             if res.is_err() {
                                 panic!("Error: Cannot send message!");
                             }
-        
+
                             let old_c = self.counter.load(Ordering::SeqCst);
                             self.counter.store(old_c + 1, Ordering::SeqCst);
                         }
@@ -109,7 +109,7 @@ impl<
                                     panic!("Error: Cannot send message!");
                                 }
                             }
-        
+
                             // Only if replicas > 1
                             if self.channels.len() > 1 && self.ordered {
                                 self.counter.store(order, Ordering::SeqCst)
@@ -211,33 +211,32 @@ impl<
             trace!("Node {}", id);
 
             match input {
-                Ok(Message { op, order }) => {
-                    match op {
-                        Task::NewTask(arg) => {
-                            let output = node.run(arg);
-                            if output.is_some() {
-                                let err = next_node.send(Message::new(Task::NewTask(output.unwrap()), order), id);
-                                if err.is_err() {
-                                    warn!("Error: {}", err.unwrap_err())
-                                }
-                            } else {
-                                let err = next_node.send(Message::new(Task::Dropped, order), id);
-                                if err.is_err() {
-                                    warn!("Error: {}", err.unwrap_err())
-                                }
+                Ok(Message { op, order }) => match op {
+                    Task::NewTask(arg) => {
+                        let output = node.run(arg);
+                        if output.is_some() {
+                            let err = next_node
+                                .send(Message::new(Task::NewTask(output.unwrap()), order), id);
+                            if err.is_err() {
+                                warn!("Error: {}", err.unwrap_err())
                             }
-                        }
-                        Task::Dropped => {
+                        } else {
                             let err = next_node.send(Message::new(Task::Dropped, order), id);
                             if err.is_err() {
                                 warn!("Error: {}", err.unwrap_err())
                             }
                         }
-                        Task::Terminate => {
-                            break;
+                    }
+                    Task::Dropped => {
+                        let err = next_node.send(Message::new(Task::Dropped, order), id);
+                        if err.is_err() {
+                            warn!("Error: {}", err.unwrap_err())
                         }
                     }
-                }
+                    Task::Terminate => {
+                        break;
+                    }
+                },
                 Err(e) => {
                     warn!("Error: {}", e);
                 }
@@ -281,28 +280,26 @@ impl<
                 while queue.contains_key(&c) {
                     let msg = queue.remove(&c).unwrap();
                     match msg {
-                        Message{op, order} => {
-                            match &op {
-                                Task::NewTask(_e) => {
-                                    let err = self.send(Message::new(op, c), order);
-                                    if err.is_err() {
-                                        panic!("Error: Cannot send message!");
-                                    }
-                                }
-                                Task::Dropped => {
-                                    let err = self.send(Message::new(op, c), 0);
-                                    if err.is_err() {
-                                        panic!("Error: Cannot send message!");
-                                    }
-                                }
-                                Task::Terminate => {
-                                    let err = self.send(Message::new(op, c), 0);
-                                    if err.is_err() {
-                                        panic!("Error: Cannot send message!");
-                                    }
+                        Message { op, order } => match &op {
+                            Task::NewTask(_e) => {
+                                let err = self.send(Message::new(op, c), order);
+                                if err.is_err() {
+                                    panic!("Error: Cannot send message!");
                                 }
                             }
-                        }
+                            Task::Dropped => {
+                                let err = self.send(Message::new(op, c), 0);
+                                if err.is_err() {
+                                    panic!("Error: Cannot send message!");
+                                }
+                            }
+                            Task::Terminate => {
+                                let err = self.send(Message::new(op, c), 0);
+                                if err.is_err() {
+                                    panic!("Error: Cannot send message!");
+                                }
+                            }
+                        },
                     }
                     c = self.counter.load(Ordering::SeqCst);
                 }

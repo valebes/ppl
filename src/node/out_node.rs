@@ -4,7 +4,7 @@ use std::sync::Arc;
 use log::{trace, warn};
 
 use crate::channel::ChannelError;
-use crate::task::{Task, Message};
+use crate::task::{Message, Task};
 use crate::thread::{Thread, ThreadError};
 
 use super::node::Node;

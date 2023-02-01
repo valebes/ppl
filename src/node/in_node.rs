@@ -10,7 +10,7 @@ use log::{trace, warn};
 
 use crate::{
     channel::{Channel, ChannelError},
-    task::{Task, Message},
+    task::{Message, Task},
     thread::{Thread, ThreadError},
 };
 
@@ -41,45 +41,43 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
 {
     fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), ChannelError> {
         match input {
-            Message {op, order} => {
-                match &op {
-                    Task::NewTask(_e) => {
-                        if self.ordered && order != self.counter.load(Ordering::SeqCst) {
-                            self.save_to_storage(Message::new(op, rec_id), order);
-                            self.send_pending();
-                        } else {
-                            let res = self.channel.send(Message::new(op, order));
-                            if res.is_err() {
-                                panic!("Error: Cannot send message!");
-                            }
+            Message { op, order } => match &op {
+                Task::NewTask(_e) => {
+                    if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                        self.save_to_storage(Message::new(op, rec_id), order);
+                        self.send_pending();
+                    } else {
+                        let res = self.channel.send(Message::new(op, order));
+                        if res.is_err() {
+                            panic!("Error: Cannot send message!");
+                        }
+                        let old_c = self.counter.load(Ordering::SeqCst);
+                        self.counter.store(old_c + 1, Ordering::SeqCst);
+                    }
+                }
+                Task::Dropped => {
+                    if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                        self.save_to_storage(Message::new(op, order), order);
+                        self.send_pending();
+                    } else {
+                        if self.ordered {
                             let old_c = self.counter.load(Ordering::SeqCst);
                             self.counter.store(old_c + 1, Ordering::SeqCst);
                         }
                     }
-                    Task::Dropped => {
-                        if self.ordered && order != self.counter.load(Ordering::SeqCst) {
-                            self.save_to_storage(Message::new(op, order), order);
-                            self.send_pending();
-                        } else {
-                            if self.ordered {
-                                let old_c = self.counter.load(Ordering::SeqCst);
-                                self.counter.store(old_c + 1, Ordering::SeqCst);
-                            }
-                        }
-                    }
-                    Task::Terminate => {
-                        if self.ordered && order != self.counter.load(Ordering::SeqCst) {
-                            self.save_to_storage(Message::new(op, order), order);
-                            self.send_pending();
-                        } else {
-                            let res = self.channel.send(Message::new(op, order));
-                            if res.is_err() {
-                                panic!("Error: Cannot send message!");
-                            }
+                }
+                Task::Terminate => {
+                    if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                        self.save_to_storage(Message::new(op, order), order);
+                        self.send_pending();
+                    } else {
+                        let res = self.channel.send(Message::new(op, order));
+                        if res.is_err() {
+                            panic!("Error: Cannot send message!");
                         }
                     }
                 }
-            }
+            },
         }
         Ok(())
     }
@@ -161,7 +159,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         loop {
             let input = channel.receive();
             match input {
-                Ok(Message{op, order: _}) => {
+                Ok(Message { op, order: _ }) => {
                     match op {
                         Task::NewTask(arg) => {
                             node.run(arg);
@@ -173,7 +171,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                             break;
                         }
                     }
-                },
+                }
                 Err(e) => {
                     warn!("Error: {}", e);
                 }
@@ -206,27 +204,26 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                 while queue.contains_key(&c) {
                     let msg = queue.remove(&c).unwrap();
                     match msg {
-                        Message{op, order} =>
-                        match &op {
+                        Message { op, order } => match &op {
                             Task::NewTask(_e) => {
                                 let err = self.send(Message::new(op, c), order);
-                                  if err.is_err() {
-                                      panic!("Error: Cannot send message!");
-                                  }
-                              }
-                              Task::Dropped => {
-                                  let err = self.send(Message::new(op, c), 0);
-                                  if err.is_err() {
-                                      panic!("Error: Cannot send message!");
-                                  }
-                              }
-                              Task::Terminate => {
-                                  let err = self.send(Message::new(op, c), 0);
-                                  if err.is_err() {
-                                      panic!("Error: Cannot send message!");
-                                  }
-                              }
-                        }
+                                if err.is_err() {
+                                    panic!("Error: Cannot send message!");
+                                }
+                            }
+                            Task::Dropped => {
+                                let err = self.send(Message::new(op, c), 0);
+                                if err.is_err() {
+                                    panic!("Error: Cannot send message!");
+                                }
+                            }
+                            Task::Terminate => {
+                                let err = self.send(Message::new(op, c), 0);
+                                if err.is_err() {
+                                    panic!("Error: Cannot send message!");
+                                }
+                            }
+                        },
                     }
                     c = self.counter.load(Ordering::SeqCst);
                 }

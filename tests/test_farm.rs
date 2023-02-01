@@ -57,7 +57,6 @@ impl InOut<i32, u64> for WorkerA {
     }
 }
 
-
 struct Sink {
     counter: usize,
 }

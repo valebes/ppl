@@ -84,17 +84,14 @@ fn test_mxv() {
         Box::new(Source {
             matrix: matrix.clone()
         }),
-        Box::new(Multiplication {
-            vec: vec.clone()
-        }),
-        Box::new(Sink {
-            res: vec![]
-        })
+        Box::new(Multiplication { vec: vec.clone() }),
+        Box::new(Sink { res: vec![] })
     ];
-    
+
+    // Collect the results of the computation
     let res = p.collect().unwrap();
 
-
+    // Compute the "reference" result
     for i in 0..matrix.len() {
         for j in 0..vec.len() {
             correct_result[i] = correct_result[i] + matrix[i][j] * vec[j];
@@ -103,4 +100,3 @@ fn test_mxv() {
 
     assert_eq!(res, correct_result);
 }
-
