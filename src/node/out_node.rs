@@ -29,7 +29,7 @@ impl<
         TNext: Node<TOut, TCollected> + Send + Sync + 'static,
     > Node<TIn, TCollected> for OutNode<TOut, TCollected, TNext>
 {
-    fn send(&self, _input: Task<TIn>, rec_id: usize) -> Result<(), ChannelError> {
+    fn send(&self, _input: Task<TIn>, _rec_id: usize) -> Result<(), ChannelError> {
         Ok(())
     }
 

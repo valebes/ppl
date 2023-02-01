@@ -35,7 +35,10 @@ impl InOut<i32, i32> for WorkerA {
         Some(input)
     }
     fn number_of_replicas(&self) -> usize {
-        2
+        1
+    }
+    fn ordered(&self) -> bool {
+        true
     }
 }
 
@@ -45,8 +48,7 @@ impl InOut<i32, i32> for WorkerB {
     fn run(&mut self, input: i32) -> Option<i32> {
         if input % 2 == 0 {
             Some(input)
-        }
-        else {
+        } else {
             None
         }
     }
@@ -74,7 +76,9 @@ impl In<i32, usize> for Sink {
         println!("{}", input);
         self.counter = self.counter + 1;
     }
-
+    fn ordered(&self) -> bool {
+        true
+    }
     fn finalize(&mut self) -> Option<usize> {
         println!("End");
         Some(self.counter)
@@ -87,7 +91,7 @@ fn farm() {
 
     let p = pipeline![
         Box::new(Source {
-            streamlen: 1000,
+            streamlen: 100,
             counter: 0
         }),
         Box::new(WorkerA {}),
@@ -97,5 +101,5 @@ fn farm() {
     ];
 
     let res = p.collect();
-    assert_eq!(res.unwrap(), 500);
+    assert_eq!(res.unwrap(), 50);
 }

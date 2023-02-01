@@ -1,4 +1,10 @@
-use std::{sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}}, collections::BTreeMap};
+use std::{
+    collections::BTreeMap,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+};
 
 use log::{trace, warn};
 
@@ -36,16 +42,11 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
     fn send(&self, input: Task<TIn>, rec_id: usize) -> Result<(), ChannelError> {
         match input {
             Task::NewTask(e, order) => {
-                if self.ordered
-                    && order != self.counter.load(Ordering::SeqCst)
-                {
+                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
                     self.save_to_storage(Task::NewTask(e, rec_id), order);
                     self.send_pending();
                 } else {
-                    let res = self.channel.send(Task::NewTask(
-                        e,
-                        order,
-                    ));
+                    let res = self.channel.send(Task::NewTask(e, order));
                     if res.is_err() {
                         panic!("Error: Cannot send message!");
                     }
@@ -54,9 +55,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
                 }
             }
             Task::Dropped(order) => {
-                if self.ordered
-                    && order != self.counter.load(Ordering::SeqCst)
-                {
+                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
                     self.save_to_storage(Task::Dropped(order), order);
                     self.send_pending();
                 } else {
@@ -64,13 +63,10 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
                         let old_c = self.counter.load(Ordering::SeqCst);
                         self.counter.store(old_c + 1, Ordering::SeqCst);
                     }
-
                 }
             }
             Task::Terminate(order) => {
-                if self.ordered
-                    && order != self.counter.load(Ordering::SeqCst)
-                {
+                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
                     println!("Terminate{}", order);
 
                     self.save_to_storage(Task::Terminate(order), order);
@@ -203,11 +199,11 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         match mtx {
             Ok(mut queue) => {
                 let mut c = self.counter.load(Ordering::SeqCst);
-                while (queue.contains_key(&c)) {
+                while queue.contains_key(&c) {
                     let msg = queue.remove(&c).unwrap();
                     match msg {
                         Task::NewTask(e, rec_id) => {
-                            let err = self.send(Task::NewTask(e, c), rec_id);
+                          let err = self.send(Task::NewTask(e, c), rec_id);
                             if err.is_err() {
                                 panic!("Error: Cannot send message!");
                             }

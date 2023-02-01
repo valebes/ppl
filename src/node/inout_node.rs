@@ -27,7 +27,7 @@ pub trait InOut<TIn, TOut>: DynClone {
         1
     }
     fn ordered(&self) -> bool {
-        true
+        false
     }
 }
 
@@ -68,19 +68,13 @@ impl<
                     if rec_id >= self.threads.len() {
                         rec_id = rec_id % self.threads.len();
                     }
-                    let res = self.channels[rec_id].send(Task::NewTask(
-                        e,
-                        order,
-                    ));
+                    let res = self.channels[rec_id].send(Task::NewTask(e, order));
                     if res.is_err() {
                         panic!("Error: Cannot send message!");
                     }
 
-                    if self.channels.len() == 1  && self.ordered {
-                        let old_c = self.counter.load(Ordering::SeqCst);
-                        self.counter.store(old_c + 1, Ordering::SeqCst);
-                    }
-
+                    let old_c = self.counter.load(Ordering::SeqCst);
+                    self.counter.store(old_c + 1, Ordering::SeqCst);
                 }
             }
             Task::Dropped(order) => {
@@ -92,21 +86,17 @@ impl<
                     self.save_to_storage(Task::Dropped(order), order);
                     self.send_pending();
                 } else {
-                    if self.channels.len() == 1  && self.ordered {
-                        let old_c = self.counter.load(Ordering::SeqCst);
-                        self.counter.store(old_c + 1, Ordering::SeqCst);
-                    }
-
                     let mut rec_id = rec_id;
                     if rec_id >= self.threads.len() {
                         rec_id = rec_id % self.threads.len();
                     }
-                    let res = self.channels[rec_id].send(Task::Dropped(
-                        order));
+                    let res = self.channels[rec_id].send(Task::Dropped(order));
                     if res.is_err() {
                         panic!("Error: Cannot send message!");
                     }
 
+                    let old_c = self.counter.load(Ordering::SeqCst);
+                    self.counter.store(old_c + 1, Ordering::SeqCst);
                 }
             }
             Task::Terminate(order) => {
@@ -125,7 +115,7 @@ impl<
                     }
 
                     // Only if replicas > 1
-                    if self.channels.len() > 1  && self.ordered {
+                    if self.channels.len() > 1 && self.ordered {
                         self.counter.store(order, Ordering::SeqCst)
                     }
                 }
@@ -262,12 +252,7 @@ impl<
             }
         }
         let c = self.counter.load(Ordering::SeqCst);
-        let err = self.next_node.send(
-            Task::Terminate(
-                c,
-            ),
-            0,
-        );
+        let err = self.next_node.send(Task::Terminate(c), 0);
         if err.is_err() {
             panic!("Error: Cannot send message!");
         }
@@ -291,7 +276,7 @@ impl<
         match mtx {
             Ok(mut queue) => {
                 let mut c = self.counter.load(Ordering::SeqCst);
-                while (queue.contains_key(&c)) {
+                while queue.contains_key(&c) {
                     let msg = queue.remove(&c).unwrap();
                     match msg {
                         Task::NewTask(e, rec_id) => {
