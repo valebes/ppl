@@ -4,7 +4,7 @@ use std::sync::Arc;
 use log::{trace, warn};
 
 use crate::channel::ChannelError;
-use crate::task::Task;
+use crate::task::{Task, Message};
 use crate::thread::{Thread, ThreadError};
 
 use super::node::Node;
@@ -29,7 +29,7 @@ impl<
         TNext: Node<TOut, TCollected> + Send + Sync + 'static,
     > Node<TIn, TCollected> for OutNode<TOut, TCollected, TNext>
 {
-    fn send(&self, _input: Task<TIn>, _rec_id: usize) -> Result<(), ChannelError> {
+    fn send(&self, _input: Message<TIn>, _rec_id: usize) -> Result<(), ChannelError> {
         Ok(())
     }
 
@@ -90,14 +90,14 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
             let res = node.run();
             match res {
                 Some(output) => {
-                    let err = nn.send(Task::NewTask(output, order), counter);
+                    let err = nn.send(Message::new(Task::NewTask(output), order), counter);
                     if err.is_err() {
                         warn!("Error: {}", err.unwrap_err())
                     }
                     order = order + 1;
                 }
                 None => {
-                    let err = nn.send(Task::Terminate(order), counter);
+                    let err = nn.send(Message::new(Task::Terminate, order), counter);
                     if err.is_err() {
                         warn!("Error: {}", err.unwrap_err())
                     }

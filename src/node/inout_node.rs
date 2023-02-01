@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 
 use crate::{
     channel::{Channel, ChannelError},
-    task::Task,
+    task::{Task, Message},
     thread::{Thread, ThreadError},
 };
 
@@ -33,10 +33,10 @@ pub trait InOut<TIn, TOut>: DynClone {
 
 pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     threads: Vec<Thread>,
-    channels: Vec<Arc<Channel<Task<TIn>>>>,
+    channels: Vec<Arc<Channel<Message<TIn>>>>,
     next_node: Arc<TNext>,
     ordered: bool,
-    storage: Mutex<BTreeMap<usize, Task<TIn>>>,
+    storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     counter: AtomicUsize,
     phantom: PhantomData<(TOut, TCollected)>,
 }
@@ -48,75 +48,73 @@ impl<
         TNext: Node<TOut, TCollected> + Send + Sync + 'static,
     > Node<TIn, TCollected> for InOutNode<TIn, TOut, TCollected, TNext>
 {
-    fn send(&self, input: Task<TIn>, rec_id: usize) -> Result<(), ChannelError> {
+    fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), ChannelError> {
         match input {
-            Task::NewTask(e, order) => {
-                if self.channels.len() == 1
-                    && self.ordered
-                    && order != self.counter.load(Ordering::SeqCst)
-                {
-                    println!(
-                        "Arrived{}, expected{}",
-                        order,
-                        self.counter.load(Ordering::SeqCst)
-                    );
-                    self.save_to_storage(Task::NewTask(e, rec_id), order);
-                    self.send_pending();
-                } else {
-                    //println!("Arrived{}", order);
-                    let mut rec_id = rec_id;
-                    if rec_id >= self.threads.len() {
-                        rec_id = rec_id % self.threads.len();
-                    }
-                    let res = self.channels[rec_id].send(Task::NewTask(e, order));
-                    if res.is_err() {
-                        panic!("Error: Cannot send message!");
-                    }
-
-                    let old_c = self.counter.load(Ordering::SeqCst);
-                    self.counter.store(old_c + 1, Ordering::SeqCst);
-                }
-            }
-            Task::Dropped(order) => {
-                //println!("Dropped{}", order);
-                if self.channels.len() == 1
-                    && self.ordered
-                    && order != self.counter.load(Ordering::SeqCst)
-                {
-                    self.save_to_storage(Task::Dropped(order), order);
-                    self.send_pending();
-                } else {
-                    let mut rec_id = rec_id;
-                    if rec_id >= self.threads.len() {
-                        rec_id = rec_id % self.threads.len();
-                    }
-                    let res = self.channels[rec_id].send(Task::Dropped(order));
-                    if res.is_err() {
-                        panic!("Error: Cannot send message!");
-                    }
-
-                    let old_c = self.counter.load(Ordering::SeqCst);
-                    self.counter.store(old_c + 1, Ordering::SeqCst);
-                }
-            }
-            Task::Terminate(order) => {
-                if self.channels.len() == 1
-                    && self.ordered
-                    && order != self.counter.load(Ordering::SeqCst)
-                {
-                    self.save_to_storage(Task::Terminate(order), order);
-                    self.send_pending();
-                } else {
-                    for ch in &self.channels {
-                        let err = ch.send(Task::Terminate(order));
-                        if err.is_err() {
-                            panic!("Error: Cannot send message!");
+            Message { op, order } => {
+                match &op {
+                    Task::NewTask(_e) => {
+                        if self.channels.len() == 1
+                            && self.ordered
+                            && order != self.counter.load(Ordering::SeqCst)
+                        {
+                            self.save_to_storage(Message::new(op, rec_id), order);
+                            self.send_pending();
+                        } else {
+                            //println!("Arrived{}", order);
+                            let mut rec_id = rec_id;
+                            if rec_id >= self.threads.len() {
+                                rec_id = rec_id % self.threads.len();
+                            }
+                            let res = self.channels[rec_id].send(Message::new(op, order));
+                            if res.is_err() {
+                                panic!("Error: Cannot send message!");
+                            }
+        
+                            let old_c = self.counter.load(Ordering::SeqCst);
+                            self.counter.store(old_c + 1, Ordering::SeqCst);
                         }
                     }
-
-                    // Only if replicas > 1
-                    if self.channels.len() > 1 && self.ordered {
-                        self.counter.store(order, Ordering::SeqCst)
+                    Task::Dropped => {
+                        if self.channels.len() == 1
+                            && self.ordered
+                            && order != self.counter.load(Ordering::SeqCst)
+                        {
+                            self.save_to_storage(Message::new(op, order), order);
+                            self.send_pending();
+                        } else {
+                            let mut rec_id = rec_id;
+                            if rec_id >= self.threads.len() {
+                                rec_id = rec_id % self.threads.len();
+                            }
+                            let res = self.channels[rec_id].send(Message::new(op, order));
+                            if res.is_err() {
+                                panic!("Error: Cannot send message!");
+                            }
+        
+                            let old_c = self.counter.load(Ordering::SeqCst);
+                            self.counter.store(old_c + 1, Ordering::SeqCst);
+                        }
+                    }
+                    Task::Terminate => {
+                        if self.channels.len() == 1
+                            && self.ordered
+                            && order != self.counter.load(Ordering::SeqCst)
+                        {
+                            self.save_to_storage(Message::new(op, order), order);
+                            self.send_pending();
+                        } else {
+                            for ch in &self.channels {
+                                let err = ch.send(Message::new(Task::Terminate, order));
+                                if err.is_err() {
+                                    panic!("Error: Cannot send message!");
+                                }
+                            }
+        
+                            // Only if replicas > 1
+                            if self.channels.len() > 1 && self.ordered {
+                                self.counter.store(order, Ordering::SeqCst)
+                            }
+                        }
                     }
                 }
             }
@@ -195,7 +193,7 @@ impl<
     fn rts(
         id: usize,
         mut node: Box<dyn InOut<TIn, TOut>>,
-        channel_in: &Channel<Task<TIn>>,
+        channel_in: &Channel<Message<TIn>>,
         next_node: &TNext,
         n_replicas: usize,
     ) {
@@ -213,28 +211,32 @@ impl<
             trace!("Node {}", id);
 
             match input {
-                Ok(Task::NewTask(arg, order)) => {
-                    let output = node.run(arg);
-                    if output.is_some() {
-                        let err = next_node.send(Task::NewTask(output.unwrap(), order), id);
-                        if err.is_err() {
-                            warn!("Error: {}", err.unwrap_err())
+                Ok(Message { op, order }) => {
+                    match op {
+                        Task::NewTask(arg) => {
+                            let output = node.run(arg);
+                            if output.is_some() {
+                                let err = next_node.send(Message::new(Task::NewTask(output.unwrap()), order), id);
+                                if err.is_err() {
+                                    warn!("Error: {}", err.unwrap_err())
+                                }
+                            } else {
+                                let err = next_node.send(Message::new(Task::Dropped, order), id);
+                                if err.is_err() {
+                                    warn!("Error: {}", err.unwrap_err())
+                                }
+                            }
                         }
-                    } else {
-                        let err = next_node.send(Task::Dropped(order), id);
-                        if err.is_err() {
-                            warn!("Error: {}", err.unwrap_err())
+                        Task::Dropped => {
+                            let err = next_node.send(Message::new(Task::Dropped, order), id);
+                            if err.is_err() {
+                                warn!("Error: {}", err.unwrap_err())
+                            }
+                        }
+                        Task::Terminate => {
+                            break;
                         }
                     }
-                }
-                Ok(Task::Dropped(order)) => {
-                    let err = next_node.send(Task::Dropped(order), id);
-                    if err.is_err() {
-                        warn!("Error: {}", err.unwrap_err())
-                    }
-                }
-                Ok(Task::Terminate(_)) => {
-                    break;
                 }
                 Err(e) => {
                     warn!("Error: {}", e);
@@ -252,19 +254,19 @@ impl<
             }
         }
         let c = self.counter.load(Ordering::SeqCst);
-        let err = self.next_node.send(Task::Terminate(c), 0);
+        let err = self.next_node.send(Message::new(Task::Terminate, c), 0);
         if err.is_err() {
             panic!("Error: Cannot send message!");
         }
         Ok(())
     }
 
-    fn save_to_storage(&self, task: Task<TIn>, order: usize) {
+    fn save_to_storage(&self, msg: Message<TIn>, order: usize) {
         let mtx = self.storage.lock();
 
         match mtx {
             Ok(mut queue) => {
-                queue.insert(order, task);
+                queue.insert(order, msg);
             }
             Err(_) => panic!("Error: Cannot lock the storage!"),
         }
@@ -279,22 +281,26 @@ impl<
                 while queue.contains_key(&c) {
                     let msg = queue.remove(&c).unwrap();
                     match msg {
-                        Task::NewTask(e, rec_id) => {
-                            let err = self.send(Task::NewTask(e, c), rec_id);
-                            if err.is_err() {
-                                panic!("Error: Cannot send message!");
-                            }
-                        }
-                        Task::Dropped(e) => {
-                            let err = self.send(Task::Dropped(e), 0);
-                            if err.is_err() {
-                                panic!("Error: Cannot send message!");
-                            }
-                        }
-                        Task::Terminate(e) => {
-                            let err = self.send(Task::Terminate(e), 0);
-                            if err.is_err() {
-                                panic!("Error: Cannot send message!");
+                        Message{op, order} => {
+                            match &op {
+                                Task::NewTask(_e) => {
+                                    let err = self.send(Message::new(op, c), order);
+                                    if err.is_err() {
+                                        panic!("Error: Cannot send message!");
+                                    }
+                                }
+                                Task::Dropped => {
+                                    let err = self.send(Message::new(op, c), 0);
+                                    if err.is_err() {
+                                        panic!("Error: Cannot send message!");
+                                    }
+                                }
+                                Task::Terminate => {
+                                    let err = self.send(Message::new(op, c), 0);
+                                    if err.is_err() {
+                                        panic!("Error: Cannot send message!");
+                                    }
+                                }
                             }
                         }
                     }

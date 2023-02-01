@@ -53,31 +53,10 @@ impl InOut<i32, u64> for WorkerA {
         Some(fibonacci_reccursive(input))
     }
     fn number_of_replicas(&self) -> usize {
-        2
+        6
     }
 }
 
-#[derive(Clone)]
-struct WorkerB {}
-impl InOut<u64, u64> for WorkerB {
-    fn run(&mut self, input: u64) -> Option<u64> {
-        Some(input * 5)
-    }
-    fn number_of_replicas(&self) -> usize {
-        2
-    }
-}
-
-#[derive(Clone)]
-struct WorkerC {}
-impl InOut<u64, u64> for WorkerC {
-    fn run(&mut self, input: u64) -> Option<u64> {
-        Some(input / 5)
-    }
-    fn number_of_replicas(&self) -> usize {
-        2
-    }
-}
 
 struct Sink {
     counter: usize,
@@ -104,8 +83,6 @@ fn fibonacci_farm() {
             counter: 0
         }),
         Box::new(WorkerA {}),
-        Box::new(WorkerB {}),
-        Box::new(WorkerC {}),
         Box::new(Sink { counter: 0 })
     ];
 

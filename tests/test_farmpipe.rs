@@ -35,10 +35,7 @@ impl InOut<i32, i32> for WorkerA {
         Some(input)
     }
     fn number_of_replicas(&self) -> usize {
-        1
-    }
-    fn ordered(&self) -> bool {
-        true
+        2
     }
 }
 
