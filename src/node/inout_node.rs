@@ -110,10 +110,8 @@ impl<
                                 }
                             }
 
-                            // Only if replicas > 1
-                            if self.channels.len() > 1 && self.ordered {
-                                self.counter.store(order, Ordering::SeqCst)
-                            }
+                            self.counter.store(order, Ordering::SeqCst)
+                            
                         }
                     }
                 }

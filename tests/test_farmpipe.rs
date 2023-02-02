@@ -34,6 +34,9 @@ impl InOut<i32, i32> for WorkerA {
     fn run(&mut self, input: i32) -> Option<i32> {
         Some(input)
     }
+    fn ordered(&self) -> bool {
+        false
+    }
     fn number_of_replicas(&self) -> usize {
         1
     }
@@ -50,7 +53,7 @@ impl InOut<i32, i32> for WorkerB {
         }
     }
     fn number_of_replicas(&self) -> usize {
-        4
+        2
     }
 }
 
@@ -74,7 +77,7 @@ impl In<i32, usize> for Sink {
         self.counter = self.counter + 1;
     }
     fn ordered(&self) -> bool {
-        false
+        true
     }
     fn finalize(&mut self) -> Option<usize> {
         println!("End");
