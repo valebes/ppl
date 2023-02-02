@@ -202,8 +202,13 @@ impl<
         if (next_node.get_num_of_replicas() > n_replicas) && n_replicas != 1 {
             counter = id * (next_node.get_num_of_replicas() / n_replicas);
         }
+        else if next_node.get_num_of_replicas() <= n_replicas {
+            // Standard case, not a2a
+            counter = id;
+        }
         loop {
-            if counter >= next_node.get_num_of_replicas() {
+            // If next node have more replicas, when counter > next_replicas i reset the counter
+            if (next_node.get_num_of_replicas() > n_replicas) && counter >= next_node.get_num_of_replicas() {
                 counter = 0;
             }
 
@@ -216,19 +221,19 @@ impl<
                         let output = node.run(arg);
                         if output.is_some() {
                             let err = next_node
-                                .send(Message::new(Task::NewTask(output.unwrap()), order), id);
+                                .send(Message::new(Task::NewTask(output.unwrap()), order), counter);
                             if err.is_err() {
                                 warn!("Error: {}", err.unwrap_err())
                             }
                         } else {
-                            let err = next_node.send(Message::new(Task::Dropped, order), id);
+                            let err = next_node.send(Message::new(Task::Dropped, order), counter);
                             if err.is_err() {
                                 warn!("Error: {}", err.unwrap_err())
                             }
                         }
                     }
                     Task::Dropped => {
-                        let err = next_node.send(Message::new(Task::Dropped, order), id);
+                        let err = next_node.send(Message::new(Task::Dropped, order), counter);
                         if err.is_err() {
                             warn!("Error: {}", err.unwrap_err())
                         }
@@ -241,7 +246,9 @@ impl<
                     warn!("Error: {}", e);
                 }
             }
-            counter = counter + 1;
+            if next_node.get_num_of_replicas() > n_replicas {
+                counter = counter + 1;
+            }
         }
     }
 
