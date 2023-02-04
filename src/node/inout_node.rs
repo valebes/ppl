@@ -168,7 +168,7 @@ impl<
             let nn = Arc::clone(&next_node);
             let copy = dyn_clone::clone_box(&*handler);
             let mut thread = Thread::new(
-                id,
+                i + id,
                 move || {
                     Self::rts(i + id, copy, &ch_in, &nn, replicas);
                 },
