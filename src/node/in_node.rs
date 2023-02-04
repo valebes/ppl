@@ -111,7 +111,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         handler: Box<dyn In<TIn, TCollected> + Send + Sync>,
         blocking: bool,
     ) -> Result<InNode<TIn, TCollected>, ThreadError> {
-        trace!("Created a new InNode!");
+        trace!("Created a new Sink! Id: {}", id);
 
         let channel = Arc::new(Channel::new(blocking));
         let result = Arc::new(Mutex::new(None));
@@ -134,7 +134,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                     }
                 }
             },
-            false,
+            true,
         );
 
         let mut node = InNode {

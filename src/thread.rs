@@ -1,7 +1,9 @@
+use log::error;
 use log::info;
 use std::error::Error;
 use std::fmt;
 use std::thread;
+extern crate core_affinity;
 
 #[derive(Debug)]
 pub struct ThreadError {
@@ -52,9 +54,23 @@ impl Thread {
         if self.job.is_none() {
             return Err(ThreadError::new("Thread already started."));
         }
+        
         let f = std::mem::replace(&mut self.job, None).unwrap();
+        
+        let id = self.get_id();
+        let pinned = self.is_pinned();
 
         self.thread = Some(thread::spawn(move || {
+            if pinned {
+                let mut core_ids = core_affinity::get_core_ids().unwrap();
+                if core_ids.get(id).is_none() {
+                    error!("Cannot pin the thread in the choosen position.");
+                }
+                let err = core_affinity::set_for_current(core_ids.remove(id));
+                if !err {
+                    error!("Thread pinning for thread[{}] failed!", id);
+                }
+            }
             info!("{:?} started", thread::current().id());
             (f)();
             info!("{:?} now will end.", thread::current().id());

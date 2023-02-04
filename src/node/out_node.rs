@@ -57,7 +57,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         handler: Box<dyn Out<TOut> + Send + Sync>,
         next_node: TNext,
     ) -> Result<OutNode<TOut, TCollected, TNext>, ()> {
-        trace!("Created a new OutNode!");
+        trace!("Created a new Source! Id: {}", id);
 
         let next_node = Arc::new(next_node);
 
@@ -68,7 +68,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
             move || {
                 Self::rts(handler, &nn);
             },
-            false,
+            true,
         );
 
         let node = OutNode {

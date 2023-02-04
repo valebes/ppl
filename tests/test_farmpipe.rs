@@ -35,10 +35,10 @@ impl InOut<i32, i32> for WorkerA {
         Some(input)
     }
     fn ordered(&self) -> bool {
-        false
+        true
     }
     fn number_of_replicas(&self) -> usize {
-        1
+        2
     }
 }
 
@@ -52,6 +52,9 @@ impl InOut<i32, i32> for WorkerB {
             None
         }
     }
+    fn ordered(&self) -> bool {
+        true
+    }
     fn number_of_replicas(&self) -> usize {
         2
     }
@@ -62,6 +65,9 @@ struct WorkerC {}
 impl InOut<i32, i32> for WorkerC {
     fn run(&mut self, input: i32) -> Option<i32> {
         Some(input / 2)
+    }
+    fn ordered(&self) -> bool {
+        true
     }
     fn number_of_replicas(&self) -> usize {
         2

@@ -35,6 +35,9 @@ impl InOut<Vec<i64>, i64> for Multiplication {
     fn run(&mut self, input: Vec<i64>) -> Option<i64> {
         Some(mult(input, &self.vec))
     }
+    fn ordered(&self) -> bool {
+        true
+    }
     fn number_of_replicas(&self) -> usize {
         6
     }
