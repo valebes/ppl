@@ -1,5 +1,6 @@
 use log::error;
 use log::info;
+use log::trace;
 use std::error::Error;
 use std::fmt;
 use std::thread;
@@ -69,6 +70,8 @@ impl Thread {
                 let err = core_affinity::set_for_current(core_ids.remove(id));
                 if !err {
                     error!("Thread pinning for thread[{}] failed!", id);
+                } else {
+                    trace!("Thread[{}] correctly pinned!", id);
                 }
             }
             info!("{:?} started", thread::current().id());
