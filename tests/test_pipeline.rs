@@ -11,9 +11,8 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
-    pipeline,
     pipeline::Pipeline,
-    pipeline_propagate,
+    pipeline_propagate, parallel,
 };
 
 struct Source {
@@ -73,7 +72,7 @@ impl In<u64, usize> for Sink {
 fn fibonacci_pipe() {
     env_logger::init();
 
-    let p = pipeline![
+    let p = parallel![
         Box::new(Source {
             streamlen: 20,
             counter: 0

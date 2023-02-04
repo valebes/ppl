@@ -56,6 +56,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         id: usize,
         handler: Box<dyn Out<TOut> + Send + Sync>,
         next_node: TNext,
+        pinning: bool,
     ) -> Result<OutNode<TOut, TCollected, TNext>, ()> {
         trace!("Created a new Source! Id: {}", id);
 
@@ -68,7 +69,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
             move || {
                 Self::rts(handler, &nn);
             },
-            true,
+            pinning,
         );
 
         let node = OutNode {

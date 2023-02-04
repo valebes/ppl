@@ -8,9 +8,8 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
-    pipeline,
     pipeline::Pipeline,
-    pipeline_propagate,
+    pipeline_propagate, parallel,
 };
 
 struct Source {
@@ -95,7 +94,7 @@ impl In<i32, usize> for Sink {
 fn farm() {
     env_logger::init();
 
-    let p = pipeline![
+    let p = parallel![
         Box::new(Source {
             streamlen: 100,
             counter: 0

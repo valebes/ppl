@@ -110,6 +110,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         id: usize,
         handler: Box<dyn In<TIn, TCollected> + Send + Sync>,
         blocking: bool,
+        pinning: bool,
     ) -> Result<InNode<TIn, TCollected>, ThreadError> {
         trace!("Created a new Sink! Id: {}", id);
 
@@ -134,7 +135,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                     }
                 }
             },
-            true,
+            pinning,
         );
 
         let mut node = InNode {

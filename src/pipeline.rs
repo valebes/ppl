@@ -25,7 +25,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
 macro_rules! pipeline_propagate {
     ($id:expr, $s1:expr) => {
         {
-            let mut block = InNode::new($id, $s1, false).unwrap();
+            let mut block = InNode::new($id, $s1, false, true).unwrap();
             block
         }
     };
@@ -34,18 +34,18 @@ macro_rules! pipeline_propagate {
         {
             let mut block = InOutNode::new($id, $s1,
                 pipeline_propagate!($id + (1 * $s1.number_of_replicas()), $($tail),*),
-                false).unwrap();
+                false, true).unwrap();
             block
         }
     };
 }
 
 #[macro_export]
-macro_rules! pipeline {
+macro_rules! parallel {
     ($s1:expr $(, $tail:expr)*) => {
         {
             let mut block = OutNode::new(0, $s1,
-                pipeline_propagate!(1, $($tail),*)).unwrap();
+                pipeline_propagate!(1, $($tail),*), true).unwrap();
 
             let mut pipeline = Pipeline::new(block);
             pipeline.start();

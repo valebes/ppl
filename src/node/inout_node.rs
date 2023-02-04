@@ -156,6 +156,7 @@ impl<
         handler: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: TNext,
         blocking: bool,
+        pinning: bool,
     ) -> Result<InOutNode<TIn, TOut, TCollected, TNext>, ThreadError> {
         let mut threads = Vec::new();
         let mut channels = Vec::new();
@@ -172,7 +173,7 @@ impl<
                 move || {
                     Self::rts(i + id, copy, &ch_in, &nn, replicas);
                 },
-                true,
+                pinning,
             );
             let err = thread.start();
             if err.is_err() {
