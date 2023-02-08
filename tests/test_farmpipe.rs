@@ -84,7 +84,7 @@ impl In<i32, usize> for Sink {
     fn ordered(&self) -> bool {
         true
     }
-    fn finalize(&mut self) -> Option<usize> {
+    fn finalize(self) -> Option<usize> {
         println!("End");
         Some(self.counter)
     }
@@ -94,7 +94,7 @@ impl In<i32, usize> for Sink {
 fn farm() {
     env_logger::init();
 
-    let p = parallel![
+    let mut p = parallel![
         Box::new(Source {
             streamlen: 100,
             counter: 0
@@ -105,6 +105,7 @@ fn farm() {
         Box::new(Sink { counter: 0 })
     ];
 
+    p.start();
     let res = p.collect();
     assert_eq!(res.unwrap(), 50);
 }

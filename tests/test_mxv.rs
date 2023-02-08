@@ -52,7 +52,7 @@ impl In<i64, Vec<i64>> for Sink {
     fn ordered(&self) -> bool {
         true
     }
-    fn finalize(&mut self) -> Option<Vec<i64>> {
+    fn finalize(self) -> Option<Vec<i64>> {
         Some(self.res.clone())
     }
 }
@@ -82,13 +82,15 @@ fn test_mxv() {
     }
 
     // Build and start the spp graph
-    let p = parallel![
+    let mut p = parallel![
         Box::new(Source {
             matrix: matrix.clone()
         }),
         Box::new(Multiplication { vec: vec.clone() }),
         Box::new(Sink { res: vec![] })
     ];
+
+    p.start();
 
     // Collect the results of the computation
     let res = p.collect().unwrap();

@@ -1,3 +1,4 @@
+
 use std::{
     collections::BTreeMap,
     sync::{
@@ -21,7 +22,7 @@ Public API
 */
 pub trait In<TIn: 'static + Send, TOut> {
     fn run(&mut self, input: TIn);
-    fn finalize(&mut self) -> Option<TOut>;
+    fn finalize(self) -> Option<TOut>;
     fn ordered(&self) -> bool {
         false
     }
@@ -178,7 +179,8 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                 }
             }
         }
-        node.finalize()
+        let res = node.finalize();
+        res
     }
 
     pub fn wait(&mut self) -> std::result::Result<(), ThreadError> {

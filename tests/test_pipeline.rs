@@ -62,7 +62,7 @@ impl In<u64, usize> for Sink {
         self.counter = self.counter + 1;
     }
 
-    fn finalize(&mut self) -> Option<usize> {
+    fn finalize(self) -> Option<usize> {
         println!("End");
         Some(self.counter)
     }
@@ -72,7 +72,7 @@ impl In<u64, usize> for Sink {
 fn fibonacci_pipe() {
     env_logger::init();
 
-    let p = parallel![
+    let mut p = parallel![
         Box::new(Source {
             streamlen: 20,
             counter: 0
@@ -81,6 +81,7 @@ fn fibonacci_pipe() {
         Box::new(Sink { counter: 0 })
     ];
 
+    p.start(); 
     let res = p.collect();
     assert_eq!(res.unwrap(), 20);
 }
