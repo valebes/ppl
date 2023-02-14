@@ -66,13 +66,15 @@ impl Thread {
                 let mut core_ids = core_affinity::get_core_ids().unwrap();
                 if core_ids.get(id).is_none() {
                     error!("Cannot pin the thread in the choosen position.");
-                }
-                let err = core_affinity::set_for_current(core_ids.remove(id));
-                if !err {
-                    error!("Thread pinning for thread[{}] failed!", id);
                 } else {
-                    trace!("Thread[{}] correctly pinned!", id);
+                    let err = core_affinity::set_for_current(core_ids.remove(id));
+                    if !err {
+                        error!("Thread pinning for thread[{}] failed!", id);
+                    } else {
+                        trace!("Thread[{}] correctly pinned!", id);
+                    }
                 }
+
             }
             info!("{:?} started", thread::current().id());
             (f)();
