@@ -12,4 +12,4 @@ dyn-clone = "1.0.10"
 rand = "*"
 core_affinity = "0.8.0"
 raster = "0.2.0"
-ff_buffer = { git = "https://github.com/lucarin91/ff_buffer.git" }
+#ff_buffer = { git = "https://github.com/lucarin91/ff_buffer.git" }
