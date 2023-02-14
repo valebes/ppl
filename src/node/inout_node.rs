@@ -11,7 +11,7 @@ use log::{trace, warn};
 use std::collections::BTreeMap;
 
 use crate::{
-    channel_ff::{Channel, ChannelError},
+    channel::{Channel, ChannelError},
     task::{Message, Task},
     thread::{Thread, ThreadError},
 };
