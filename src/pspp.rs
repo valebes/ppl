@@ -25,7 +25,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
 macro_rules! propagate {
     ($id:expr, $s1:expr) => {
         {
-            let mut block = InNode::new($id, Box::new($s1), true, false).unwrap();
+            let mut block = InNode::new($id, Box::new($s1), false, false).unwrap();
             block
         }
     };
@@ -34,7 +34,7 @@ macro_rules! propagate {
         {
             let mut block = InOutNode::new($id, Box::new($s1),
                 propagate!($id + (1 * $s1.number_of_replicas()), $($tail),*),
-                true, false).unwrap();
+                false, false).unwrap();
             block
         }
     };
