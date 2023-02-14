@@ -72,7 +72,7 @@ impl In<u64, usize> for Sink {
 }
 
 #[test]
-fn fibonacci_farm() {
+fn test_farm() {
     env_logger::init();
 
     let mut p = parallel![

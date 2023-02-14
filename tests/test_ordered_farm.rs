@@ -95,7 +95,7 @@ impl In<usize, bool> for Sink {
 }
 
 #[test]
-fn farm() {
+fn test_ordered_farm() {
     env_logger::init();
 
     let mut p = parallel![
