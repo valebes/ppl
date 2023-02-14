@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-log = "0.4"
+log = "0.4.17"
 env_logger = "0.10.0"
 dyn-clone = "1.0.10"
 rand = "*"
@@ -14,5 +14,7 @@ core_affinity = "0.8.0"
 #ff_buffer = { git = "https://github.com/lucarin91/ff_buffer.git" }
 
 [dev-dependencies]
- raster = "0.2.0"
- rayon = "1.6.1" 
+raster = "0.2.0"
+rayon = "1.6.1" 
+crossbeam-channel = "0.5"
+rust-spp = { git = "https://github.com/GMAP/rust-ssp.git" }
