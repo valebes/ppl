@@ -15,3 +15,4 @@ core_affinity = "0.8.0"
 
 [dev-dependencies]
  raster = "0.2.0"
+ rayon = "1.6.1" 
