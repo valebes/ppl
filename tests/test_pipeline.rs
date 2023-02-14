@@ -11,8 +11,8 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
-    pipeline::Pipeline,
-    pipeline_propagate, parallel,
+    parallel_pipe::ParallelPipe,
+    propagate, parallel,
 };
 
 struct Source {
@@ -73,12 +73,12 @@ fn fibonacci_pipe() {
     env_logger::init();
 
     let mut p = parallel![
-        Box::new(Source {
+        Source {
             streamlen: 20,
             counter: 0
-        }),
-        Box::new(Worker {}),
-        Box::new(Sink { counter: 0 })
+        },
+        Worker {},
+        Sink { counter: 0 }
     ];
 
     p.start(); 

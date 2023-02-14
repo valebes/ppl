@@ -8,8 +8,8 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
-    pipeline::Pipeline,
-    pipeline_propagate, parallel,
+    parallel_pipe::ParallelPipe,
+    propagate, parallel,
 };
 
 struct Source {
@@ -95,14 +95,14 @@ fn farm() {
     env_logger::init();
 
     let mut p = parallel![
-        Box::new(Source {
+        Source {
             streamlen: 100,
             counter: 0
-        }),
-        Box::new(WorkerA {}),
-        Box::new(WorkerB {}),
-        Box::new(WorkerC {}),
-        Box::new(Sink { counter: 0 })
+        },
+        WorkerA {},
+        WorkerB {},
+        WorkerC {},
+        Sink { counter: 0 }
     ];
 
     p.start();

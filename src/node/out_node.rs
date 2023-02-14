@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use log::{trace, warn};
 
-use crate::channel::ChannelError;
+use crate::channel_ff::ChannelError;
 use crate::task::{Message, Task};
 use crate::thread::{Thread, ThreadError};
 

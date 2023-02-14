@@ -8,8 +8,8 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
-    pipeline::Pipeline,
-    pipeline_propagate, parallel,
+    parallel_pipe::ParallelPipe,
+    propagate, parallel,
 };
 
 struct Source {
@@ -114,15 +114,15 @@ fn test_raster() {
 
 
     let mut p = parallel![
-        Box::new(Source {
+        Source {
             all_images: all_images,
-        }),
-        Box::new(WorkerA {}),
-        Box::new(WorkerB {}),
-        Box::new(WorkerC {}),
-        Box::new(WorkerD {}),
-        Box::new(WorkerE {}),
-        Box::new(Sink { images: vec![] })
+        },
+        WorkerA {},
+        WorkerB {},
+        WorkerC {},
+        WorkerD {},
+        WorkerE {},
+        Sink { images: vec![] }
     ];
    
     let start = SystemTime::now();

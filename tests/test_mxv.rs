@@ -4,8 +4,8 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
-    pipeline::Pipeline,
-    pipeline_propagate, parallel,
+    parallel_pipe::ParallelPipe,
+    propagate, parallel,
 };
 /**
     Matrix * Vector multiplication
@@ -83,11 +83,11 @@ fn test_mxv() {
 
     // Build and start the spp graph
     let mut p = parallel![
-        Box::new(Source {
+        Source {
             matrix: matrix.clone()
-        }),
-        Box::new(Multiplication { vec: vec.clone() }),
-        Box::new(Sink { res: vec![] })
+        },
+        Multiplication { vec: vec.clone() },
+        Sink { res: vec![] }
     ];
 
     p.start();

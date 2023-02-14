@@ -2,10 +2,13 @@ use std::{
     error::Error,
     fmt,
     sync::{
-        mpsc::{channel, Receiver, RecvError, SendError, Sender, TryRecvError},
         Mutex,
     },
 };
+
+use ff_buffer::{self, FFReceiver, FFSender};
+
+// Working in progress.
 
 #[derive(Debug)]
 pub struct ChannelError {
@@ -33,28 +36,35 @@ impl Error for ChannelError {
 }
 
 struct InputChannel<T> {
-    rx: Mutex<Receiver<T>>,
+    rx: Mutex<FFReceiver<T>>,
 }
 
 impl<T: Send> InputChannel<T> {
-    fn receive(&self) -> Result<T, TryRecvError> {
+    fn receive(&self) -> Option<T> {
         let ch = self.rx.lock().unwrap();
-        ch.try_recv()
+        match ch.try_pop() {
+            Some(res) => Some(Box::into_inner(res)),
+            None => None,
+        }
     }
-    fn block_receive(&self) -> Result<T, RecvError> {
+    fn block_receive(&self) -> T {
         let ch = self.rx.lock().unwrap();
-        ch.recv()
+        Box::into_inner(ch.pop())
     }
 }
 
 struct OutputChannel<T> {
-    tx: Mutex<Sender<T>>,
+    tx: Mutex<FFSender<T>>,
 }
 
 impl<T: Send> OutputChannel<T> {
-    fn send(&self, msg: T) -> Result<(), SendError<T>> {
+    fn send(&self, msg: T) -> Option<&str>{
         let ch = self.tx.lock().unwrap();
-        ch.send(msg)
+        let res = ch.push(Box::new(msg));
+        match res {
+            Some(_) => Some("Can't send the msg."),
+            None => None,
+        }
     }
 }
 
@@ -66,7 +76,7 @@ pub struct Channel<T> {
 
 impl<T: Send> Channel<T> {
     pub fn new(blocking: bool) -> Channel<T> {
-        let (tx, rx) = channel();
+        let (tx, rx) = ff_buffer::build::<T>();
         Channel {
             rx: InputChannel { rx: Mutex::new(rx) },
             tx: OutputChannel { tx: Mutex::new(tx) },
@@ -77,23 +87,19 @@ impl<T: Send> Channel<T> {
     pub fn send(&self, msg: T) -> Result<(), ChannelError> {
         let err = self.tx.send(msg);
         match err {
-            Ok(()) => Ok(()),
-            Err(e) => Err(ChannelError::new(&e.to_string())),
+            None => Ok(()),
+            Some(e) => Err(ChannelError::new(&e.to_string())),
         }
     }
 
     pub fn receive(&self) -> Result<T, ChannelError> {
         if self.blocking {
-            let err = self.rx.block_receive();
-            match err {
-                Ok(msg) => Ok(msg),
-                Err(e) => Err(ChannelError::new(&e.to_string())),
-            }
+            Ok(self.rx.block_receive())
         } else {
             let err = self.rx.receive();
             match err {
-                Ok(msg) => Ok(msg),
-                Err(e) => Err(ChannelError::new(&e.to_string())),
+                Some(msg) => Ok(msg),
+                None => Err(ChannelError::new("The channel is empty.")),
             }
         }
     }
