@@ -1,6 +1,9 @@
+extern crate raster;
+
 use raster::filter;
 use raster::Image;
 
+use std::env;
 use std::time::{SystemTime};
 use pspp::{
     node::{
@@ -22,62 +25,72 @@ impl Out<Image> for Source {
 }
 
 #[derive(Clone)]
-struct WorkerA {}
+struct WorkerA {
+    replicas: usize
+}
 impl InOut<Image, Image> for WorkerA {
     fn run(&mut self, mut input: Image) -> Option<Image> {
         filter::saturation(&mut input, 0.2).unwrap();
         Some(input)
     }
     fn number_of_replicas(&self) -> usize {
-        8
+        self.replicas
     }
 }
 
 #[derive(Clone)]
-struct WorkerB {}
+struct WorkerB {
+    replicas: usize
+}
 impl InOut<Image, Image> for WorkerB {
     fn run(&mut self, mut input: Image) -> Option<Image> {
         filter::emboss(&mut input).unwrap();
         Some(input)
     }
     fn number_of_replicas(&self) -> usize {
-        8
+        self.replicas
     }
 }
 
 #[derive(Clone)]
-struct WorkerC {}
+struct WorkerC {
+    replicas: usize
+}
 impl InOut<Image, Image> for WorkerC {
     fn run(&mut self, mut input: Image) -> Option<Image> {
         filter::gamma(&mut input, 2.0).unwrap();
         Some(input)
     }
     fn number_of_replicas(&self) -> usize {
-        8
+        self.replicas
     }
 }
 
 #[derive(Clone)]
-struct WorkerD {}
+struct WorkerD {
+    replicas: usize
+}
 impl InOut<Image, Image> for WorkerD {
     fn run(&mut self, mut input: Image) -> Option<Image> {
         filter::sharpen(&mut input).unwrap();
         Some(input)
     }
     fn number_of_replicas(&self) -> usize {
-        8
+        self.replicas
     }
 }
 
 #[derive(Clone)]
-struct WorkerE {}
+struct WorkerE {
+    replicas: usize
+}
 impl InOut<Image, Image> for WorkerE {
     fn run(&mut self, mut input: Image) -> Option<Image> {
         filter::grayscale(&mut input).unwrap();
         Some(input)
     }
     fn number_of_replicas(&self) -> usize {
-        8
+        self.replicas
     }
 }
 
@@ -95,11 +108,17 @@ impl In<Image, Vec<Image>> for Sink {
     }
 }
 
-#[test]
-fn test_raster() {
+fn main() {
     env_logger::init();
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 3 {
+        println!();
+        panic!("Correct usage: $ ./{:?} <nthreads> <images dir>", args[0]);
+    }
+    let threads = args[1].parse::<usize>().unwrap();
+    let dir_name = &args[2];
 
-    let dir_entries = std::fs::read_dir(format!("{}", "/Users/valebes/Desktop/pspp/tests/input_big")).unwrap();
+    let dir_entries = std::fs::read_dir(format!("{}", dir_name)).unwrap();
     let mut all_images: Vec<Image> = Vec::new();
 
     for entry in dir_entries {
@@ -117,11 +136,11 @@ fn test_raster() {
         Source {
             all_images: all_images,
         },
-        WorkerA {},
-        WorkerB {},
-        WorkerC {},
-        WorkerD {},
-        WorkerE {},
+        WorkerA { replicas: threads },
+        WorkerB { replicas: threads },
+        WorkerC { replicas: threads },
+        WorkerD { replicas: threads },
+        WorkerE { replicas: threads },
         Sink { images: vec![] }
     ];
    
