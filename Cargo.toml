@@ -7,9 +7,7 @@ edition = "2021"
 
 [dependencies]
 log = "0.4.17"
-env_logger = "0.10.0"
 dyn-clone = "1.0.10"
-rand = "*"
 core_affinity = "0.8.0"
 #ff_buffer = { git = "https://github.com/lucarin91/ff_buffer.git" }
 
@@ -18,3 +16,5 @@ raster = "0.2.0"
 rayon = "1.6.1" 
 crossbeam-channel = "0.5"
 rust-spp = { git = "https://github.com/GMAP/rust-ssp.git" }
+rand = "*"
+env_logger = "0.10.0"

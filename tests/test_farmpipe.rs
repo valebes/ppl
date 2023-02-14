@@ -16,8 +16,8 @@ struct Source {
     streamlen: usize,
     counter: usize,
 }
-impl Out<i32> for Source {
-    fn run(&mut self) -> Option<i32> {
+impl Out<usize> for Source {
+    fn run(&mut self) -> Option<usize> {
         if self.counter < self.streamlen {
             self.counter = self.counter + 1;
             Some((self.counter).try_into().unwrap())
@@ -29,8 +29,8 @@ impl Out<i32> for Source {
 
 #[derive(Clone)]
 struct WorkerA {}
-impl InOut<i32, i32> for WorkerA {
-    fn run(&mut self, input: i32) -> Option<i32> {
+impl InOut<usize, usize> for WorkerA {
+    fn run(&mut self, input: usize) -> Option<usize> {
         Some(input)
     }
     fn ordered(&self) -> bool {
@@ -43,8 +43,8 @@ impl InOut<i32, i32> for WorkerA {
 
 #[derive(Clone)]
 struct WorkerB {}
-impl InOut<i32, i32> for WorkerB {
-    fn run(&mut self, input: i32) -> Option<i32> {
+impl InOut<usize, usize> for WorkerB {
+    fn run(&mut self, input: usize) -> Option<usize> {
         if input % 2 == 0 {
             Some(input)
         } else {
@@ -61,8 +61,8 @@ impl InOut<i32, i32> for WorkerB {
 
 #[derive(Clone)]
 struct WorkerC {}
-impl InOut<i32, i32> for WorkerC {
-    fn run(&mut self, input: i32) -> Option<i32> {
+impl InOut<usize, usize> for WorkerC {
+    fn run(&mut self, input: usize) -> Option<usize> {
         Some(input / 2)
     }
     fn ordered(&self) -> bool {
@@ -75,18 +75,22 @@ impl InOut<i32, i32> for WorkerC {
 
 struct Sink {
     counter: usize,
+    check: bool,
 }
-impl In<i32, usize> for Sink {
-    fn run(&mut self, input: i32) {
+impl In<usize, bool> for Sink {
+    fn run(&mut self, input: usize) {
         println!("{}", input);
+        if input != self.counter {
+            self.check = false;
+        }
         self.counter = self.counter + 1;
     }
     fn ordered(&self) -> bool {
         true
     }
-    fn finalize(self) -> Option<usize> {
+    fn finalize(self) -> Option<bool> {
         println!("End");
-        Some(self.counter)
+        Some(self.check)
     }
 }
 
@@ -102,10 +106,10 @@ fn farm() {
         WorkerA {},
         WorkerB {},
         WorkerC {},
-        Sink { counter: 0 }
+        Sink { counter: 1, check: true }
     ];
 
     p.start();
     let res = p.wait_and_collect();
-    assert_eq!(res.unwrap(), 50);
+    assert!(res.unwrap());
 }
