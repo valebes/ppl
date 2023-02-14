@@ -5,6 +5,6 @@
 //pub mod channel;
 pub mod channel_ff;
 pub mod node;
-pub mod parallel_pipe;
+pub mod pspp;
 pub mod task;
 pub mod thread;

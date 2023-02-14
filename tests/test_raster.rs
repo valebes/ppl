@@ -8,7 +8,7 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
-    parallel_pipe::ParallelPipe,
+    pspp::Parallel,
     propagate, parallel,
 };
 
@@ -128,7 +128,7 @@ fn test_raster() {
     let start = SystemTime::now();
 
     p.start();
-    let _res = p.collect();
+    let _res = p.wait_and_collect();
 
     let system_duration = start.elapsed().expect("Failed to get render time?");
     let in_sec = system_duration.as_secs() as f64 + system_duration.subsec_nanos() as f64 * 1e-9;

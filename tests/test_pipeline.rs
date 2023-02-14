@@ -11,7 +11,7 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
-    parallel_pipe::ParallelPipe,
+    pspp::Parallel,
     propagate, parallel,
 };
 
@@ -82,6 +82,6 @@ fn fibonacci_pipe() {
     ];
 
     p.start(); 
-    let res = p.collect();
+    let res = p.wait_and_collect();
     assert_eq!(res.unwrap(), 20);
 }

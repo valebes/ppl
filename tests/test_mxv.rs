@@ -4,7 +4,7 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
-    parallel_pipe::ParallelPipe,
+    pspp::Parallel,
     propagate, parallel,
 };
 /**
@@ -93,7 +93,7 @@ fn test_mxv() {
     p.start();
 
     // Collect the results of the computation
-    let res = p.collect().unwrap();
+    let res = p.wait_and_collect().unwrap();
 
     // Compute the "reference" result
     for i in 0..matrix.len() {
