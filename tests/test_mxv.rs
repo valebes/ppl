@@ -1,3 +1,10 @@
+/**
+    Matrix * Vector multiplication
+    A: n*n matrix
+    b: n vector
+*/
+
+use rand::Rng;
 use pspp::{
     node::{
         in_node::{In, InNode},
@@ -7,12 +14,6 @@ use pspp::{
     pspp::Parallel,
     propagate, parallel,
 };
-/**
-    Matrix * Vector multiplication
-    A: n*n matrix
-    b: n vector
-*/
-use rand::Rng;
 
 struct Source {
     matrix: Vec<Vec<i64>>,

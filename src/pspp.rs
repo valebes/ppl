@@ -48,7 +48,6 @@ macro_rules! parallel {
                 propagate!(1, $($tail),*), false).unwrap();
 
             let mut pipeline = Parallel::new(block);
-            //pipeline.start();
             pipeline
         }
     };

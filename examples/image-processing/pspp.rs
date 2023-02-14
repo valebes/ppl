@@ -100,7 +100,6 @@ impl In<Image, Vec<Image>> for Sink {
     }
 
     fn finalize(self) -> Option<Vec<Image>> {
-        println!("End");
         Some(self.images)
     }
 }

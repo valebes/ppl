@@ -10,7 +10,7 @@ use std::{
 use log::{trace, warn};
 
 use crate::{
-    channel::{Channel, ChannelError},
+    channel_ff::{Channel, ChannelError},
     task::{Message, Task},
     thread::{Thread, ThreadError},
 };
