@@ -61,6 +61,9 @@ impl Thread {
         let id = self.get_id();
         let pinned = self.is_pinned();
 
+        // Before start the rts method, if we enabled pinning, we pin the thread.
+        // If we cant pin the thread, maybe because the cpu have less threads than required,
+        // we procede without pinning the thread.
         self.thread = Some(thread::spawn(move || {
             if pinned {
                 let mut core_ids = core_affinity::get_core_ids().unwrap();
