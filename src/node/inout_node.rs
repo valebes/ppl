@@ -11,7 +11,7 @@ use log::{trace, warn};
 use std::collections::BTreeMap;
 
 use crate::{
-    channel::{Channel, ChannelError},
+    channel::{Channel, ChannelError, OutputChannel, InputChannel},
     task::{Message, Task},
     thread::{Thread, ThreadError},
 };
@@ -41,7 +41,7 @@ pub trait InOut<TIn, TOut>: DynClone {
 
 pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     threads: Vec<Thread>,
-    channels: Vec<Arc<Channel<Message<TIn>>>>,
+    channels: Vec<OutputChannel<Message<TIn>>>,
     next_node: Arc<TNext>,
     ordered: bool,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
@@ -163,14 +163,14 @@ impl<
 
         let replicas = handler.number_of_replicas();
         for i in 0..replicas {
-            channels.push(Arc::new(Channel::new(blocking)));
-            let ch_in = Arc::clone(&channels[i]);
+            let (channel_in, channel_out) = Channel::new(blocking);
+            channels.push(channel_out);
             let nn = Arc::clone(&next_node);
             let copy = dyn_clone::clone_box(&*handler);
             let mut thread = Thread::new(
                 i + id,
                 move || {
-                    Self::rts(i + id, copy, &ch_in, &nn, replicas);
+                    Self::rts(i + id, copy, channel_in, &nn, replicas);
                 },
                 pinning,
             );
@@ -197,7 +197,7 @@ impl<
     fn rts(
         id: usize,
         mut node: Box<dyn InOut<TIn, TOut>>,
-        channel_in: &Channel<Message<TIn>>,
+        channel_in: InputChannel<Message<TIn>>,
         next_node: &TNext,
         n_replicas: usize,
     ) {

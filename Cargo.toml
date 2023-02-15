@@ -11,12 +11,12 @@ debug = 1
 log = "0.4.17"
 dyn-clone = "1.0.10"
 core_affinity = "0.8.0"
+crossbeam-channel = "0.5.6"
 #ff_buffer = { git = "https://github.com/lucarin91/ff_buffer.git" }
 
 [dev-dependencies]
 raster = { git = "https://github.com/valebes/raster.git" }
 rayon = "1.6.1" 
-crossbeam-channel = "0.5"
 rust-spp = { git = "https://github.com/GMAP/rust-ssp.git" }
 rand = "*"
 env_logger = "0.10.0"

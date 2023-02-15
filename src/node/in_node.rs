@@ -9,7 +9,7 @@ use std::{
 use log::{trace, warn};
 
 use crate::{
-    channel::{Channel, ChannelError},
+    channel::{Channel, ChannelError, InputChannel, OutputChannel},
     task::{Message, Task},
     thread::{Thread, ThreadError},
 };
@@ -29,7 +29,7 @@ pub trait In<TIn: 'static + Send, TOut> {
 
 pub struct InNode<TIn: Send, TCollected> {
     thread: Thread,
-    channel: Arc<Channel<Message<TIn>>>,
+    channel: OutputChannel<Message<TIn>>,
     ordered: bool,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     counter: AtomicUsize,
@@ -114,17 +114,16 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
     ) -> Result<InNode<TIn, TCollected>, ThreadError> {
         trace!("Created a new Sink! Id: {}", id);
 
-        let channel = Arc::new(Channel::new(blocking));
+        let (channel_in, channel_out) = Channel::new(blocking);
         let result = Arc::new(Mutex::new(None));
         let ordered = handler.ordered();
 
-        let ch = Arc::clone(&channel);
         let bucket = Arc::clone(&result);
 
         let thread = Thread::new(
             id,
             move || {
-                let res = InNode::rts(handler, &ch);
+                let res = InNode::rts(handler, channel_in);
                 if res.is_some() {
                     let err = bucket.lock();
                     if err.is_ok() {
@@ -140,7 +139,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
         let mut node = InNode {
             thread: thread,
-            channel: channel,
+            channel: channel_out,
             ordered: ordered,
             storage: Mutex::new(BTreeMap::new()),
             counter: AtomicUsize::new(0),
@@ -155,7 +154,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
     fn rts(
         mut node: Box<dyn In<TIn, TCollected>>,
-        channel: &Channel<Message<TIn>>,
+        channel: InputChannel<Message<TIn>>,
     ) -> Option<TCollected> {
         loop {
             let input = channel.receive();

@@ -1,11 +1,9 @@
 use std::{
     error::Error,
-    fmt,
-    sync::{
-        mpsc::{channel, Receiver, RecvError, SendError, Sender, TryRecvError},
-        Mutex,
-    },
+    fmt
 };
+
+use crossbeam_channel::{Sender, Receiver, TryRecvError, RecvError};
 
 #[derive(Debug)]
 pub struct ChannelError {
@@ -32,65 +30,27 @@ impl Error for ChannelError {
     }
 }
 
-struct InputChannel<T> {
-    rx: Mutex<Receiver<T>>,
-}
-
-impl<T: Send> InputChannel<T> {
-    fn receive(&self) -> Result<T, TryRecvError> {
-        let ch = self.rx.lock().unwrap();
-        ch.try_recv()
-    }
-    fn block_receive(&self) -> Result<T, RecvError> {
-        let ch = self.rx.lock().unwrap();
-        ch.recv()
-    }
-}
-
-struct OutputChannel<T> {
-    tx: Mutex<Sender<T>>,
-}
-
-impl<T: Send> OutputChannel<T> {
-    fn send(&self, msg: T) -> Result<(), SendError<T>> {
-        let ch = self.tx.lock().unwrap();
-        ch.send(msg)
-    }
-}
-
-pub struct Channel<T> {
-    rx: InputChannel<T>,
-    tx: OutputChannel<T>,
+pub struct InputChannel<T> {
+    rx: Receiver<T>,
     blocking: bool,
 }
-
-impl<T: Send> Channel<T> {
-    pub fn new(blocking: bool) -> Channel<T> {
-        let (tx, rx) = channel();
-        Channel {
-            rx: InputChannel { rx: Mutex::new(rx) },
-            tx: OutputChannel { tx: Mutex::new(tx) },
-            blocking: blocking,
-        }
+impl<T: Send> InputChannel<T> {
+    fn non_block_receive(&self) -> Result<T, TryRecvError> {
+        self.rx.try_recv()
     }
-
-    pub fn send(&self, msg: T) -> Result<(), ChannelError> {
-        let err = self.tx.send(msg);
-        match err {
-            Ok(()) => Ok(()),
-            Err(e) => Err(ChannelError::new(&e.to_string())),
-        }
-    }
+    fn block_receive(&self) -> Result<T, RecvError> {
+        self.rx.recv()   
+     }
 
     pub fn receive(&self) -> Result<Option<T>, ChannelError> {
         if self.blocking {
-            let err = self.rx.block_receive();
+            let err = self.block_receive();
             match err {
                 Ok(msg) => Ok(Some(msg)),
                 Err(e) => Err(ChannelError::new(&e.to_string())),
             }
         } else {
-            let err = self.rx.receive();
+            let err = self.non_block_receive();
             match err {
                 Ok(msg) => Ok(Some(msg)),
                 Err(e) => {
@@ -101,5 +61,29 @@ impl<T: Send> Channel<T> {
                 }
             }
         }
+    }
+}
+
+pub struct OutputChannel<T> {
+    tx: Sender<T>,
+}
+
+impl<T: Send> OutputChannel<T> {
+    pub fn send(&self, msg: T) -> Result<(), ChannelError> {
+        let err = self.tx.send(msg);
+        match err {
+            Ok(()) => Ok(()),
+            Err(e) => Err(ChannelError::new(&e.to_string())),
+        }
+    }
+}
+
+pub struct Channel { }
+
+impl Channel {
+    pub fn new<T: Send>(blocking: bool) -> (InputChannel<T>, OutputChannel<T>) {
+        let (tx, rx) = crossbeam_channel::unbounded();
+            (InputChannel { rx: rx, blocking: blocking },
+            OutputChannel { tx: tx })
     }
 }
