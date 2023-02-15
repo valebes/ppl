@@ -8,8 +8,8 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
+    parallel, propagate,
     pspp::Parallel,
-    propagate, parallel,
 };
 
 struct Source {
@@ -106,7 +106,10 @@ fn test_ordered_farm() {
         WorkerA {},
         WorkerB {},
         WorkerC {},
-        Sink { counter: 1, check: true }
+        Sink {
+            counter: 1,
+            check: true
+        }
     ];
 
     p.start();

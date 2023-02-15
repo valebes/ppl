@@ -11,8 +11,8 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
+    parallel, propagate,
     pspp::Parallel,
-    propagate, parallel,
 };
 
 struct Source {
@@ -81,7 +81,7 @@ fn fibonacci_pipe() {
         Sink { counter: 0 }
     ];
 
-    p.start(); 
+    p.start();
     let res = p.wait_and_collect();
     assert_eq!(res.unwrap(), 20);
 }

@@ -1,4 +1,3 @@
-
 use std::{
     collections::BTreeMap,
     sync::{
@@ -161,7 +160,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         loop {
             let input = channel.receive();
             match input {
-                Ok(Message { op, order: _ }) => {
+                Ok(Some(Message { op, order: _ })) => {
                     match op {
                         Task::NewTask(arg) => {
                             node.run(arg);
@@ -173,7 +172,8 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                             break;
                         }
                     }
-                }
+                },
+                Ok(None) => (),
                 Err(e) => {
                     warn!("Error: {}", e);
                 }

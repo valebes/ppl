@@ -82,18 +82,23 @@ impl<T: Send> Channel<T> {
         }
     }
 
-    pub fn receive(&self) -> Result<T, ChannelError> {
+    pub fn receive(&self) -> Result<Option<T>, ChannelError> {
         if self.blocking {
             let err = self.rx.block_receive();
             match err {
-                Ok(msg) => Ok(msg),
+                Ok(msg) => Ok(Some(msg)),
                 Err(e) => Err(ChannelError::new(&e.to_string())),
             }
         } else {
             let err = self.rx.receive();
             match err {
-                Ok(msg) => Ok(msg),
-                Err(e) => Err(ChannelError::new(&e.to_string())),
+                Ok(msg) => Ok(Some(msg)),
+                Err(e) => {
+                    match e {
+                        TryRecvError::Empty => Ok(None),
+                        TryRecvError::Disconnected => Err(ChannelError::new(&e.to_string())),
+                    }
+                }
             }
         }
     }

@@ -29,10 +29,12 @@ pub trait InOut<TIn, TOut>: DynClone {
     fn ordered(&self) -> bool {
         false
     }
-    fn broadcasting(&self) -> bool { // to be implemented
+    fn broadcasting(&self) -> bool {
+        // to be implemented
         false
     }
-    fn a2a(&self) -> bool {  // to be implemented
+    fn a2a(&self) -> bool {
+        // to be implemented
         false
     }
 }
@@ -61,69 +63,66 @@ impl<
         }
 
         match input {
-            Message { op, order } => {
-                match &op {
-                    Task::NewTask(_e) => {
-                        if self.channels.len() == 1
-                            && self.ordered
-                            && order != self.counter.load(Ordering::SeqCst)
-                        {
-                            self.save_to_storage(Message::new(op, rec_id), order);
-                            self.send_pending();
-                        } else {
-                            let res = self.channels[rec_id].send(Message::new(op, order));
-                            if res.is_err() {
-                                panic!("Error: Cannot send message!");
-                            }
+            Message { op, order } => match &op {
+                Task::NewTask(_e) => {
+                    if self.channels.len() == 1
+                        && self.ordered
+                        && order != self.counter.load(Ordering::SeqCst)
+                    {
+                        self.save_to_storage(Message::new(op, rec_id), order);
+                        self.send_pending();
+                    } else {
+                        let res = self.channels[rec_id].send(Message::new(op, order));
+                        if res.is_err() {
+                            panic!("Error: Cannot send message!");
+                        }
 
-                            if self.ordered {
+                        if self.ordered {
                             let old_c = self.counter.load(Ordering::SeqCst);
                             self.counter.store(old_c + 1, Ordering::SeqCst);
-                            }
-                        }
-                    }
-                    Task::Dropped => {
-                        if self.channels.len() == 1
-                            && self.ordered
-                            && order != self.counter.load(Ordering::SeqCst)
-                        {
-                            self.save_to_storage(Message::new(op, rec_id), order);
-                            self.send_pending();
-                        } else {
-                            let res = self.channels[rec_id].send(Message::new(op, order));
-                            if res.is_err() {
-                                panic!("Error: Cannot send message!");
-                            }
-
-                            if self.ordered {
-                                let old_c = self.counter.load(Ordering::SeqCst);
-                                self.counter.store(old_c + 1, Ordering::SeqCst);
-                            }
-                        }
-                    }
-                    Task::Terminate => {
-                        if self.channels.len() == 1
-                            && self.ordered
-                            && order != self.counter.load(Ordering::SeqCst)
-                        {
-                            self.save_to_storage(Message::new(op, order), order);
-                            self.send_pending();
-                        } else {
-                            for ch in &self.channels {
-                                let err = ch.send(Message::new(Task::Terminate, order));
-                                if err.is_err() {
-                                    panic!("Error: Cannot send message!");
-                                }
-                            }
-
-                            if self.ordered {
-                                self.counter.store(order, Ordering::SeqCst)
-                            }
-                            
                         }
                     }
                 }
-            }
+                Task::Dropped => {
+                    if self.channels.len() == 1
+                        && self.ordered
+                        && order != self.counter.load(Ordering::SeqCst)
+                    {
+                        self.save_to_storage(Message::new(op, rec_id), order);
+                        self.send_pending();
+                    } else {
+                        let res = self.channels[rec_id].send(Message::new(op, order));
+                        if res.is_err() {
+                            panic!("Error: Cannot send message!");
+                        }
+
+                        if self.ordered {
+                            let old_c = self.counter.load(Ordering::SeqCst);
+                            self.counter.store(old_c + 1, Ordering::SeqCst);
+                        }
+                    }
+                }
+                Task::Terminate => {
+                    if self.channels.len() == 1
+                        && self.ordered
+                        && order != self.counter.load(Ordering::SeqCst)
+                    {
+                        self.save_to_storage(Message::new(op, order), order);
+                        self.send_pending();
+                    } else {
+                        for ch in &self.channels {
+                            let err = ch.send(Message::new(Task::Terminate, order));
+                            if err.is_err() {
+                                panic!("Error: Cannot send message!");
+                            }
+                        }
+
+                        if self.ordered {
+                            self.counter.store(order, Ordering::SeqCst)
+                        }
+                    }
+                }
+            },
         }
         Ok(())
     }
@@ -206,22 +205,23 @@ impl<
         let mut counter = 0;
         if (next_node.get_num_of_replicas() > n_replicas) && n_replicas != 1 {
             counter = id * (next_node.get_num_of_replicas() / n_replicas);
-        }
-        else if next_node.get_num_of_replicas() <= n_replicas {
+        } else if next_node.get_num_of_replicas() <= n_replicas {
             // Standard case, not a2a
             counter = id;
         }
         trace!("Created a new Node! Id: {}", id);
         loop {
             // If next node have more replicas, when counter > next_replicas i reset the counter
-            if (next_node.get_num_of_replicas() > n_replicas) && counter >= next_node.get_num_of_replicas() {
+            if (next_node.get_num_of_replicas() > n_replicas)
+                && counter >= next_node.get_num_of_replicas()
+            {
                 counter = 0;
             }
 
             let input = channel_in.receive();
 
             match input {
-                Ok(Message { op, order }) => match op {
+                Ok(Some(Message { op, order })) => match op {
                     Task::NewTask(arg) => {
                         let output = node.run(arg);
                         if output.is_some() {
@@ -236,17 +236,18 @@ impl<
                                 warn!("Error: {}", err.unwrap_err())
                             }
                         }
-                    }
+                    },
                     Task::Dropped => {
                         let err = next_node.send(Message::new(Task::Dropped, order), counter);
                         if err.is_err() {
                             warn!("Error: {}", err.unwrap_err())
                         }
-                    }
+                    },
                     Task::Terminate => {
                         break;
-                    }
+                    },
                 },
+                Ok(None) => (),
                 Err(e) => {
                     warn!("Error: {}", e);
                 }

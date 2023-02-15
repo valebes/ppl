@@ -11,8 +11,8 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
+    parallel, propagate,
     pspp::Parallel,
-    propagate, parallel,
 };
 
 struct Source {

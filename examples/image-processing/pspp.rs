@@ -1,6 +1,6 @@
 use raster::filter;
 use raster::Image;
-use std::time::{SystemTime};
+use std::time::SystemTime;
 
 use pspp::{
     node::{
@@ -8,8 +8,8 @@ use pspp::{
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
+    parallel, propagate,
     pspp::Parallel,
-    propagate, parallel,
 };
 
 struct Source {
@@ -23,7 +23,7 @@ impl Out<Image> for Source {
 
 #[derive(Clone)]
 struct WorkerA {
-    replicas: usize
+    replicas: usize,
 }
 impl InOut<Image, Image> for WorkerA {
     fn run(&mut self, mut input: Image) -> Option<Image> {
@@ -37,7 +37,7 @@ impl InOut<Image, Image> for WorkerA {
 
 #[derive(Clone)]
 struct WorkerB {
-    replicas: usize
+    replicas: usize,
 }
 impl InOut<Image, Image> for WorkerB {
     fn run(&mut self, mut input: Image) -> Option<Image> {
@@ -51,7 +51,7 @@ impl InOut<Image, Image> for WorkerB {
 
 #[derive(Clone)]
 struct WorkerC {
-    replicas: usize
+    replicas: usize,
 }
 impl InOut<Image, Image> for WorkerC {
     fn run(&mut self, mut input: Image) -> Option<Image> {
@@ -65,7 +65,7 @@ impl InOut<Image, Image> for WorkerC {
 
 #[derive(Clone)]
 struct WorkerD {
-    replicas: usize
+    replicas: usize,
 }
 impl InOut<Image, Image> for WorkerD {
     fn run(&mut self, mut input: Image) -> Option<Image> {
@@ -79,7 +79,7 @@ impl InOut<Image, Image> for WorkerD {
 
 #[derive(Clone)]
 struct WorkerE {
-    replicas: usize
+    replicas: usize,
 }
 impl InOut<Image, Image> for WorkerE {
     fn run(&mut self, mut input: Image) -> Option<Image> {
@@ -92,7 +92,7 @@ impl InOut<Image, Image> for WorkerE {
 }
 
 struct Sink {
-    images: Vec<Image>
+    images: Vec<Image>,
 }
 impl In<Image, Vec<Image>> for Sink {
     fn run(&mut self, input: Image) {
@@ -118,7 +118,6 @@ pub fn pspp(dir_name: &str, threads: usize) {
         all_images.push(raster::open(path.to_str().unwrap()).unwrap());
     }
 
-
     let mut p = parallel![
         Source {
             all_images: all_images,
@@ -130,7 +129,7 @@ pub fn pspp(dir_name: &str, threads: usize) {
         WorkerE { replicas: threads },
         Sink { images: vec![] }
     ];
-   
+
     let start = SystemTime::now();
 
     p.start();

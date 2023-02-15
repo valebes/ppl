@@ -55,9 +55,9 @@ impl Thread {
         if self.job.is_none() {
             return Err(ThreadError::new("Thread already started."));
         }
-        
+
         let f = std::mem::replace(&mut self.job, None).unwrap();
-        
+
         let id = self.get_id();
         let pinned = self.is_pinned();
 
@@ -77,7 +77,6 @@ impl Thread {
                         trace!("Thread[{}] correctly pinned!", id);
                     }
                 }
-
             }
             info!("{:?} started", thread::current().id());
             (f)();
