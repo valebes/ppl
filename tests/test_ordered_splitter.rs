@@ -32,7 +32,7 @@ struct WorkerA {
 }
 impl InOut<String, String> for WorkerA {
     fn run(&mut self, input: String) -> Option<String> {
-        for i in 0..self.number_of_messages {
+        for _i in 0..self.number_of_messages {
             self.queue.push(input.clone())
         }
         None

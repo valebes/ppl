@@ -47,25 +47,25 @@ pub trait InOut<TIn, TOut>: DynClone {
 }
 
 struct OrderedSplitter {
-    latest: AtomicUsize,
-    start: AtomicUsize,
+    latest: usize,
+    start: usize,
 }
 impl OrderedSplitter {
     fn new() -> OrderedSplitter {
         OrderedSplitter {
-            latest: AtomicUsize::new(0),
-            start: AtomicUsize::new(0),
+            latest: 0,
+            start: 0,
         }
     }
     fn get(&self) -> (usize, usize) {
         (
-            self.latest.load(Ordering::SeqCst),
-            self.start.load(Ordering::SeqCst),
+            self.latest,
+            self.start,
         )
     }
-    fn set(&self, latest: usize, start: usize) {
-        self.latest.store(latest, Ordering::SeqCst);
-        self.start.store(start, Ordering::SeqCst);
+    fn set(&mut self, latest: usize, start: usize) {
+        self.latest = latest;
+        self.start = start;
     }
 }
 
@@ -75,7 +75,7 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     next_node: Arc<TNext>,
     ordered: bool,
     splitter: bool,
-    ordered_splitter: Arc<OrderedSplitter>,
+    ordered_splitter: Arc<(Mutex<OrderedSplitter>, Condvar)>,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
     phantom: PhantomData<(TOut, TCollected)>,
@@ -194,16 +194,14 @@ impl<
         let next_node = Arc::new(next_node);
         let replicas = handler.number_of_replicas();
 
-        let splitter = Arc::new((Mutex::new(false), Condvar::new()));
-        let ordered_splitter = Arc::new(OrderedSplitter::new());
+        let splitter = Arc::new((Mutex::new(OrderedSplitter::new()), Condvar::new()));
         for i in 0..replicas {
             let (channel_in, channel_out) = Channel::new(blocking);
             channels.push(channel_out);
             let nn = Arc::clone(&next_node);
             let copy = dyn_clone::clone_box(&*handler);
 
-            let splitter_copy = Arc::clone(&ordered_splitter);
-            let splitter_handler_copy = Arc::clone(&splitter);
+            let splitter_copy = Arc::clone(&splitter);
             let mut thread = Thread::new(
                 i + id,
                 move || {
@@ -214,7 +212,6 @@ impl<
                         &nn,
                         replicas,
                         &splitter_copy,
-                        &splitter_handler_copy,
                     );
                 },
                 pinning,
@@ -232,7 +229,7 @@ impl<
             next_node: next_node,
             ordered: handler.is_ordered(),
             splitter: handler.is_splitter(),
-            ordered_splitter: ordered_splitter,
+            ordered_splitter: splitter,
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
             phantom: PhantomData,
@@ -247,8 +244,7 @@ impl<
         channel_in: InputChannel<Message<TIn>>,
         next_node: &TNext,
         n_replicas: usize,
-        ordered_splitter: &OrderedSplitter,
-        ordered_splitter_handler: &(Mutex<bool>, Condvar),
+        ordered_splitter_handler: &(Mutex<OrderedSplitter>, Condvar),
     ) {
         // If next node have more replicas, i specify the first next node where i send my msg
         let mut counter = 0;
@@ -305,10 +301,9 @@ impl<
                             if node.is_ordered() {
                                 let (lock, cvar) = &*ordered_splitter_handler;
                                 loop {
-                                    let mut bool = lock.lock().unwrap();
+                                    let mut ordered_splitter = lock.lock().unwrap();
                                     let (latest, end) = ordered_splitter.get();
                                     if latest == order {
-                                        *bool = true;
                                         let mut count_splitter = end;
                                         while !tmp.is_empty() {
                                             let err = next_node.send(
@@ -327,7 +322,7 @@ impl<
                                         cvar.notify_all();
                                         break;
                                     } else {
-                                        let err = cvar.wait(bool);
+                                        let err = cvar.wait(ordered_splitter);
                                         if err.is_err() {
                                             panic!("Error: Poisoned mutex!");
                                         }
@@ -381,7 +376,9 @@ impl<
         if self.ordered && !self.splitter {
             c = self.next_msg.load(Ordering::SeqCst);
         } else if self.ordered && self.splitter {
-            (_, c) = self.ordered_splitter.get();
+            let (lock, _) = self.ordered_splitter.as_ref();
+            let ordered_splitter = lock.lock().unwrap();
+            (_, c) = ordered_splitter.get();
         }
         let err = self.next_node.send(Message::new(Task::Terminate, c), 0);
         if err.is_err() {
