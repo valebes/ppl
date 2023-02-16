@@ -1,9 +1,6 @@
-use std::{
-    error::Error,
-    fmt
-};
+use std::{error::Error, fmt};
 
-use crossbeam_channel::{Sender, Receiver, TryRecvError, RecvError};
+use crossbeam_channel::{Receiver, RecvError, Sender, TryRecvError};
 
 #[derive(Debug)]
 pub struct ChannelError {
@@ -39,8 +36,8 @@ impl<T: Send> InputChannel<T> {
         self.rx.try_recv()
     }
     fn block_receive(&self) -> Result<T, RecvError> {
-        self.rx.recv()   
-     }
+        self.rx.recv()
+    }
 
     pub fn receive(&self) -> Result<Option<T>, ChannelError> {
         if self.blocking {
@@ -53,12 +50,10 @@ impl<T: Send> InputChannel<T> {
             let err = self.non_block_receive();
             match err {
                 Ok(msg) => Ok(Some(msg)),
-                Err(e) => {
-                    match e {
-                        TryRecvError::Empty => Ok(None),
-                        TryRecvError::Disconnected => Err(ChannelError::new(&e.to_string())),
-                    }
-                }
+                Err(e) => match e {
+                    TryRecvError::Empty => Ok(None),
+                    TryRecvError::Disconnected => Err(ChannelError::new(&e.to_string())),
+                },
             }
         }
     }
@@ -78,12 +73,17 @@ impl<T: Send> OutputChannel<T> {
     }
 }
 
-pub struct Channel { }
+pub struct Channel {}
 
 impl Channel {
     pub fn new<T: Send>(blocking: bool) -> (InputChannel<T>, OutputChannel<T>) {
         let (tx, rx) = crossbeam_channel::unbounded();
-            (InputChannel { rx: rx, blocking: blocking },
-            OutputChannel { tx: tx })
+        (
+            InputChannel {
+                rx: rx,
+                blocking: blocking,
+            },
+            OutputChannel { tx: tx },
+        )
     }
 }

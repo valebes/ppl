@@ -33,7 +33,7 @@ impl InOut<usize, usize> for WorkerA {
     fn run(&mut self, input: usize) -> Option<usize> {
         Some(input)
     }
-    fn ordered(&self) -> bool {
+    fn is_ordered(&self) -> bool {
         true
     }
     fn number_of_replicas(&self) -> usize {
@@ -51,7 +51,7 @@ impl InOut<usize, usize> for WorkerB {
             None
         }
     }
-    fn ordered(&self) -> bool {
+    fn is_ordered(&self) -> bool {
         true
     }
     fn number_of_replicas(&self) -> usize {
@@ -65,7 +65,7 @@ impl InOut<usize, usize> for WorkerC {
     fn run(&mut self, input: usize) -> Option<usize> {
         Some(input / 2)
     }
-    fn ordered(&self) -> bool {
+    fn is_ordered(&self) -> bool {
         true
     }
     fn number_of_replicas(&self) -> usize {
@@ -85,7 +85,7 @@ impl In<usize, bool> for Sink {
         }
         self.counter = self.counter + 1;
     }
-    fn ordered(&self) -> bool {
+    fn is_ordered(&self) -> bool {
         true
     }
     fn finalize(self) -> Option<bool> {

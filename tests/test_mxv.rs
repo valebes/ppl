@@ -34,7 +34,7 @@ impl InOut<Vec<i64>, i64> for Multiplication {
     fn run(&mut self, input: Vec<i64>) -> Option<i64> {
         Some(mult(input, &self.vec))
     }
-    fn ordered(&self) -> bool {
+    fn is_ordered(&self) -> bool {
         true
     }
     fn number_of_replicas(&self) -> usize {
@@ -49,7 +49,7 @@ impl In<i64, Vec<i64>> for Sink {
     fn run(&mut self, input: i64) {
         self.res.push(input);
     }
-    fn ordered(&self) -> bool {
+    fn is_ordered(&self) -> bool {
         true
     }
     fn finalize(self) -> Option<Vec<i64>> {

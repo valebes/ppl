@@ -1,8 +1,9 @@
 use std::{
+    collections::VecDeque,
     marker::PhantomData,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
+        Arc, Condvar, Mutex,
     },
 };
 
@@ -11,7 +12,7 @@ use log::{trace, warn};
 use std::collections::BTreeMap;
 
 use crate::{
-    channel::{Channel, ChannelError, OutputChannel, InputChannel},
+    channel::{Channel, ChannelError, InputChannel, OutputChannel},
     task::{Message, Task},
     thread::{Thread, ThreadError},
 };
@@ -23,10 +24,13 @@ Public API
 */
 pub trait InOut<TIn, TOut>: DynClone {
     fn run(&mut self, input: TIn) -> Option<TOut>;
+    fn splitter_handler(&mut self) -> Option<TOut> {
+        None
+    }
     fn number_of_replicas(&self) -> usize {
         1
     }
-    fn ordered(&self) -> bool {
+    fn is_ordered(&self) -> bool {
         false
     }
     fn broadcasting(&self) -> bool {
@@ -37,6 +41,32 @@ pub trait InOut<TIn, TOut>: DynClone {
         // to be implemented
         false
     }
+    fn is_splitter(&self) -> bool {
+        false
+    }
+}
+
+struct OrderedSplitter {
+    latest: AtomicUsize,
+    start: AtomicUsize,
+}
+impl OrderedSplitter {
+    fn new() -> OrderedSplitter {
+        OrderedSplitter {
+            latest: AtomicUsize::new(0),
+            start: AtomicUsize::new(0),
+        }
+    }
+    fn get(&self) -> (usize, usize) {
+        (
+            self.latest.load(Ordering::SeqCst),
+            self.start.load(Ordering::SeqCst),
+        )
+    }
+    fn set(&self, latest: usize, start: usize) {
+        self.latest.store(latest, Ordering::SeqCst);
+        self.start.store(start, Ordering::SeqCst);
+    }
 }
 
 pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
@@ -44,8 +74,10 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     channels: Vec<OutputChannel<Message<TIn>>>,
     next_node: Arc<TNext>,
     ordered: bool,
+    splitter: bool,
+    ordered_splitter: Arc<OrderedSplitter>,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
-    counter: AtomicUsize,
+    next_msg: AtomicUsize,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
@@ -67,7 +99,7 @@ impl<
                 Task::NewTask(_e) => {
                     if self.channels.len() == 1
                         && self.ordered
-                        && order != self.counter.load(Ordering::SeqCst)
+                        && order != self.next_msg.load(Ordering::SeqCst)
                     {
                         self.save_to_storage(Message::new(op, rec_id), order);
                         self.send_pending();
@@ -78,15 +110,15 @@ impl<
                         }
 
                         if self.ordered {
-                            let old_c = self.counter.load(Ordering::SeqCst);
-                            self.counter.store(old_c + 1, Ordering::SeqCst);
+                            let old_c = self.next_msg.load(Ordering::SeqCst);
+                            self.next_msg.store(old_c + 1, Ordering::SeqCst);
                         }
                     }
                 }
                 Task::Dropped => {
                     if self.channels.len() == 1
                         && self.ordered
-                        && order != self.counter.load(Ordering::SeqCst)
+                        && order != self.next_msg.load(Ordering::SeqCst)
                     {
                         self.save_to_storage(Message::new(op, rec_id), order);
                         self.send_pending();
@@ -97,15 +129,15 @@ impl<
                         }
 
                         if self.ordered {
-                            let old_c = self.counter.load(Ordering::SeqCst);
-                            self.counter.store(old_c + 1, Ordering::SeqCst);
+                            let old_c = self.next_msg.load(Ordering::SeqCst);
+                            self.next_msg.store(old_c + 1, Ordering::SeqCst);
                         }
                     }
                 }
                 Task::Terminate => {
                     if self.channels.len() == 1
                         && self.ordered
-                        && order != self.counter.load(Ordering::SeqCst)
+                        && order != self.next_msg.load(Ordering::SeqCst)
                     {
                         self.save_to_storage(Message::new(op, order), order);
                         self.send_pending();
@@ -118,7 +150,7 @@ impl<
                         }
 
                         if self.ordered {
-                            self.counter.store(order, Ordering::SeqCst)
+                            self.next_msg.store(order, Ordering::SeqCst)
                         }
                     }
                 }
@@ -160,17 +192,30 @@ impl<
         let mut threads = Vec::new();
         let mut channels = Vec::new();
         let next_node = Arc::new(next_node);
-
         let replicas = handler.number_of_replicas();
+
+        let splitter = Arc::new((Mutex::new(false), Condvar::new()));
+        let ordered_splitter = Arc::new(OrderedSplitter::new());
         for i in 0..replicas {
             let (channel_in, channel_out) = Channel::new(blocking);
             channels.push(channel_out);
             let nn = Arc::clone(&next_node);
             let copy = dyn_clone::clone_box(&*handler);
+
+            let splitter_copy = Arc::clone(&ordered_splitter);
+            let splitter_handler_copy = Arc::clone(&splitter);
             let mut thread = Thread::new(
                 i + id,
                 move || {
-                    Self::rts(i + id, copy, channel_in, &nn, replicas);
+                    Self::rts(
+                        i + id,
+                        copy,
+                        channel_in,
+                        &nn,
+                        replicas,
+                        &splitter_copy,
+                        &splitter_handler_copy,
+                    );
                 },
                 pinning,
             );
@@ -185,9 +230,11 @@ impl<
             channels: channels,
             threads: threads,
             next_node: next_node,
-            ordered: handler.ordered(),
+            ordered: handler.is_ordered(),
+            splitter: handler.is_splitter(),
+            ordered_splitter: ordered_splitter,
             storage: Mutex::new(BTreeMap::new()),
-            counter: AtomicUsize::new(0),
+            next_msg: AtomicUsize::new(0),
             phantom: PhantomData,
         };
 
@@ -200,6 +247,8 @@ impl<
         channel_in: InputChannel<Message<TIn>>,
         next_node: &TNext,
         n_replicas: usize,
+        ordered_splitter: &OrderedSplitter,
+        ordered_splitter_handler: &(Mutex<bool>, Condvar),
     ) {
         // If next node have more replicas, i specify the first next node where i send my msg
         let mut counter = 0;
@@ -224,28 +273,91 @@ impl<
                 Ok(Some(Message { op, order })) => match op {
                     Task::NewTask(arg) => {
                         let output = node.run(arg);
-                        if output.is_some() {
-                            let err = next_node
-                                .send(Message::new(Task::NewTask(output.unwrap()), order), counter);
-                            if err.is_err() {
-                                warn!("Error: {}", err.unwrap_err())
+                        if !node.is_splitter() {
+                            match output {
+                                Some(msg) => {
+                                    let err = next_node
+                                        .send(Message::new(Task::NewTask(msg), order), counter);
+                                    if err.is_err() {
+                                        warn!("Error: {}", err.unwrap_err())
+                                    }
+                                }
+                                None => {
+                                    let err =
+                                        next_node.send(Message::new(Task::Dropped, order), counter);
+                                    if err.is_err() {
+                                        warn!("Error: {}", err.unwrap_err())
+                                    }
+                                }
                             }
                         } else {
-                            let err = next_node.send(Message::new(Task::Dropped, order), counter);
-                            if err.is_err() {
-                                warn!("Error: {}", err.unwrap_err())
+                            let mut tmp = VecDeque::new();
+                            loop {
+                                let splitter_out = node.splitter_handler();
+                                match splitter_out {
+                                    Some(msg) => {
+                                        tmp.push_back(msg);
+                                    }
+                                    None => break,
+                                }
+                            }
+
+                            if node.is_ordered() {
+                                let (lock, cvar) = &*ordered_splitter_handler;
+                                loop {
+                                    let mut bool = lock.lock().unwrap();
+                                    let (latest, end) = ordered_splitter.get();
+                                    if latest == order {
+                                        *bool = true;
+                                        let mut count_splitter = end;
+                                        while !tmp.is_empty() {
+                                            let err = next_node.send(
+                                                Message::new(
+                                                    Task::NewTask(tmp.pop_front().unwrap()),
+                                                    count_splitter,
+                                                ),
+                                                counter,
+                                            );
+                                            if err.is_err() {
+                                                warn!("Error: {}", err.unwrap_err())
+                                            }
+                                            count_splitter = count_splitter + 1;
+                                        }
+                                        ordered_splitter.set(order + 1, count_splitter);
+                                        cvar.notify_all();
+                                        break;
+                                    } else {
+                                        let err = cvar.wait(bool);
+                                        if err.is_err() {
+                                            panic!("Error: Poisoned mutex!");
+                                        }
+                                    }
+                                }
+                            } else {
+                                while !tmp.is_empty() {
+                                    let err = next_node.send(
+                                        Message::new(
+                                            Task::NewTask(tmp.pop_front().unwrap()),
+                                            order,
+                                        ),
+                                        counter,
+                                    );
+                                    if err.is_err() {
+                                        warn!("Error: {}", err.unwrap_err())
+                                    }
+                                }
                             }
                         }
-                    },
+                    }
                     Task::Dropped => {
                         let err = next_node.send(Message::new(Task::Dropped, order), counter);
                         if err.is_err() {
                             warn!("Error: {}", err.unwrap_err())
                         }
-                    },
+                    }
                     Task::Terminate => {
                         break;
-                    },
+                    }
                 },
                 Ok(None) => (),
                 Err(e) => {
@@ -266,9 +378,10 @@ impl<
             }
         }
         let mut c = 0;
-
-        if self.ordered {
-            c = self.counter.load(Ordering::SeqCst);
+        if self.ordered && !self.splitter {
+            c = self.next_msg.load(Ordering::SeqCst);
+        } else if self.ordered && self.splitter {
+            (_, c) = self.ordered_splitter.get();
         }
         let err = self.next_node.send(Message::new(Task::Terminate, c), 0);
         if err.is_err() {
@@ -293,7 +406,7 @@ impl<
 
         match mtx {
             Ok(mut queue) => {
-                let mut c = self.counter.load(Ordering::SeqCst);
+                let mut c = self.next_msg.load(Ordering::SeqCst);
                 while queue.contains_key(&c) {
                     let msg = queue.remove(&c).unwrap();
                     match msg {
@@ -318,7 +431,7 @@ impl<
                             }
                         },
                     }
-                    c = self.counter.load(Ordering::SeqCst);
+                    c = self.next_msg.load(Ordering::SeqCst);
                 }
             }
             Err(_) => panic!("Error: Cannot lock the storage!"),

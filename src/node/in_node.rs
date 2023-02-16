@@ -22,7 +22,7 @@ Public API
 pub trait In<TIn: 'static + Send, TOut> {
     fn run(&mut self, input: TIn);
     fn finalize(self) -> Option<TOut>;
-    fn ordered(&self) -> bool {
+    fn is_ordered(&self) -> bool {
         false
     }
 }
@@ -116,7 +116,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
         let (channel_in, channel_out) = Channel::new(blocking);
         let result = Arc::new(Mutex::new(None));
-        let ordered = handler.ordered();
+        let ordered = handler.is_ordered();
 
         let bucket = Arc::clone(&result);
 
@@ -171,7 +171,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                             break;
                         }
                     }
-                },
+                }
                 Ok(None) => (),
                 Err(e) => {
                     warn!("Error: {}", e);
