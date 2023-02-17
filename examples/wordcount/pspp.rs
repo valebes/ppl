@@ -90,7 +90,7 @@ struct Sink {
 }
 impl In<(String, usize), usize> for Sink {
     fn run(&mut self, input: (String, usize)) {
-        println!("Received word {} with counter {}", input.0, input.1 );
+        //println!("Received word {} with counter {}", input.0, input.1 );
         self.counter = self.counter + 1;
     }
     fn finalize(self) -> Option<usize> {
