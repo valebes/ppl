@@ -104,7 +104,7 @@ pub fn pspp(dataset: &str, threads: usize) {
         }
     }
 
-    let hashmap = Arc::new(DashMap::new());
+    let hashmap = Arc::new(DashMap::with_shard_amount(256));
     let mut p = parallel![
         Source { buffer: buffer },
         Splitter {replicas: threads, tmp_buffer: VecDeque::new()},
