@@ -37,7 +37,7 @@ impl InOut<usize, usize> for WorkerA {
         self.counter = 0;
         None
     }
-    fn splitter_handler(&mut self) -> Option<usize> {
+    fn splitter(&mut self) -> Option<usize> {
         if self.counter < self.number_of_messages {
             self.counter = self.counter + 1;
             Some(self.counter)

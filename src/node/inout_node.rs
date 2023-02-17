@@ -24,7 +24,7 @@ Public API
 */
 pub trait InOut<TIn, TOut>: DynClone {
     fn run(&mut self, input: TIn) -> Option<TOut>;
-    fn splitter_handler(&mut self) -> Option<TOut> {
+    fn splitter(&mut self) -> Option<TOut> {
         None
     }
     fn number_of_replicas(&self) -> usize {
@@ -289,7 +289,7 @@ impl<
                         } else {
                             let mut tmp = VecDeque::new();
                             loop {
-                                let splitter_out = node.splitter_handler();
+                                let splitter_out = node.splitter();
                                 match splitter_out {
                                     Some(msg) => {
                                         tmp.push_back(msg);
@@ -300,8 +300,8 @@ impl<
 
                             if node.is_ordered() {
                                 let (lock, cvar) = &*ordered_splitter_handler;
+                                let mut ordered_splitter = lock.lock().unwrap();
                                 loop {
-                                    let mut ordered_splitter = lock.lock().unwrap();
                                     let (latest, end) = ordered_splitter.get();
                                     if latest == order {
                                         let mut count_splitter = end;
@@ -325,6 +325,8 @@ impl<
                                         let err = cvar.wait(ordered_splitter);
                                         if err.is_err() {
                                             panic!("Error: Poisoned mutex!");
+                                        } else {
+                                            ordered_splitter = err.unwrap();
                                         }
                                     }
                                 }

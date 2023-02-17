@@ -37,7 +37,7 @@ impl InOut<String, String> for WorkerA {
         }
         None
     }
-    fn splitter_handler(&mut self) -> Option<String> {
+    fn splitter(&mut self) -> Option<String> {
         if !self.queue.is_empty() {
             Some(self.queue.pop().unwrap())
         } else {
