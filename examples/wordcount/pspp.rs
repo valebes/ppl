@@ -12,14 +12,21 @@ use pspp::{
 };
 
 struct Source {
-    buffer: VecDeque<String>,
+    reader: BufReader<File>,
 }
 impl Out<String> for Source {
     fn run(&mut self) -> Option<String> {
-        if !self.buffer.is_empty() {
-            Some(self.buffer.pop_front().unwrap())
-        } else {
-            None
+        let mut tmp = String::new();
+        let res = self.reader.read_line(&mut tmp);
+        match res {
+            Ok(len) => {
+                if len > 0 {
+                    Some(tmp)
+                } else {
+                    None
+                }
+            },
+            Err(e) => panic!("{}", e.to_string()),
         }
     }
 }
@@ -31,7 +38,8 @@ struct Splitter {
 }
 impl InOut<String, String> for Splitter {
     fn run(&mut self, input: String) -> Option<String> {
-        self.tmp_buffer = input.split_whitespace().into_iter().map(|s| String::from(s).to_lowercase()).collect();
+        self.tmp_buffer = input.split_whitespace().into_iter().map(|s| s.to_lowercase().chars()
+        .filter(|c| c.is_alphabetic()).collect::<String>()).collect();
         None
     }
     fn splitter(&mut self) -> Option<String> {
@@ -82,7 +90,7 @@ struct Sink {
 }
 impl In<(String, usize), usize> for Sink {
     fn run(&mut self, input: (String, usize)) {
-        //println!("Received word {} with counter {}", input.0, input.1 );
+        println!("Received word {} with counter {}", input.0, input.1 );
         self.counter = self.counter + 1;
     }
     fn finalize(self) -> Option<usize> {
@@ -95,18 +103,12 @@ impl In<(String, usize), usize> for Sink {
 
 pub fn pspp(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
-    let reader = BufReader::new(file).lines();
-    let mut buffer = VecDeque::new();
-    for line in reader {
-        match line {
-            Ok(str) => buffer.push_back(str),
-            Err(_) => panic!("Error reading the dataset!"),
-        }
-    }
+    let reader = BufReader::new(file);
+
 
     let hashmap = Arc::new(DashMap::with_shard_amount(256));
     let mut p = parallel![
-        Source { buffer: buffer },
+        Source { reader: reader },
         Splitter {replicas: threads, tmp_buffer: VecDeque::new()},
         Counter { hashmap: Arc::clone(&hashmap) , replicas: threads},
         Sink { counter: 0 }
