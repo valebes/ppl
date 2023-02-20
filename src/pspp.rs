@@ -1,25 +1,57 @@
 use crate::node::{node::Node, out_node::*};
 
-pub struct Parallel<TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
-    first_block: OutNode<TOut, TCollected, TNext>,
+pub struct Parallel<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static > {
+    first_block: Option<OutNode<TOut, TCollected, TNext>>,
 }
 impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static>
     Parallel<TOut, TCollected, TNext>
 {
     pub fn new(first_block: OutNode<TOut, TCollected, TNext>) -> Parallel<TOut, TCollected, TNext> {
-        Parallel { first_block }
+        Parallel { first_block: Some(first_block) }
     }
     pub fn start(&mut self) {
-        let err = self.first_block.start();
-        if err.is_err() {
-            panic!("Error: Cannot start thread!");
+        match &mut self.first_block {
+            Some(block) =>{
+                let err = block.start();
+                if err.is_err() {
+                    panic!("Error: Cannot start thread!");
+                }
+            },
+            None =>  panic!("Error: Cannot start the pipeline!"),
         }
+
     }
 
-    pub fn wait_and_collect(self) -> Option<TCollected> {
-        Node::<TOut, TCollected>::collect(self.first_block)
+    pub fn wait_and_collect(&mut self) -> Option<TCollected> {
+        match &mut self.first_block {
+            Some(_block) => { 
+                let block = std::mem::replace(&mut self.first_block, None);
+                if block.is_some() {
+                    Node::<TOut, TCollected>::collect(block.unwrap())
+                } else {
+                    None
+                }             
+            },
+            None => None,
+        }
     }
 }
+
+impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static> Drop for
+    Parallel<TOut, TCollected, TNext> {
+        fn drop(&mut self) {
+            match &mut self.first_block {
+                Some(_block) => { 
+                    let block = std::mem::replace(&mut self.first_block, None);
+                    if block.is_some() {
+                        let _err= block.unwrap().terminate(); 
+                    }               
+                },
+                None => (),
+            }
+            println!("pipeline dropped")
+    }
+    }
 
 #[macro_export]
 macro_rules! propagate {
