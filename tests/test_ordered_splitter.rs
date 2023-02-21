@@ -88,9 +88,7 @@ fn test_ordered_splitter() {
             number_of_messages: 5,
             queue: Vec::new()
         },
-        Sink {
-            queue: Vec::new()
-        }
+        Sink { queue: Vec::new() }
     ];
 
     p.start();
@@ -100,7 +98,6 @@ fn test_ordered_splitter() {
     let c = vec!["paperino".to_string(); 5];
     let d = vec!["topolino".to_string(); 5];
 
-    let check =  [a,b,c,d].concat();
+    let check = [a, b, c, d].concat();
     assert_eq!(res, check)
-    
 }

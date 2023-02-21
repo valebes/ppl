@@ -3,11 +3,14 @@ mod pspp;
 
 fn main() {
     env_logger::init();
-    
+
     let args: Vec<String> = env::args().collect();
     if args.len() < 4 {
         println!();
-        panic!("Correct usage: $ ./{:?} <backend> <nthreads> <dataset.txt>", args[0]);
+        panic!(
+            "Correct usage: $ ./{:?} <backend> <nthreads> <dataset.txt>",
+            args[0]
+        );
     }
     let backend = &args[1];
     let threads = args[2].parse::<usize>().unwrap();

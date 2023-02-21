@@ -58,10 +58,7 @@ impl OrderedSplitter {
         }
     }
     fn get(&self) -> (usize, usize) {
-        (
-            self.latest,
-            self.start,
-        )
+        (self.latest, self.start)
     }
     fn set(&mut self, latest: usize, start: usize) {
         self.latest = latest;
@@ -205,14 +202,7 @@ impl<
             let mut thread = Thread::new(
                 i + id,
                 move || {
-                    Self::rts(
-                        i + id,
-                        copy,
-                        channel_in,
-                        &nn,
-                        replicas,
-                        &splitter_copy,
-                    );
+                    Self::rts(i + id, copy, channel_in, &nn, replicas, &splitter_copy);
                 },
                 pinning,
             );

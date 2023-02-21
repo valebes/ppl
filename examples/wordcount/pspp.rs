@@ -1,4 +1,10 @@
-use std::{fs::File, collections::{VecDeque}, io::{BufReader, BufRead}, time::SystemTime, sync::{Arc}};
+use std::{
+    collections::VecDeque,
+    fs::File,
+    io::{BufRead, BufReader},
+    sync::Arc,
+    time::SystemTime,
+};
 
 use dashmap::DashMap;
 use pspp::{
@@ -25,7 +31,7 @@ impl Out<String> for Source {
                 } else {
                     None
                 }
-            },
+            }
             Err(e) => panic!("{}", e.to_string()),
         }
     }
@@ -34,12 +40,20 @@ impl Out<String> for Source {
 #[derive(Clone)]
 struct Splitter {
     replicas: usize,
-    tmp_buffer: VecDeque<String>
+    tmp_buffer: VecDeque<String>,
 }
 impl InOut<String, String> for Splitter {
     fn run(&mut self, input: String) -> Option<String> {
-        self.tmp_buffer = input.split_whitespace().into_iter().map(|s| s.to_lowercase().chars()
-        .filter(|c| c.is_alphabetic()).collect::<String>()).collect();
+        self.tmp_buffer = input
+            .split_whitespace()
+            .into_iter()
+            .map(|s| {
+                s.to_lowercase()
+                    .chars()
+                    .filter(|c| c.is_alphabetic())
+                    .collect::<String>()
+            })
+            .collect();
         None
     }
     fn splitter(&mut self) -> Option<String> {
@@ -62,11 +76,11 @@ impl InOut<String, String> for Splitter {
 
 #[derive(Clone)]
 struct Counter {
-    hashmap:  Arc<DashMap<String, usize>>,
+    hashmap: Arc<DashMap<String, usize>>,
     replicas: usize,
 }
 impl InOut<String, (String, usize)> for Counter {
-    fn run(&mut self, input: String) -> Option< (String, usize)> {
+    fn run(&mut self, input: String) -> Option<(String, usize)> {
         if self.hashmap.contains_key(&input) {
             let res = *self.hashmap.get(&input).unwrap() + 1;
             self.hashmap.insert(input.clone(), res);
@@ -84,9 +98,8 @@ impl InOut<String, (String, usize)> for Counter {
     }
 }
 
-
 struct Sink {
-    counter: usize
+    counter: usize,
 }
 impl In<(String, usize), usize> for Sink {
     fn run(&mut self, _input: (String, usize)) {
@@ -105,12 +118,17 @@ pub fn pspp(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
     let reader = BufReader::new(file);
 
-
     let hashmap = Arc::new(DashMap::with_shard_amount(256));
     let mut p = parallel![
         Source { reader: reader },
-        Splitter {replicas: threads, tmp_buffer: VecDeque::new()},
-        Counter { hashmap: Arc::clone(&hashmap) , replicas: threads},
+        Splitter {
+            replicas: threads,
+            tmp_buffer: VecDeque::new()
+        },
+        Counter {
+            hashmap: Arc::clone(&hashmap),
+            replicas: threads
+        },
         Sink { counter: 0 }
     ];
 

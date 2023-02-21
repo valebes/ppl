@@ -7,3 +7,4 @@ pub mod node;
 pub mod pspp;
 pub mod task;
 pub mod thread;
+pub mod thread_pool;
