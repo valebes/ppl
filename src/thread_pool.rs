@@ -1,10 +1,13 @@
 use crossbeam_deque::{Injector, Worker, Stealer};
 use log::trace;
+use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier};
 use std::thread::{JoinHandle};
 use std::{ iter, thread, mem, hint};
+
+use crate::channel::{self, Channel};
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -97,18 +100,17 @@ impl ThreadPool {
         })
     }
 
-    pub fn wait(&mut self) {
-        while self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0 && !self.injector.is_empty() {
+    pub fn wait(&self) {
+        while (self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0) && !self.injector.is_empty() {
             hint::spin_loop();
         }
 
     }
 
-    pub fn par_for<Iter: IntoIterator, F>(&mut self, iter: Iter, f: F, chunk_size: usize)
+    pub fn par_for<Iter: IntoIterator, F>(&mut self, iter: Iter, f: F)
     where
     F: FnOnce(Iter::Item) + Send + 'static + Copy, <Iter as IntoIterator>::Item: Send
     {
-        let ck = chunk_size;
         self.scoped(|s| {
             iter.into_iter().for_each(|el| {
                 s.execute(move || {
@@ -118,6 +120,37 @@ impl ThreadPool {
         });
     }
 
+    pub fn par_map<Iter: IntoIterator, F, R>(&mut self, iter: Iter, f: F) -> impl Iterator<Item = R>
+    where
+    F: FnOnce(Iter::Item) -> R + Send + 'static + Copy, <Iter as IntoIterator>::Item: Send, R: Send {
+        let (rx, tx) = Channel::new(true);
+        let arc_tx = Arc::new(tx);
+        self.scoped(|s| {
+            iter.into_iter().enumerate().for_each(|el| {
+                let out_cp = Arc::clone(&arc_tx);
+                s.execute(move || {
+                   let err = out_cp.send((el.0, (&f)(el.1)));
+                    if err.is_err() {
+                        panic!("Error: {}", err.unwrap_err().to_string());
+                    }
+                })
+            });
+        });
+
+        self.wait();
+        
+        let mut unordered_map = BTreeMap::<usize, R>::new();
+        while !arc_tx.is_empty() && !rx.is_empty() {
+            let msg = rx.receive();
+            match msg {
+                Ok(Some((order, result))) => unordered_map.insert(order, result),
+                Ok(None) => continue,
+                Err(e) => panic!("Error: {}", e.to_string()),
+            };
+        }
+        unordered_map.into_values()
+
+    }
     pub fn scoped<'pool, 'scope, F, R>(&'pool mut self, f: F) -> R
     where F: FnOnce(&Scope<'pool, 'scope>) -> R
 {
@@ -198,12 +231,14 @@ fn test_par_for() {
 
     tp.wait();
 
-    tp.par_for(&mut vec, |el: &mut i32| { *el = *el + 1 }, 10);
+    tp.par_for(&mut vec, |el: &mut i32| { *el = *el + 1 });
 
-   
     tp.wait();
 
-    for e in vec.iter() {
+    let res: Vec<String> = tp.par_map(&mut vec, |el| -> String { String::from("Hello from: ".to_string() + &el.to_string()) }).collect();
+
+    
+    for e in res.iter() {
         println!("[{}]", e);
     }
 }

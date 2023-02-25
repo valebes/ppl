@@ -1,5 +1,4 @@
 use std::{error::Error, fmt};
-
 use crossbeam_channel::{Receiver, RecvError, Sender, TryRecvError};
 
 #[derive(Debug)]
@@ -57,6 +56,11 @@ impl<T: Send> InputChannel<T> {
             }
         }
     }
+    
+    pub fn is_empty(&self) -> bool {
+        self.rx.is_empty()
+    }
+
 }
 
 pub struct OutputChannel<T> {
@@ -70,6 +74,10 @@ impl<T: Send> OutputChannel<T> {
             Ok(()) => Ok(()),
             Err(e) => Err(ChannelError::new(&e.to_string())),
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tx.is_empty()
     }
 }
 
