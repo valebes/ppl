@@ -1,20 +1,21 @@
 use crossbeam_deque::{Injector, Worker, Stealer};
 use log::trace;
-use std::sync::{Arc};
-use std::thread::JoinHandle;
-use std::{ iter, thread};
+use std::marker::PhantomData;
+use std::sync::atomic::AtomicUsize;
+use std::sync::{Arc, Barrier};
+use std::thread::{JoinHandle};
+use std::{ iter, thread, mem, hint};
 
-use crate::thread::Thread;
-
-type Func = Box<dyn FnOnce() + Send + 'static>;
+type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
 enum Job {
-    NewJob(Func),
+    NewJob(Func<'static>),
     Terminate,
 }
 
 struct ThreadPool {
     threads: Vec<Option<JoinHandle<()>>>,
+    total_tasks: Arc<AtomicUsize>,
     injector: Arc<Injector<Job>>,
 }
 
@@ -32,20 +33,29 @@ impl ThreadPool {
             stealers.push(w.stealer());
         }
 
+        let total_tasks = Arc::new(AtomicUsize::new(0));
+        let barrier = Arc::new(Barrier::new(num_threads));
+
         for i in 0..num_threads {   
             let local_injector = Arc::clone(&injector);
             let local_worker = workers.remove(0);
             let local_stealers = stealers.clone();
+            let local_barrier = Arc::clone(&barrier);
+            let total_tasks_cp = Arc::clone(&total_tasks);
 
-            
             threads.push(Some(thread::spawn(move || {
                 let mut stop = false;
+                // We wait that all threads start
+                local_barrier.wait();
                 loop {
                     let res = Self::find_task(&local_worker, &local_injector, &local_stealers);
                     match res {
                         Some(task) => {
                             match task {
-                                Job::NewJob(func) => (func)(),
+                                Job::NewJob(func) =>  {
+                                    (func)();
+                                    total_tasks_cp.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+                                },
                                 Job::Terminate => stop = true,
                             }
                         },
@@ -62,7 +72,7 @@ impl ThreadPool {
             })));
         }
 
-        Self { threads, injector }
+        Self { threads, total_tasks, injector }
     }
 
     fn find_task<F>(
@@ -87,12 +97,37 @@ impl ThreadPool {
         })
     }
 
-    fn execute<F>(&self, task: F)
-    where
-        F: FnOnce() + Send + 'static,
-    {
-        self.injector.push(Job::NewJob(Box::new(task)));
+    pub fn wait(&mut self) {
+        while self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0 && !self.injector.is_empty() {
+            hint::spin_loop();
+        }
+
     }
+
+    pub fn par_for<Iter: IntoIterator, F>(&mut self, iter: Iter, f: F, chunk_size: usize)
+    where
+    F: FnOnce(Iter::Item) + Send + 'static + Copy, <Iter as IntoIterator>::Item: Send
+    {
+        let ck = chunk_size;
+        self.scoped(|s| {
+            iter.into_iter().for_each(|el| {
+                s.execute(move || {
+                    (&f)(el)
+                })
+            });
+        });
+    }
+
+    pub fn scoped<'pool, 'scope, F, R>(&'pool mut self, f: F) -> R
+    where F: FnOnce(&Scope<'pool, 'scope>) -> R
+{
+    let scope = Scope {
+        pool: self,
+        _marker: PhantomData,
+    };
+    f(&scope)
+}
+
 }
 
 impl Drop for ThreadPool {
@@ -107,6 +142,24 @@ impl Drop for ThreadPool {
         }
     }
 }
+pub struct Scope<'pool, 'scope> {
+    pool: &'pool mut ThreadPool,
+    _marker: PhantomData<::std::cell::Cell<&'scope mut ()>>,
+}
+
+impl<'pool, 'scope> Scope<'pool, 'scope> {
+    fn execute<F>(&self, task: F)
+    where
+        F: FnOnce() + Send + 'scope,
+    {
+        let task = unsafe {
+            mem::transmute::<Func<'scope>, Func<'static>>(Box::new(task))
+        };
+        self.pool.injector.push(Job::NewJob(Box::new(task)));
+        self.pool.total_tasks.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+    }
+}
+
 pub fn fibonacci_reccursive(n: i32) -> u64 {
     if n < 0 {
         panic!("{} is negative!", n);
@@ -126,6 +179,31 @@ pub fn fibonacci_reccursive(n: i32) -> u64 {
 fn test_threadpool() {
     let mut tp = ThreadPool::new(8, false);
     for i in 1..45 {
-        tp.execute(move || { println!("Fib({}): {}", i, fibonacci_reccursive(i)) })
+        tp.scoped(|s| { s.execute(move || { println!("Fib({}): {}", i, fibonacci_reccursive(i)) })});
+    }
+}
+
+#[test]
+fn test_par_for() {
+    let mut vec = vec![0;10];
+    let mut tp = ThreadPool::new(8, false);
+
+    tp.scoped(
+        |s| {
+            for e in vec.iter_mut() {
+                s.execute(move || { *e = *e + 1; } );
+            }
+        }
+    );
+
+    tp.wait();
+
+    tp.par_for(&mut vec, |el: &mut i32| { *el = *el + 1 }, 10);
+
+   
+    tp.wait();
+
+    for e in vec.iter() {
+        println!("[{}]", e);
     }
 }
