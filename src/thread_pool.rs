@@ -123,30 +123,30 @@ impl ThreadPool {
     pub fn par_map<Iter: IntoIterator, F, R>(&mut self, iter: Iter, f: F) -> impl Iterator<Item = R>
     where
     F: FnOnce(Iter::Item) -> R + Send + 'static + Copy, <Iter as IntoIterator>::Item: Send, R: Send {
-        let (rx, tx) = Channel::new(true);
-        let arc_tx = Arc::new(tx);
+        let (rx, tx) = Channel::new(false);
+        let mut arc_tx = Arc::new(tx);
+        let mut unordered_map = BTreeMap::<usize, R>::new();
+        
         self.scoped(|s| {
             iter.into_iter().enumerate().for_each(|el| {
-                let out_cp = Arc::clone(&arc_tx);
+                let cp = Arc::clone(&arc_tx);
                 s.execute(move || {
-                   let err = out_cp.send((el.0, (&f)(el.1)));
+                   let err = cp.send((el.0, (&f)(el.1)));
                     if err.is_err() {
                         panic!("Error: {}", err.unwrap_err().to_string());
                     }
-                })
+                });
             });
         });
-
         self.wait();
-        
-        let mut unordered_map = BTreeMap::<usize, R>::new();
-        while !arc_tx.is_empty() && !rx.is_empty() {
+        while Arc::strong_count(&arc_tx) != 1 || !rx.is_empty() {
             let msg = rx.receive();
             match msg {
                 Ok(Some((order, result))) => unordered_map.insert(order, result),
                 Ok(None) => continue,
                 Err(e) => panic!("Error: {}", e.to_string()),
             };
+            
         }
         unordered_map.into_values()
 
@@ -166,6 +166,7 @@ impl ThreadPool {
 impl Drop for ThreadPool {
     fn drop(&mut self) {
         trace!("Closing threadpool");
+        self.wait();
         self.injector.push(Job::Terminate);
         for th in &mut self.threads {
             match th.take() {
@@ -218,7 +219,7 @@ fn test_threadpool() {
 
 #[test]
 fn test_par_for() {
-    let mut vec = vec![0;10];
+    let mut vec = vec![0;100];
     let mut tp = ThreadPool::new(8, false);
 
     tp.scoped(
@@ -236,8 +237,7 @@ fn test_par_for() {
     tp.wait();
 
     let res: Vec<String> = tp.par_map(&mut vec, |el| -> String { String::from("Hello from: ".to_string() + &el.to_string()) }).collect();
-
-    
+            
     for e in res.iter() {
         println!("[{}]", e);
     }

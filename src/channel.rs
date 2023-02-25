@@ -56,7 +56,7 @@ impl<T: Send> InputChannel<T> {
             }
         }
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.rx.is_empty()
     }
@@ -78,6 +78,12 @@ impl<T: Send> OutputChannel<T> {
 
     pub fn is_empty(&self) -> bool {
         self.tx.is_empty()
+    }
+}
+
+impl<T> Clone for OutputChannel<T> {
+    fn clone(&self) -> Self {
+        Self { tx: self.tx.clone() }
     }
 }
 
