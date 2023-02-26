@@ -56,14 +56,14 @@ impl InOut<String, String> for Splitter {
             .collect();
         None
     }
-    fn splitter(&mut self) -> Option<String> {
+    fn produce(&mut self) -> Option<String> {
         if !self.tmp_buffer.is_empty() {
             Some(self.tmp_buffer.pop_front().unwrap())
         } else {
             None
         }
     }
-    fn is_splitter(&self) -> bool {
+    fn is_producer(&self) -> bool {
         true
     }
     fn number_of_replicas(&self) -> usize {

@@ -100,6 +100,14 @@ impl ThreadPool {
         })
     }
 
+    // Execute normal task ( not scoped )
+    fn execute<F>(&self, task: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.injector.push(Job::NewJob(Box::new(task)));
+    }
+
     pub fn wait(&self) {
         while (self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0) && !self.injector.is_empty() {
             hint::spin_loop();
@@ -211,9 +219,9 @@ pub fn fibonacci_reccursive(n: i32) -> u64 {
 
 #[test]
 fn test_threadpool() {
-    let mut tp = ThreadPool::new(8, false);
+    let tp = ThreadPool::new(8, false);
     for i in 1..45 {
-        tp.scoped(|s| { s.execute(move || { println!("Fib({}): {}", i, fibonacci_reccursive(i)) })});
+        tp.execute(move || { println!("Fib({}): {}", i, fibonacci_reccursive(i)) });
     }
 }
 
@@ -236,9 +244,18 @@ fn test_par_for() {
 
     tp.wait();
 
-    let res: Vec<String> = tp.par_map(&mut vec, |el| -> String { String::from("Hello from: ".to_string() + &el.to_string()) }).collect();
-            
-    for e in res.iter() {
-        println!("[{}]", e);
+    assert_eq!(vec, vec![2i32 ;100])
+}
+
+#[test]
+fn test_par_map() {
+    let mut vec = Vec::new();
+    let mut tp = ThreadPool::new(8, false);
+
+    for i in 0..100 {
+        vec.push(i);
     }
+    let res: Vec<String> = tp.par_map(&mut vec, |el| -> String { String::from("Hello from: ".to_string() + &el.to_string()) }).collect();
+
+    assert_eq!(vec.len(), 100)
 }

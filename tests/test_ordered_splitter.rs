@@ -37,14 +37,14 @@ impl InOut<String, String> for WorkerA {
         }
         None
     }
-    fn splitter(&mut self) -> Option<String> {
+    fn produce(&mut self) -> Option<String> {
         if !self.queue.is_empty() {
             Some(self.queue.pop().unwrap())
         } else {
             None
         }
     }
-    fn is_splitter(&self) -> bool {
+    fn is_producer(&self) -> bool {
         true
     }
     fn number_of_replicas(&self) -> usize {

@@ -24,7 +24,7 @@ Public API
 */
 pub trait InOut<TIn, TOut>: DynClone {
     fn run(&mut self, input: TIn) -> Option<TOut>;
-    fn splitter(&mut self) -> Option<TOut> {
+    fn produce(&mut self) -> Option<TOut> {
         None
     }
     fn number_of_replicas(&self) -> usize {
@@ -41,7 +41,7 @@ pub trait InOut<TIn, TOut>: DynClone {
         // to be implemented
         false
     }
-    fn is_splitter(&self) -> bool {
+    fn is_producer(&self) -> bool {
         false
     }
 }
@@ -218,7 +218,7 @@ impl<
             threads: threads,
             next_node: next_node,
             ordered: handler.is_ordered(),
-            splitter: handler.is_splitter(),
+            splitter: handler.is_producer(),
             ordered_splitter: splitter,
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
@@ -259,7 +259,7 @@ impl<
                 Ok(Some(Message { op, order })) => match op {
                     Task::NewTask(arg) => {
                         let output = node.run(arg);
-                        if !node.is_splitter() {
+                        if !node.is_producer() {
                             match output {
                                 Some(msg) => {
                                     let err = next_node
@@ -279,7 +279,7 @@ impl<
                         } else {
                             let mut tmp = VecDeque::new();
                             loop {
-                                let splitter_out = node.splitter();
+                                let splitter_out = node.produce();
                                 match splitter_out {
                                     Some(msg) => {
                                         tmp.push_back(msg);

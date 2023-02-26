@@ -37,7 +37,7 @@ impl InOut<usize, usize> for WorkerA {
         self.counter = 0;
         None
     }
-    fn splitter(&mut self) -> Option<usize> {
+    fn produce(&mut self) -> Option<usize> {
         if self.counter < self.number_of_messages {
             self.counter = self.counter + 1;
             Some(self.counter)
@@ -45,7 +45,7 @@ impl InOut<usize, usize> for WorkerA {
             None
         }
     }
-    fn is_splitter(&self) -> bool {
+    fn is_producer(&self) -> bool {
         true
     }
     fn number_of_replicas(&self) -> usize {
