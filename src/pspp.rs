@@ -58,6 +58,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     }
 }
 
+
 #[macro_export]
 macro_rules! propagate {
     ($id:expr, $s1:expr) => {
@@ -69,8 +70,10 @@ macro_rules! propagate {
 
     ($id:expr, $s1:expr $(, $tail:expr)*) => {
         {
-            let mut block = InOutNode::new($id, Box::new($s1),
-                propagate!($id + (1 * $s1.number_of_replicas()), $($tail),*),
+            let node = ($s1);
+            let replicas = node.number_of_replicas();
+            let mut block = InOutNode::new($id, Box::new(node),
+                propagate!($id + (1 * replicas), $($tail),*),
                 false, false).unwrap();
             block
         }
@@ -88,4 +91,5 @@ macro_rules! parallel {
             pipeline
         }
     };
+
 }

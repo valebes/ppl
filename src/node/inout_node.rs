@@ -71,7 +71,7 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     channels: Vec<OutputChannel<Message<TIn>>>,
     next_node: Arc<TNext>,
     ordered: bool,
-    splitter: bool,
+    producer: bool,
     ordered_splitter: Arc<(Mutex<OrderedSplitter>, Condvar)>,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
@@ -192,13 +192,22 @@ impl<
         let replicas = handler.number_of_replicas();
 
         let splitter = Arc::new((Mutex::new(OrderedSplitter::new()), Condvar::new()));
+        let ordered = handler.is_ordered();
+        let producer = handler.is_producer();
+
+        let mut handler_copies = Vec::with_capacity(replicas);
+        for _i in 0..replicas-1 {
+            handler_copies.push(dyn_clone::clone_box(&*handler));
+        }
+        handler_copies.push(handler);
+        
         for i in 0..replicas {
             let (channel_in, channel_out) = Channel::new(blocking);
             channels.push(channel_out);
             let nn = Arc::clone(&next_node);
-            let copy = dyn_clone::clone_box(&*handler);
-
             let splitter_copy = Arc::clone(&splitter);
+            let copy = handler_copies.pop().unwrap();
+
             let mut thread = Thread::new(
                 i + id,
                 move || {
@@ -217,8 +226,8 @@ impl<
             channels: channels,
             threads: threads,
             next_node: next_node,
-            ordered: handler.is_ordered(),
-            splitter: handler.is_producer(),
+            ordered: ordered,
+            producer: producer,
             ordered_splitter: splitter,
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
@@ -365,9 +374,9 @@ impl<
             }
         }
         let mut c = 0;
-        if self.ordered && !self.splitter {
+        if self.ordered && !self.producer {
             c = self.next_msg.load(Ordering::SeqCst);
-        } else if self.ordered && self.splitter {
+        } else if self.ordered && self.producer {
             let (lock, _) = self.ordered_splitter.as_ref();
             let ordered_splitter = lock.lock().unwrap();
             (_, c) = ordered_splitter.get();

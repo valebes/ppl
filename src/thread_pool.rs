@@ -3,11 +3,11 @@ use log::trace;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
-use std::sync::{Arc, Barrier};
+use std::sync::{Arc, Barrier, Mutex};
 use std::thread::{JoinHandle};
 use std::{ iter, thread, mem, hint};
 
-use crate::channel::{self, Channel};
+use crate::channel::{Channel};
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -15,15 +15,22 @@ enum Job {
     NewJob(Func<'static>),
     Terminate,
 }
-
-struct ThreadPool {
-    threads: Vec<Option<JoinHandle<()>>>,
+pub struct ThreadPool {
+    num_threads: usize,
+    pinning: bool,
+    threads: Arc<Mutex<Vec<Option<JoinHandle<()>>>>>,
     total_tasks: Arc<AtomicUsize>,
     injector: Arc<Injector<Job>>,
 }
 
+impl Clone for ThreadPool {
+    fn clone(&self) -> Self {
+        ThreadPool::new(self.num_threads, self.pinning)
+}
+}
 impl ThreadPool {
-    fn new(num_threads: usize, pinning: bool) -> Self {
+    pub fn new(num_threads: usize, pinning: bool) -> Self {
+        println!("Creating new threadpool");
         let mut threads = Vec::with_capacity(num_threads);
         let mut workers: Vec<Worker<Job>> = Vec::with_capacity(num_threads);
         let mut stealers = Vec::with_capacity(num_threads);
@@ -50,6 +57,7 @@ impl ThreadPool {
                 let mut stop = false;
                 // We wait that all threads start
                 local_barrier.wait();
+                println!("Thread started");
                 loop {
                     let res = Self::find_task(&local_worker, &local_injector, &local_stealers);
                     match res {
@@ -75,7 +83,7 @@ impl ThreadPool {
             })));
         }
 
-        Self { threads, total_tasks, injector }
+        Self { num_threads, pinning, threads: Arc::new(Mutex::new(threads)), total_tasks, injector }
     }
 
     fn find_task<F>(
@@ -101,7 +109,7 @@ impl ThreadPool {
     }
 
     // Execute normal task ( not scoped )
-    fn execute<F>(&self, task: F)
+    pub fn execute<F>(&self, task: F)
     where
         F: FnOnce() + Send + 'static,
     {
@@ -130,11 +138,10 @@ impl ThreadPool {
 
     pub fn par_map<Iter: IntoIterator, F, R>(&mut self, iter: Iter, f: F) -> impl Iterator<Item = R>
     where
-    F: FnOnce(Iter::Item) -> R + Send + 'static + Copy, <Iter as IntoIterator>::Item: Send, R: Send {
-        let (rx, tx) = Channel::new(false);
-        let mut arc_tx = Arc::new(tx);
+    F: FnOnce(Iter::Item) -> R + Send + Copy, <Iter as IntoIterator>::Item: Send, R: Send {
+        let (rx, tx) = Channel::new(true);
+        let arc_tx = Arc::new(tx);
         let mut unordered_map = BTreeMap::<usize, R>::new();
-        
         self.scoped(|s| {
             iter.into_iter().enumerate().for_each(|el| {
                 let cp = Arc::clone(&arc_tx);
@@ -150,7 +157,9 @@ impl ThreadPool {
         while Arc::strong_count(&arc_tx) != 1 || !rx.is_empty() {
             let msg = rx.receive();
             match msg {
-                Ok(Some((order, result))) => unordered_map.insert(order, result),
+                Ok(Some((order, result))) => {
+                    unordered_map.insert(order, result);
+                },
                 Ok(None) => continue,
                 Err(e) => panic!("Error: {}", e.to_string()),
             };
@@ -173,15 +182,22 @@ impl ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        trace!("Closing threadpool");
+        println!("Closing threadpool");
         self.wait();
         self.injector.push(Job::Terminate);
-        for th in &mut self.threads {
-            match th.take() {
-                Some(thread) => thread.join().expect("Error while joining thread!"),
-                None => (), // thread already joined
-            }
+        let mtx = self.threads.lock();
+        match mtx {
+            Ok(mut tp) => {
+                for th in &mut *tp {
+                    match th.take() {
+                        Some(thread) => thread.join().expect("Error while joining thread!"),
+                        None => (), // thread already joined
+                    }
+                }
+            },
+            Err(e) => panic!("Error: {}", e.to_string()),
         }
+
     }
 }
 pub struct Scope<'pool, 'scope> {
@@ -255,7 +271,7 @@ fn test_par_map() {
     for i in 0..100 {
         vec.push(i);
     }
-    let res: Vec<String> = tp.par_map(&mut vec, |el| -> String { String::from("Hello from: ".to_string() + &el.to_string()) }).collect();
+    let res: Vec<String> = tp.par_map(vec, |el| -> String { String::from("Hello from: ".to_string() + &el.to_string()) }).collect();
 
-    assert_eq!(vec.len(), 100)
+    assert_eq!(res.len(), 100)
 }
