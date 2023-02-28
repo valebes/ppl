@@ -52,7 +52,7 @@ impl InOut<i32, u64> for WorkerA {
         Some(fibonacci_reccursive(input))
     }
     fn number_of_replicas(&self) -> usize {
-        6
+        8
     }
 }
 

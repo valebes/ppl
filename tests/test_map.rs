@@ -29,7 +29,7 @@ struct Sink {
 }
 impl In<Vec<String>, usize> for Sink {
     fn run(&mut self, input: Vec<String>) {
-        for el in input {
+        for _el in input {
             //println!("{}", el);
         }
         self.counter = self.counter + 1;

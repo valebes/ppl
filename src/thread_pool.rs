@@ -117,11 +117,12 @@ impl ThreadPool {
         F: FnOnce() + Send + 'static,
     {
         self.injector.push(Job::NewJob(Box::new(task)));
+        self.total_tasks.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     }
 
     pub fn wait(&self) {
         while (self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0)
-            && !self.injector.is_empty()
+            || !self.injector.is_empty()
         {
             hint::spin_loop();
         }
@@ -158,7 +159,7 @@ impl ThreadPool {
             });
         });
         self.wait();
-        while Arc::strong_count(&arc_tx) != 1 || !rx.is_empty() {
+        while !rx.is_empty() {
             let msg = rx.receive();
             match msg {
                 Ok(Some((order, result))) => {
@@ -185,7 +186,6 @@ impl ThreadPool {
 impl Drop for ThreadPool {
     fn drop(&mut self) {
         trace!("Closing threadpool");
-        self.wait();
         self.injector.push(Job::Terminate);
         let mtx = self.threads.lock();
         match mtx {
