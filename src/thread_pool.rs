@@ -1,13 +1,13 @@
-use crossbeam_deque::{Injector, Worker, Stealer};
+use crossbeam_deque::{Injector, Stealer, Worker};
 use log::trace;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier, Mutex};
-use std::thread::{JoinHandle};
-use std::{ iter, thread, mem, hint};
+use std::thread::JoinHandle;
+use std::{hint, iter, mem, thread};
 
-use crate::channel::{Channel};
+use crate::channel::Channel;
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -26,11 +26,11 @@ pub struct ThreadPool {
 impl Clone for ThreadPool {
     fn clone(&self) -> Self {
         ThreadPool::new(self.num_threads, self.pinning)
-}
+    }
 }
 impl ThreadPool {
     pub fn new(num_threads: usize, pinning: bool) -> Self {
-        println!("Creating new threadpool");
+        trace!("Creating new threadpool");
         let mut threads = Vec::with_capacity(num_threads);
         let mut workers: Vec<Worker<Job>> = Vec::with_capacity(num_threads);
         let mut stealers = Vec::with_capacity(num_threads);
@@ -46,7 +46,7 @@ impl ThreadPool {
         let total_tasks = Arc::new(AtomicUsize::new(0));
         let barrier = Arc::new(Barrier::new(num_threads));
 
-        for i in 0..num_threads {   
+        for i in 0..num_threads {
             let local_injector = Arc::clone(&injector);
             let local_worker = workers.remove(0);
             let local_stealers = stealers.clone();
@@ -57,18 +57,15 @@ impl ThreadPool {
                 let mut stop = false;
                 // We wait that all threads start
                 local_barrier.wait();
-                println!("Thread started");
                 loop {
                     let res = Self::find_task(&local_worker, &local_injector, &local_stealers);
                     match res {
-                        Some(task) => {
-                            match task {
-                                Job::NewJob(func) =>  {
-                                    (func)();
-                                    total_tasks_cp.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
-                                },
-                                Job::Terminate => stop = true,
+                        Some(task) => match task {
+                            Job::NewJob(func) => {
+                                (func)();
+                                total_tasks_cp.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
                             }
+                            Job::Terminate => stop = true,
                         },
                         None => {
                             if stop {
@@ -77,27 +74,33 @@ impl ThreadPool {
                             } else {
                                 continue;
                             }
-                        },
+                        }
                     }
                 }
             })));
         }
 
-        Self { num_threads, pinning, threads: Arc::new(Mutex::new(threads)), total_tasks, injector }
+        Self {
+            num_threads,
+            pinning,
+            threads: Arc::new(Mutex::new(threads)),
+            total_tasks,
+            injector,
+        }
     }
 
     fn find_task<F>(
         local: &Worker<F>,
         global: &Injector<F>,
         stealers: &Vec<Stealer<F>>,
-    ) -> Option<F> 
-         {
+    ) -> Option<F> {
         // Pop a task from the local queue, if not empty.
         local.pop().or_else(|| {
             // Otherwise, we need to look for a task elsewhere.
             iter::repeat_with(|| {
                 // Try stealing a batch of tasks from the global queue.
-                global.steal_batch_and_pop(local)
+                global
+                    .steal_batch_and_pop(local)
                     // Or try stealing a task from one of the other threads.
                     .or_else(|| stealers.iter().map(|s| s.steal()).collect())
             })
@@ -117,28 +120,29 @@ impl ThreadPool {
     }
 
     pub fn wait(&self) {
-        while (self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0) && !self.injector.is_empty() {
+        while (self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0)
+            && !self.injector.is_empty()
+        {
             hint::spin_loop();
         }
-
     }
 
     pub fn par_for<Iter: IntoIterator, F>(&mut self, iter: Iter, f: F)
     where
-    F: FnOnce(Iter::Item) + Send + 'static + Copy, <Iter as IntoIterator>::Item: Send
+        F: FnOnce(Iter::Item) + Send + 'static + Copy,
+        <Iter as IntoIterator>::Item: Send,
     {
         self.scoped(|s| {
-            iter.into_iter().for_each(|el| {
-                s.execute(move || {
-                    (&f)(el)
-                })
-            });
+            iter.into_iter().for_each(|el| s.execute(move || (&f)(el)));
         });
     }
 
     pub fn par_map<Iter: IntoIterator, F, R>(&mut self, iter: Iter, f: F) -> impl Iterator<Item = R>
     where
-    F: FnOnce(Iter::Item) -> R + Send + Copy, <Iter as IntoIterator>::Item: Send, R: Send {
+        F: FnOnce(Iter::Item) -> R + Send + Copy,
+        <Iter as IntoIterator>::Item: Send,
+        R: Send,
+    {
         let (rx, tx) = Channel::new(true);
         let arc_tx = Arc::new(tx);
         let mut unordered_map = BTreeMap::<usize, R>::new();
@@ -146,7 +150,7 @@ impl ThreadPool {
             iter.into_iter().enumerate().for_each(|el| {
                 let cp = Arc::clone(&arc_tx);
                 s.execute(move || {
-                   let err = cp.send((el.0, (&f)(el.1)));
+                    let err = cp.send((el.0, (&f)(el.1)));
                     if err.is_err() {
                         panic!("Error: {}", err.unwrap_err().to_string());
                     }
@@ -159,30 +163,28 @@ impl ThreadPool {
             match msg {
                 Ok(Some((order, result))) => {
                     unordered_map.insert(order, result);
-                },
+                }
                 Ok(None) => continue,
                 Err(e) => panic!("Error: {}", e.to_string()),
             };
-            
         }
         unordered_map.into_values()
-
     }
     pub fn scoped<'pool, 'scope, F, R>(&'pool mut self, f: F) -> R
-    where F: FnOnce(&Scope<'pool, 'scope>) -> R
-{
-    let scope = Scope {
-        pool: self,
-        _marker: PhantomData,
-    };
-    f(&scope)
-}
-
+    where
+        F: FnOnce(&Scope<'pool, 'scope>) -> R,
+    {
+        let scope = Scope {
+            pool: self,
+            _marker: PhantomData,
+        };
+        f(&scope)
+    }
 }
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        println!("Closing threadpool");
+        trace!("Closing threadpool");
         self.wait();
         self.injector.push(Job::Terminate);
         let mtx = self.threads.lock();
@@ -194,10 +196,9 @@ impl Drop for ThreadPool {
                         None => (), // thread already joined
                     }
                 }
-            },
+            }
             Err(e) => panic!("Error: {}", e.to_string()),
         }
-
     }
 }
 pub struct Scope<'pool, 'scope> {
@@ -210,11 +211,11 @@ impl<'pool, 'scope> Scope<'pool, 'scope> {
     where
         F: FnOnce() + Send + 'scope,
     {
-        let task = unsafe {
-            mem::transmute::<Func<'scope>, Func<'static>>(Box::new(task))
-        };
+        let task = unsafe { mem::transmute::<Func<'scope>, Func<'static>>(Box::new(task)) };
         self.pool.injector.push(Job::NewJob(Box::new(task)));
-        self.pool.total_tasks.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        self.pool
+            .total_tasks
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     }
 }
 
@@ -237,30 +238,30 @@ pub fn fibonacci_reccursive(n: i32) -> u64 {
 fn test_threadpool() {
     let tp = ThreadPool::new(8, false);
     for i in 1..45 {
-        tp.execute(move || { println!("Fib({}): {}", i, fibonacci_reccursive(i)) });
+        tp.execute(move || println!("Fib({}): {}", i, fibonacci_reccursive(i)));
     }
 }
 
 #[test]
 fn test_par_for() {
-    let mut vec = vec![0;100];
+    let mut vec = vec![0; 100];
     let mut tp = ThreadPool::new(8, false);
 
-    tp.scoped(
-        |s| {
-            for e in vec.iter_mut() {
-                s.execute(move || { *e = *e + 1; } );
-            }
+    tp.scoped(|s| {
+        for e in vec.iter_mut() {
+            s.execute(move || {
+                *e = *e + 1;
+            });
         }
-    );
+    });
 
     tp.wait();
 
-    tp.par_for(&mut vec, |el: &mut i32| { *el = *el + 1 });
+    tp.par_for(&mut vec, |el: &mut i32| *el = *el + 1);
 
     tp.wait();
 
-    assert_eq!(vec, vec![2i32 ;100])
+    assert_eq!(vec, vec![2i32; 100])
 }
 
 #[test]
@@ -271,7 +272,11 @@ fn test_par_map() {
     for i in 0..100 {
         vec.push(i);
     }
-    let res: Vec<String> = tp.par_map(vec, |el| -> String { String::from("Hello from: ".to_string() + &el.to_string()) }).collect();
+    let res: Vec<String> = tp
+        .par_map(vec, |el| -> String {
+            String::from("Hello from: ".to_string() + &el.to_string())
+        })
+        .collect();
 
     assert_eq!(res.len(), 100)
 }

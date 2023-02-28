@@ -58,7 +58,6 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     }
 }
 
-
 #[macro_export]
 macro_rules! propagate {
     ($id:expr, $s1:expr) => {

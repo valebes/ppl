@@ -196,11 +196,11 @@ impl<
         let producer = handler.is_producer();
 
         let mut handler_copies = Vec::with_capacity(replicas);
-        for _i in 0..replicas-1 {
+        for _i in 0..replicas - 1 {
             handler_copies.push(dyn_clone::clone_box(&*handler));
         }
         handler_copies.push(handler);
-        
+
         for i in 0..replicas {
             let (channel_in, channel_out) = Channel::new(blocking);
             channels.push(channel_out);

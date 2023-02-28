@@ -60,7 +60,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         pinning: bool,
     ) -> Result<OutNode<TOut, TCollected, TNext>, ()> {
         trace!("Created a new Source! Id: {}", id);
-        let stop =  Arc::new(Mutex::new(false));
+        let stop = Arc::new(Mutex::new(false));
         let stop_copy = Arc::clone(&stop);
 
         let next_node = Arc::new(next_node);
@@ -96,11 +96,11 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                         let err = nn.send(Message::new(Task::Terminate, order), counter);
                         if err.is_err() {
                             warn!("Error: {}", err.unwrap_err())
-                      }
-                      // to do cleanup
-                      break;
+                        }
+                        // to do cleanup
+                        break;
                     }
-                },
+                }
                 Err(_) => panic!("Error: Cannot lock mutex."),
             }
 
@@ -140,7 +140,9 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
 
         match Arc::try_unwrap(self.next_node) {
-            Ok(nn) => { nn.collect(); },
+            Ok(nn) => {
+                nn.collect();
+            }
             Err(_) => panic!("Error: Cannot collect results"),
         }
 
@@ -150,7 +152,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         let mtx = self.stop.lock();
         match mtx {
             Ok(mut stop) => *stop = true,
-            Err(_) =>panic!("Error: Cannot lock mutex."),
+            Err(_) => panic!("Error: Cannot lock mutex."),
         }
     }
 

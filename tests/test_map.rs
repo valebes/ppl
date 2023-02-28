@@ -5,16 +5,15 @@
    Fibonacci number.
 */
 
-use std::{sync::Arc, marker::PhantomData};
-
 use pspp::{
+    map::Map,
     node::{
         in_node::{In, InNode},
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
     parallel, propagate,
-    pspp::Parallel,  thread_pool::ThreadPool, map::{Map},
+    pspp::Parallel,
 };
 
 struct Source {
@@ -25,14 +24,12 @@ impl Out<Vec<i32>> for Source {
     fn run(&mut self) -> Option<Vec<i32>> {
         if self.counter < self.streamlen {
             self.counter = self.counter + 1;
-            Some(vec![2i32 ;100])
+            Some(vec![2i32; 100])
         } else {
             None
         }
     }
 }
-
-
 
 struct Sink {
     counter: usize,
@@ -40,7 +37,7 @@ struct Sink {
 impl In<Vec<String>, usize> for Sink {
     fn run(&mut self, input: Vec<String>) {
         for el in input {
-            println!("{}", el);
+            //println!("{}", el);
         }
         self.counter = self.counter + 1;
     }
@@ -55,14 +52,15 @@ impl In<Vec<String>, usize> for Sink {
 fn test_map() {
     env_logger::init();
 
-
     let mut p = parallel![
         Source {
             streamlen: 45,
             counter: 0
         },
-       Map::new(2, |el: i32| -> String {String::from("Hello from: ".to_string() + &el.to_string())}),
-       Sink { counter: 0 }
+        Map::new(2, |el: i32| -> String {
+            String::from("Hello from: ".to_string() + &el.to_string())
+        }),
+        Sink { counter: 0 }
     ];
 
     p.start();

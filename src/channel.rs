@@ -1,5 +1,5 @@
-use std::{error::Error, fmt};
 use crossbeam_channel::{Receiver, RecvError, Sender, TryRecvError};
+use std::{error::Error, fmt};
 
 #[derive(Debug)]
 pub struct ChannelError {
@@ -60,7 +60,6 @@ impl<T: Send> InputChannel<T> {
     pub fn is_empty(&self) -> bool {
         self.rx.is_empty()
     }
-
 }
 
 pub struct OutputChannel<T> {
@@ -83,7 +82,9 @@ impl<T: Send> OutputChannel<T> {
 
 impl<T> Clone for OutputChannel<T> {
     fn clone(&self) -> Self {
-        Self { tx: self.tx.clone() }
+        Self {
+            tx: self.tx.clone(),
+        }
     }
 }
 
