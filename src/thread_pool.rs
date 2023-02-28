@@ -269,7 +269,7 @@ fn test_par_map() {
     let mut vec = Vec::new();
     let mut tp = ThreadPool::new(8, false);
 
-    for i in 0..100 {
+    for i in 0..1000 {
         vec.push(i);
     }
     let res: Vec<String> = tp
@@ -278,5 +278,13 @@ fn test_par_map() {
         })
         .collect();
 
-    assert_eq!(res.len(), 100)
+    let mut check = true;
+    let mut i = 0;
+    for str in res {
+        if str != String::from("Hello from: ".to_string() + &i.to_string()) {
+            check = false;
+        }
+        i += 1;
+    }
+    assert!(check)
 }
