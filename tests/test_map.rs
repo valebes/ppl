@@ -17,7 +17,7 @@ impl Out<Vec<i32>> for Source {
     fn run(&mut self) -> Option<Vec<i32>> {
         if self.counter < self.streamlen {
             self.counter = self.counter + 1;
-            Some(vec![2i32; 100])
+            Some((0..99).collect())
         } else {
             None
         }
@@ -25,19 +25,16 @@ impl Out<Vec<i32>> for Source {
 }
 
 struct Sink {
-    counter: usize,
+    res: Vec<Vec<String>>
 }
-impl In<Vec<String>, usize> for Sink {
+impl In<Vec<String>, Vec<Vec<String>>> for Sink {
     fn run(&mut self, input: Vec<String>) {
-        for _el in input {
-            //println!("{}", el);
-        }
-        self.counter = self.counter + 1;
+        self.res.push(input);
     }
 
-    fn finalize(self) -> Option<usize> {
+    fn finalize(self) -> Option<Vec<Vec<String>>> {
         println!("End");
-        Some(self.counter)
+        Some(self.res)
     }
 }
 
@@ -47,16 +44,27 @@ fn test_map() {
 
     let mut p = parallel![
         Source {
-            streamlen: 45,
+            streamlen: 50,
             counter: 0
         },
         Map::new(2, |el: i32| -> String {
             String::from("Hello from: ".to_string() + &el.to_string())
         }),
-        Sink { counter: 0 }
+        Sink { res: Vec::new() }
     ];
 
     p.start();
-    let res = p.wait_and_collect();
-    assert_eq!(res.unwrap(), 45);
+    let res = p.wait_and_collect().unwrap();
+
+    let mut check = true;
+    for sub_res in res {
+        let mut i = 0;
+        for str in sub_res {
+            if str != String::from("Hello from: ".to_string() + &i.to_string()) {
+                check = false;
+            }
+            i += 1;
+        }
+    }
+    assert!(check)
 }
