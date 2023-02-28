@@ -1,10 +1,3 @@
-/*
-   Fibonacci farm
-   Is generated a sequence of i from 1 to 45.
-   Each worker of the farm compute the i-th
-   Fibonacci number.
-*/
-
 use pspp::{
     map::Map,
     node::{
