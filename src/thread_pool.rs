@@ -280,6 +280,7 @@ fn test_par_for() {
 
 #[test]
 fn test_par_map() {
+    env_logger::init();
     let mut vec = Vec::new();
     let mut tp = ThreadPool::new(8, true);
 
