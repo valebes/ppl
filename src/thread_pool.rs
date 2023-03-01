@@ -1,5 +1,5 @@
 use crossbeam_deque::{Injector, Stealer, Worker};
-use log::trace;
+use log::{trace, error};
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
@@ -54,6 +54,20 @@ impl ThreadPool {
             let total_tasks_cp = Arc::clone(&total_tasks);
 
             threads.push(Some(thread::spawn(move || {
+                if pinning {
+                    let mut core_ids = core_affinity::get_core_ids().unwrap();
+                    if core_ids.get(i).is_none() {
+                        error!("Cannot pin the thread in the choosen position.");
+                    } else {
+                        let core = core_ids.remove(i);
+                        let err = core_affinity::set_for_current(core);
+                        if !err {
+                            error!("Thread pinning for thread[{}] failed!", i);
+                        } else {
+                            trace!("Thread[{}] correctly pinned on {}!", i, core.id);
+                        }
+                    }
+                }
                 let mut stop = false;
                 // We wait that all threads start
                 local_barrier.wait();
@@ -267,7 +281,7 @@ fn test_par_for() {
 #[test]
 fn test_par_map() {
     let mut vec = Vec::new();
-    let mut tp = ThreadPool::new(8, false);
+    let mut tp = ThreadPool::new(8, true);
 
     for i in 0..1000 {
         vec.push(i);
