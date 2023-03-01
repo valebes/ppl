@@ -9,10 +9,32 @@ use crate::thread::{Thread, ThreadError};
 
 use super::node::Node;
 
-/*
-Public API
-*/
+/// Trait defining a node that have an output.
+/// 
+/// Example:
+/// 
+/// A node emitting a vector containing numbers from 0 to 99 for streamlen times.
+///
+/// ```no_run
+///struct Source {
+///     streamlen: usize,
+///     counter: usize,
+///}
+///impl Out<Vec<i32>> for Source {
+///     fn run(&mut self) -> Option<Vec<i32>> {
+///         if self.counter < self.streamlen {
+///             self.counter = self.counter + 1;
+///             Some((0..99).collect())
+///         } else {
+///             None
+///         }
+///     }
+/// }
+
+/// ```
 pub trait Out<TOut: 'static + Send> {
+    /// This method is called by the rts until a None is returned.
+    /// When None is returned, the node will terminate.
     fn run(&mut self) -> Option<TOut>;
 }
 

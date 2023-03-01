@@ -25,7 +25,7 @@ impl Out<Vec<i32>> for Source {
 }
 
 struct Sink {
-    res: Vec<Vec<String>>
+    res: Vec<Vec<String>>,
 }
 impl In<Vec<String>, Vec<Vec<String>>> for Sink {
     fn run(&mut self, input: Vec<String>) {

@@ -1,5 +1,5 @@
 use crossbeam_deque::{Injector, Stealer, Worker};
-use log::{trace, error};
+use log::{error, trace};
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
@@ -131,7 +131,8 @@ impl ThreadPool {
         F: FnOnce() + Send + 'static,
     {
         self.injector.push(Job::NewJob(Box::new(task)));
-        self.total_tasks.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        self.total_tasks
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     }
 
     pub fn wait(&self) {
@@ -233,73 +234,85 @@ impl<'pool, 'scope> Scope<'pool, 'scope> {
     }
 }
 
-pub fn fibonacci_reccursive(n: i32) -> u64 {
-    if n < 0 {
-        panic!("{} is negative!", n);
-    }
-    match n {
-        0 => panic!("zero is not a right argument to fibonacci_reccursive()!"),
-        1 | 2 => 1,
-        3 => 2,
-        /*
-        50    => 12586269025,
-        */
-        _ => fibonacci_reccursive(n - 1) + fibonacci_reccursive(n - 2),
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::ThreadPool;
 
-#[test]
-fn test_threadpool() {
-    let tp = ThreadPool::new(8, false);
-    for i in 1..45 {
-        tp.execute(move || println!("Fib({}): {}", i, fibonacci_reccursive(i)));
+    fn fib(n: i32) -> u64 {
+        if n < 0 {
+            panic!("{} is negative!", n);
+        }
+        match n {
+            0 => panic!("zero is not a right argument to fib()!"),
+            1 | 2 => 1,
+            3 => 2,
+            /*
+            50    => 12586269025,
+            */
+            _ => fib(n - 1) + fib(n - 2),
+        }
     }
-}
 
-#[test]
-fn test_par_for() {
-    let mut vec = vec![0; 100];
-    let mut tp = ThreadPool::new(8, false);
-
-    tp.scoped(|s| {
-        for e in vec.iter_mut() {
-            s.execute(move || {
-                *e = *e + 1;
+    #[test]
+    fn test_threadpool() {
+        let tp = ThreadPool::new(8, false);
+        for i in 1..45 {
+            tp.execute(move || {
+                fib(i);
             });
         }
-    });
-
-    tp.wait();
-
-    tp.par_for(&mut vec, |el: &mut i32| *el = *el + 1);
-
-    tp.wait();
-
-    assert_eq!(vec, vec![2i32; 100])
-}
-
-#[test]
-fn test_par_map() {
-    env_logger::init();
-    let mut vec = Vec::new();
-    let mut tp = ThreadPool::new(8, false);
-
-    for i in 0..1000 {
-        vec.push(i);
     }
-    let res: Vec<String> = tp
-        .par_map(vec, |el| -> String {
-            String::from("Hello from: ".to_string() + &el.to_string())
-        })
-        .collect();
 
-    let mut check = true;
-    let mut i = 0;
-    for str in res {
-        if str != String::from("Hello from: ".to_string() + &i.to_string()) {
-            check = false;
+    #[test]
+    fn test_scoped_thread() {
+        let mut vec = vec![0; 100];
+        let mut tp = ThreadPool::new(8, false);
+
+        tp.scoped(|s| {
+            for e in vec.iter_mut() {
+                s.execute(move || {
+                    *e = *e + 1;
+                });
+            }
+        });
+
+        tp.wait();
+        assert_eq!(vec, vec![1i32; 100])
+    }
+
+    #[test]
+    fn test_par_for() {
+        let mut vec = vec![0; 100];
+        let mut tp = ThreadPool::new(8, false);
+
+        tp.par_for(&mut vec, |el: &mut i32| *el = *el + 1);
+        tp.wait();
+        assert_eq!(vec, vec![1i32; 100])
+    }
+
+    #[test]
+    fn test_par_map() {
+        env_logger::init();
+        let mut vec = Vec::new();
+        let mut tp = ThreadPool::new(8, false);
+
+        for i in 0..1000 {
+            vec.push(i);
         }
-        i += 1;
+        let res: Vec<String> = tp
+            .par_map(vec, |el| -> String {
+                String::from("Hello from: ".to_string() + &el.to_string())
+            })
+            .collect();
+
+        let mut check = true;
+        let mut i = 0;
+        for str in res {
+            if str != String::from("Hello from: ".to_string() + &i.to_string()) {
+                check = false;
+            }
+            i += 1;
+        }
+        assert!(check)
     }
-    assert!(check)
 }

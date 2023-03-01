@@ -1,5 +1,4 @@
 use crate::node::{node::Node, out_node::*};
-
 pub struct Parallel<
     TOut: Send + 'static,
     TCollected,

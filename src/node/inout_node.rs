@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, Condvar, Mutex, Barrier,
+        Arc, Barrier, Condvar, Mutex,
     },
 };
 
@@ -19,9 +19,7 @@ use crate::{
 
 use super::node::Node;
 
-/*
-Public API
-*/
+//
 pub trait InOut<TIn, TOut>: DynClone {
     fn run(&mut self, input: TIn) -> Option<TOut>;
     fn produce(&mut self) -> Option<TOut> {

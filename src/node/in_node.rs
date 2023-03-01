@@ -16,9 +16,6 @@ use crate::{
 
 use super::node::Node;
 
-/*
-Public API
-*/
 pub trait In<TIn: 'static + Send, TOut> {
     fn run(&mut self, input: TIn);
     fn finalize(self) -> Option<TOut>;
