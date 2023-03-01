@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, Barrier,
     },
 };
 
@@ -201,16 +201,20 @@ impl<
         }
         handler_copies.push(handler);
 
+        let barrier = Arc::new(Barrier::new(replicas));
+
         for i in 0..replicas {
             let (channel_in, channel_out) = Channel::new(blocking);
             channels.push(channel_out);
             let nn = Arc::clone(&next_node);
             let splitter_copy = Arc::clone(&splitter);
             let copy = handler_copies.pop().unwrap();
+            let local_barrier = Arc::clone(&barrier);
 
             let mut thread = Thread::new(
                 i + id,
                 move || {
+                    local_barrier.wait();
                     Self::rts(i + id, copy, channel_in, &nn, replicas, &splitter_copy);
                 },
                 pinning,
