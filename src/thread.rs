@@ -70,11 +70,12 @@ impl Thread {
                 if core_ids.get(id).is_none() {
                     error!("Cannot pin the thread in the choosen position.");
                 } else {
-                    let err = core_affinity::set_for_current(core_ids.remove(id));
+                    let core = core_ids.remove(id);
+                    let err = core_affinity::set_for_current(core);
                     if !err {
                         error!("Thread pinning for thread[{}] failed!", id);
                     } else {
-                        trace!("Thread[{}] correctly pinned!", id);
+                        trace!("Thread[{}] correctly pinned on {}!", id, core.id);
                     }
                 }
             }
