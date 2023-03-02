@@ -10,10 +10,10 @@ use crate::thread::{Thread, ThreadError};
 use super::node::Node;
 
 /// Trait defining a node that have an output.
-/// 
-/// Example:
-/// 
-/// A node emitting a vector containing numbers from 0 to 99 for streamlen times.
+///
+/// # Examples:
+///
+/// A node emitting a vector containing numbers from 0 to 99 for `streamlen` times:
 ///
 /// ```no_run
 ///struct Source {

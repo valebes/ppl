@@ -1,7 +1,7 @@
 //! Parallelo Structured Parallel Processing is a simple parallel processing
 //! library written in Rust.
 //!
-#![warn(missing_docs)]
+//#![warn(missing_docs)]
 #![feature(unsized_fn_params)]
 #![feature(box_into_inner)]
 

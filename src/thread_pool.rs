@@ -15,6 +15,7 @@ enum Job {
     NewJob(Func<'static>),
     Terminate,
 }
+///Struct representing a thread pool.
 pub struct ThreadPool {
     num_threads: usize,
     pinning: bool,
@@ -29,6 +30,17 @@ impl Clone for ThreadPool {
     }
 }
 impl ThreadPool {
+    /// Create a new thread pool with `num_threads`threads.
+    /// If `pinning` is `true`, the threads will be pinned on the cpu.
+    /// # Examples
+    ///
+    /// Create a new thread pool with `8` threads:
+    ///
+    /// ```
+    /// use pspp::thread_pool::ThreadPool;
+    ///
+    /// let mut pool = ThreadPool::new(8, false);
+    ///
     pub fn new(num_threads: usize, pinning: bool) -> Self {
         trace!("Creating new threadpool");
         let mut threads = Vec::with_capacity(num_threads);
@@ -125,7 +137,7 @@ impl ThreadPool {
         })
     }
 
-    // Execute normal task ( not scoped )
+    /// Execute a function `task` on a thread in the thread pool.
     pub fn execute<F>(&self, task: F)
     where
         F: FnOnce() + Send + 'static,
@@ -134,7 +146,7 @@ impl ThreadPool {
         self.total_tasks
             .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     }
-
+    /// Block until all current jobs in the thread pool are finished.
     pub fn wait(&self) {
         while (self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0)
             || !self.injector.is_empty()
@@ -142,7 +154,21 @@ impl ThreadPool {
             hint::spin_loop();
         }
     }
-
+    /// Applies in parallel the function `f` on a iterable object `iter`.
+    ///
+    /// # Examples
+    ///
+    /// Increment of 1 all the elements in a vector concurrently:
+    ///
+    /// ```
+    /// use pspp::thread_pool::ThreadPool;
+    ///
+    /// let mut pool = ThreadPool::new(8, false);
+    /// let mut vec = vec![0; 100];
+    ///
+    /// tp.par_for(&mut vec, |el: &mut i32| *el = *el + 1);
+    /// tp.wait(); // wait the threads to finish the jobs
+    ///
     pub fn par_for<Iter: IntoIterator, F>(&mut self, iter: Iter, f: F)
     where
         F: FnOnce(Iter::Item) + Send + 'static + Copy,
@@ -152,7 +178,23 @@ impl ThreadPool {
             iter.into_iter().for_each(|el| s.execute(move || (&f)(el)));
         });
     }
-
+    /// Applies in parallel the function `f` on a iterable object `iter`,
+    /// producing a new iterator with the results.
+    ///
+    /// # Examples
+    ///
+    /// Produce a vec of `String` from the elements of a vector `vec` concurrently:
+    ///
+    /// ```
+    /// use pspp::thread_pool::ThreadPool;
+    ///
+    /// let mut pool = ThreadPool::new(8, false);
+    /// let mut vec = vec![0; 100];
+    ///
+    /// let res: Vec<String> = tp.par_for(&mut vec, |el| -> String {
+    ///            String::from("Hello from: ".to_string() + &el.to_string())
+    ///       }).collect();
+    ///
     pub fn par_map<Iter: IntoIterator, F, R>(&mut self, iter: Iter, f: F) -> impl Iterator<Item = R>
     where
         F: FnOnce(Iter::Item) -> R + Send + Copy,
@@ -186,6 +228,9 @@ impl ThreadPool {
         }
         unordered_map.into_values()
     }
+
+    /// Borrows the thread pool and allows executing jobs on other
+    /// threads during that scope via the argument of the closure.
     pub fn scoped<'pool, 'scope, F, R>(&'pool mut self, f: F) -> R
     where
         F: FnOnce(&Scope<'pool, 'scope>) -> R,
@@ -216,13 +261,15 @@ impl Drop for ThreadPool {
         }
     }
 }
+/// A scope to executes scoped jobs in the thread pool.
 pub struct Scope<'pool, 'scope> {
     pool: &'pool mut ThreadPool,
     _marker: PhantomData<::std::cell::Cell<&'scope mut ()>>,
 }
 
 impl<'pool, 'scope> Scope<'pool, 'scope> {
-    fn execute<F>(&self, task: F)
+    /// Execute a function `task` on a thread in the thread pool.
+    pub fn execute<F>(&self, task: F)
     where
         F: FnOnce() + Send + 'scope,
     {
