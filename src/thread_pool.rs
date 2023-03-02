@@ -191,7 +191,7 @@ impl ThreadPool {
     /// let mut pool = ThreadPool::new(8, false);
     /// let mut vec = vec![0; 100];
     ///
-    /// let res: Vec<String> = pool.par_for(&mut vec, |el: i32| -> String {
+    /// let res: Vec<String> = pool.par_map(&mut vec, |el: i32| -> String {
     ///            String::from("Hello from: ".to_string() + &el.to_string())
     ///       }).collect();
     ///
