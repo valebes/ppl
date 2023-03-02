@@ -15,21 +15,21 @@ use super::node::Node;
 ///
 /// A node emitting a vector containing numbers from 0 to 99 for `streamlen` times:
 ///
-/// ```no_run
-///struct Source {
-///     streamlen: usize,
-///     counter: usize,
-///}
-///impl Out<Vec<i32>> for Source {
-///     fn run(&mut self) -> Option<Vec<i32>> {
-///         if self.counter < self.streamlen {
-///             self.counter = self.counter + 1;
-///             Some((0..99).collect())
-///         } else {
-///             None
-///         }
-///     }
+/// use pspp::node::{out_node::{Out, OutNode}};
+/// struct Source {
+///      streamlen: usize,
+///      counter: usize,
 /// }
+/// impl Out<Vec<i32>> for Source {
+///      fn run(&mut self) -> Option<Vec<i32>> {
+///          if self.counter < self.streamlen {
+///              self.counter = self.counter + 1;
+///              Some((0..99).collect())
+///          } else {
+///              None
+///          }
+///     }
+///  }
 
 /// ```
 pub trait Out<TOut: 'static + Send> {
