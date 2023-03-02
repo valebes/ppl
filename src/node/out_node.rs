@@ -14,7 +14,7 @@ use super::node::Node;
 /// # Examples:
 ///
 /// A node emitting a vector containing numbers from 0 to 99 for `streamlen` times:
-///
+/// ```
 /// use pspp::node::{out_node::{Out, OutNode}};
 /// struct Source {
 ///      streamlen: usize,
