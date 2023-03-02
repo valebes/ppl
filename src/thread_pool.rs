@@ -166,8 +166,8 @@ impl ThreadPool {
     /// let mut pool = ThreadPool::new(8, false);
     /// let mut vec = vec![0; 100];
     ///
-    /// tp.par_for(&mut vec, |el: &mut i32| *el = *el + 1);
-    /// tp.wait(); // wait the threads to finish the jobs
+    /// pool.par_for(&mut vec, |el: &mut i32| *el = *el + 1);
+    /// pool.wait(); // wait the threads to finish the jobs
     ///
     pub fn par_for<Iter: IntoIterator, F>(&mut self, iter: Iter, f: F)
     where
@@ -191,7 +191,7 @@ impl ThreadPool {
     /// let mut pool = ThreadPool::new(8, false);
     /// let mut vec = vec![0; 100];
     ///
-    /// let res: Vec<String> = tp.par_for(&mut vec, |el| -> String {
+    /// let res: Vec<String> = pool.par_for(&mut vec, |el| -> String {
     ///            String::from("Hello from: ".to_string() + &el.to_string())
     ///       }).collect();
     ///
