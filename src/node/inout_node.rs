@@ -28,7 +28,7 @@ use super::node::Node;
 /// use pspp::node::{inout_node::{InOut, InOutNode}};
 /// #[derive(Clone)]
 /// struct Worker {}
-/// impl InOut<i32, u64> for Worker {
+/// impl InOut<i32, i32> for Worker {
 ///    fn run(&mut self, input: i32) -> Option<i32> {
 ///        Some(input + 1)
 ///    }
