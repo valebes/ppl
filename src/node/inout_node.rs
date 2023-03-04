@@ -19,15 +19,40 @@ use crate::{
 
 use super::node::Node;
 
-//
+/// Trait defining a node that receive an input and produce an output.
+///
+/// # Examples:
+///
+/// A node that receive an integer and increment it by one:
+/// ```
+/// #[derive(Clone)]
+/// struct Worker {}
+/// impl InOut<i32, u64> for Worker {
+///    fn run(&mut self, input: i32) -> Option<i32> {
+///        Some(input + 1)
+///    }
+/// }
+/// ```
+///
+///
 pub trait InOut<TIn, TOut>: DynClone {
+    /// This method is called each time the node receive an input.
     fn run(&mut self, input: TIn) -> Option<TOut>;
+    /// If `is_producer` is `true` then this method will be called by the rts immediately
+    /// after the execution of `run`.
+    /// This method is called by the rts until a None is returned.
+    /// When None is returned, the node will wait for another input.
+    /// This method can be useful when we have a node that produce multiple output.
     fn produce(&mut self) -> Option<TOut> {
         None
     }
+    /// This method return the number of replicas of the node.
+    /// Overload this method allow to choose the number of replicas of the node.
     fn number_of_replicas(&self) -> usize {
         1
     }
+    /// This method return a boolean that represent if the node receive the input in an ordered way.
+    /// Overload this method allow to choose if the node is ordered or not.
     fn is_ordered(&self) -> bool {
         false
     }
@@ -39,6 +64,8 @@ pub trait InOut<TIn, TOut>: DynClone {
         // to be implemented
         false
     }
+    /// This method return a boolean that represent if the node is a producer or not.
+    /// Overload this method allow to choose if the node produce multiple output or not.
     fn is_producer(&self) -> bool {
         false
     }
@@ -177,6 +204,13 @@ impl<
         TNext: Node<TOut, TCollected> + Sync + Send + 'static,
     > InOutNode<TIn, TOut, TCollected, TNext>
 {
+    /// Create a new Node.
+    /// The `handler` is the  struct that implement the trait `InOut` and defines
+    /// the behavior of the node we're creating.
+    /// `next_node` contains the stage that follows the node.
+    /// If `blocking` is true the node will perform blocking operation on receive.
+    /// If `pinning` is `true` the node will be pinned to the thread in position `id`.
+    ///
     pub fn new(
         id: usize,
         handler: Box<dyn InOut<TIn, TOut> + Send + Sync>,
@@ -368,7 +402,7 @@ impl<
         }
     }
 
-    pub fn wait(&mut self) -> std::result::Result<(), ThreadError> {
+    fn wait(&mut self) -> std::result::Result<(), ThreadError> {
         for th in &mut self.threads {
             let err = th.wait();
             if err.is_err() {

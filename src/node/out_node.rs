@@ -9,7 +9,7 @@ use crate::thread::{Thread, ThreadError};
 
 use super::node::Node;
 
-/// Trait defining a node that have an output.
+/// Trait defining a node that output data.
 ///
 /// # Examples:
 ///
@@ -30,7 +30,6 @@ use super::node::Node;
 ///          }
 ///     }
 ///  }
-
 /// ```
 pub trait Out<TOut: 'static + Send> {
     /// This method is called by the rts until a None is returned.
@@ -75,6 +74,12 @@ impl<
 impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static>
     OutNode<TOut, TCollected, TNext>
 {
+    /// Create a new output Node.
+    /// The `handler` is the  struct that implement the trait `Out` and defines
+    /// the behavior of the node we're creating.
+    /// `next_node` contains the stage that follows the node.
+    /// If `pinning` is `true` the node will be pinned to the thread in position `id`.
+    ///
     pub fn new(
         id: usize,
         handler: Box<dyn Out<TOut> + Send + Sync>,
@@ -150,10 +155,21 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
+    /// Start the node.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread cannot be created.
     pub fn start(&mut self) -> std::result::Result<(), ThreadError> {
         self.thread.start()
     }
 
+    /// Terminate the current node and the following ones.
+    ///
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread cannot be terminated.
     pub fn terminate(mut self) -> std::result::Result<(), ThreadError> {
         self.send_stop();
         let err = self.wait();
@@ -178,7 +194,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
-    pub fn wait(&mut self) -> std::result::Result<(), ThreadError> {
+    fn wait(&mut self) -> std::result::Result<(), ThreadError> {
         self.thread.wait()
     }
 }

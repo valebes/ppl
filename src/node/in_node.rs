@@ -16,9 +16,36 @@ use crate::{
 
 use super::node::Node;
 
+/// Trait defining a node that receive data.
+///
+/// # Examples:
+///
+/// A node that increment an internal counter each time an input is received
+/// and return the total count of input received:
+/// ```
+/// struct Sink {
+/// counter: usize,
+/// }
+/// impl In<u64, usize> for Sink {
+///    fn run(&mut self, input: u64) {
+///        println!("{}", input);
+///       self.counter = self.counter + 1;
+///    }
+///
+///    fn finalize(self) -> Option<usize> {
+///        println!("End");
+///       Some(self.counter)
+///   }
+/// }
+/// ```
 pub trait In<TIn: 'static + Send, TOut> {
+    /// This method is called each time the node receive an input.
     fn run(&mut self, input: TIn);
+    /// This method is called before the node terminates. Is useful to take out data
+    /// at the end of the computation.
     fn finalize(self) -> Option<TOut>;
+    /// This method return a boolean that represent if the node receive the input in an ordered way.
+    /// Overload this method allow to choose if the node is ordered or not.
     fn is_ordered(&self) -> bool {
         false
     }
@@ -103,6 +130,13 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
 }
 
 impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
+    /// Create a new input Node.
+    /// The `handler` is the  struct that implement the trait `In` and defines
+    /// the behavior of the node we're creating.
+    /// `next_node` contains the stage that follows the node.
+    /// If `blocking` is true the node will perform blocking operation on receive.
+    /// If `pinning` is `true` the node will be pinned to the thread in position `id`.
+    ///
     pub fn new(
         id: usize,
         handler: Box<dyn In<TIn, TCollected> + Send + Sync>,
@@ -179,7 +213,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         res
     }
 
-    pub fn wait(&mut self) -> std::result::Result<(), ThreadError> {
+    fn wait(&mut self) -> std::result::Result<(), ThreadError> {
         self.thread.wait()
     }
 
