@@ -23,6 +23,7 @@ use super::node::Node;
 /// A node that increment an internal counter each time an input is received
 /// and return the total count of input received:
 /// ```
+/// use pspp::node::{in_node::{In, InNode}}; 
 /// struct Sink {
 /// counter: usize,
 /// }

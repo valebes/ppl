@@ -25,6 +25,7 @@ use super::node::Node;
 ///
 /// A node that receive an integer and increment it by one:
 /// ```
+/// use pspp::node::{inout_node::{InOut, InOutNode}};
 /// #[derive(Clone)]
 /// struct Worker {}
 /// impl InOut<i32, u64> for Worker {
