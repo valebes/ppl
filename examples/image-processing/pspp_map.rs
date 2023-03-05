@@ -96,6 +96,7 @@ pub fn pspp_map(dir_name: &str, threads: usize) {
     ];
 
     let start = SystemTime::now();
+    p.start();
     let _res = p.wait_and_collect();
 
     let system_duration = start.elapsed().expect("Failed to get render time?");
