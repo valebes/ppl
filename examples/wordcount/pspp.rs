@@ -3,7 +3,6 @@ use std::{
     fs::File,
     io::{BufRead, BufReader},
     sync::Arc,
-    time::SystemTime,
 };
 
 use dashmap::DashMap;
@@ -132,13 +131,7 @@ pub fn pspp(dataset: &str, threads: usize) {
         Sink { counter: 0 }
     ];
 
-    let start = SystemTime::now();
-
     p.start();
     let res = p.wait_and_collect();
     println!("Total words: {}", res.unwrap());
-
-    let system_duration = start.elapsed().expect("Failed to get render time?");
-    let in_sec = system_duration.as_secs() as f64 + system_duration.subsec_nanos() as f64 * 1e-9;
-    println!("Execution time: {} sec", in_sec);
 }

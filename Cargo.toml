@@ -1,23 +1,28 @@
 [package]
+edition = "2021"
 name = "pspp"
 version = "0.1.0"
-edition = "2021"
 
 [profile.release]
 debug = true
 
 [dependencies]
-log = "0.4.17"
-dyn-clone = "1.0.10"
 core_affinity = "0.8.0"
 crossbeam-channel = "0.5.6"
 crossbeam-deque = "0.8.2"
+dyn-clone = "1.0.10"
+log = "0.4.17"
 #ff_buffer = { git = "https://github.com/lucarin91/ff_buffer.git" }
 
 [dev-dependencies]
-raster = { git = "https://github.com/valebes/raster.git" }
-rayon = "1.6.1" 
-rust-spp = { git = "https://github.com/GMAP/rust-ssp.git" }
-rand = "*"
-env_logger = "0.10.0"
+criterion = {version = "0.4", features = ["html_reports"]}
 dashmap = "5.4.0"
+env_logger = "0.10.0"
+rand = "*"
+raster = {git = "https://github.com/valebes/raster.git"}
+rayon = "1.6.1"
+rust-spp = {git = "https://github.com/GMAP/rust-ssp.git"}
+
+[[bench]]
+harness = false
+name = "image_processing"
