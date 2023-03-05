@@ -1,5 +1,6 @@
 use std::env;
 mod pspp;
+mod pspp_map;
 mod rayon;
 mod rust_ssp;
 mod std_threads;
@@ -24,6 +25,7 @@ fn main() {
         "rayon" => rayon::rayon(dir_name, threads),
         "std-threads" => std_threads::std_threads(dir_name, threads),
         "pspp" => pspp::pspp(dir_name, threads),
-        _ => println!("Invalid run_mode, use: sequential | rust-ssp | std-threads | rayon | pspp "),
+        "pspp-map"=> pspp_map::pspp_map(dir_name, threads),
+        _ => println!("Invalid run_mode, use: sequential | rust-ssp | std-threads | rayon | pspp | pspp-map "),
     }
 }
