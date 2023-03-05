@@ -215,8 +215,9 @@ impl ThreadPool {
                 });
             });
         });
-        self.wait();
-        while !rx.is_empty() {
+        //self.wait();
+        while (self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0)
+        || !self.injector.is_empty() || !rx.is_empty() {
             let msg = rx.receive();
             match msg {
                 Ok(Some((order, result))) => {
