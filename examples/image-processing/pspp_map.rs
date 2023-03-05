@@ -69,7 +69,7 @@ pub fn pspp_map(dir_name: &str, threads: usize) {
 
     let mut p = parallel![
         Source {
-            window: threads * 10,
+            window: all_images.len() / 5,
             all_images: all_images,
         },
         Map::new(threads, |mut image: Image| -> Image {
