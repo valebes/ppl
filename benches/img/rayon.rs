@@ -45,11 +45,22 @@ pub fn rayon(images: Vec<Image>, threads: usize) {
         .into_par_iter()
         .map(|mut image: Image| {
             filter::saturation(&mut image, 0.2).unwrap();
+            image
+        })
+        .map(|mut image: Image| {
             filter::emboss(&mut image).unwrap();
+            image
+        })
+        .map(|mut image: Image| {
             filter::gamma(&mut image, 2.0).unwrap();
+            image
+        })
+        .map(|mut image: Image| {
             filter::sharpen(&mut image).unwrap();
+            image
+        })
+        .map(|mut image: Image| {
             filter::grayscale(&mut image).unwrap();
-
             image
         })
         .collect();
