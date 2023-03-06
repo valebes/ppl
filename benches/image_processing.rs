@@ -9,9 +9,9 @@ fn image_processing(criterion: &mut Criterion) {
     let plot_cfg = PlotConfiguration::default();
     let mut group = criterion.benchmark_group("Processing time");
     group
-        .sampling_mode(SamplingMode::Flat)
+        .sampling_mode(SamplingMode::Auto)
         .plot_config(plot_cfg)
-        .sample_size(10);
+        .sample_size(20);
 
     // Parses the images.
     let images = std::fs::read_dir("benches/img/images")
