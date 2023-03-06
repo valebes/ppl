@@ -34,10 +34,11 @@ use raster::Image;
 use rayon::prelude::*;
 
 pub fn rayon(images: Vec<Image>, threads: usize) {
-    let _ = rayon::ThreadPoolBuilder::new()
+    let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(threads * 5)
-        .build_global();
-
+        .build()
+        .unwrap();
+        pool.install( || {
         let _collection: Vec<Image>  = images.into_iter()
             .par_bridge()
             .filter_map(|mut image: Image| { 
@@ -61,4 +62,5 @@ pub fn rayon(images: Vec<Image>, threads: usize) {
                 Some(image)
             })
             .collect();
+});
 }
