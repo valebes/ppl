@@ -9,7 +9,7 @@ fn image_processing(criterion: &mut Criterion) {
     let plot_cfg = PlotConfiguration::default();
     let mut group = criterion.benchmark_group("Processing time");
     group
-        .sampling_mode(SamplingMode::Linear)
+        .sampling_mode(SamplingMode::Flat)
         .plot_config(plot_cfg)
         .sample_size(10);
 
