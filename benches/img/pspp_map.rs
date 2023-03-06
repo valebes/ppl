@@ -3,7 +3,7 @@ use raster::filter;
 use raster::Image;
 
 pub fn pspp_map(images: Vec<Image>, threads: usize) {
-    let mut pool = ThreadPool::new(threads, true);
+    let mut pool = ThreadPool::new(threads * 5, true);
     let a = pool.par_map(images, |mut image: Image| -> Image {
         filter::saturation(&mut image, 0.2).unwrap();
         image
@@ -20,8 +20,9 @@ pub fn pspp_map(images: Vec<Image>, threads: usize) {
         filter::sharpen(&mut image).unwrap();
         image
     });
-    let _ = pool.par_map(d, |mut image: Image| {
+    let _e: Vec<Image> = pool.par_map(d, |mut image: Image| {
         filter::grayscale(&mut image).unwrap();
         image
-    });
+    })
+    .collect();
 }

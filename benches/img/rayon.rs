@@ -38,30 +38,30 @@ pub fn rayon(images: Vec<Image>, threads: usize) {
     // worker nodes. Also the code below models the "normal form" of the parallel computation and
     // most people will write it like that when using rayon.
     let _ = rayon::ThreadPoolBuilder::new()
-        .num_threads(threads)
+        .num_threads(threads * 5)
         .build_global();
 
-    let _collection: Vec<Image> = images
-        .into_par_iter()
-        .map(|mut image: Image| {
-            filter::saturation(&mut image, 0.2).unwrap();
-            image
-        })
-        .map(|mut image: Image| {
-            filter::emboss(&mut image).unwrap();
-            image
-        })
-        .map(|mut image: Image| {
-            filter::gamma(&mut image, 2.0).unwrap();
-            image
-        })
-        .map(|mut image: Image| {
-            filter::sharpen(&mut image).unwrap();
-            image
-        })
-        .map(|mut image: Image| {
-            filter::grayscale(&mut image).unwrap();
-            image
-        })
-        .collect();
+        let _collection: Vec<Image>  = images.into_iter()
+            .par_bridge()
+            .filter_map(|mut image: Image| { 
+                filter::saturation(&mut image, 0.2).unwrap();
+                Some(image)
+            })
+            .filter_map(|mut image: Image| { 
+                filter::emboss(&mut image).unwrap();
+                Some(image)
+            })
+            .filter_map(|mut image: Image| { 
+                filter::gamma(&mut image, 2.0).unwrap();
+                Some(image)
+            })
+            .filter_map(|mut image: Image| { 
+                filter::sharpen(&mut image).unwrap();
+                Some(image)
+            })
+            .filter_map(|mut image: Image| { 
+                filter::grayscale(&mut image).unwrap();
+                Some(image)
+            })
+            .collect();
 }
