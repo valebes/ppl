@@ -2,7 +2,7 @@ mod img;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, PlotConfiguration, SamplingMode};
 
-const THREADS: usize = 4; // Can be an array also.
+const THREADS: usize = 8; // Can be an array also.
 
 fn image_processing(criterion: &mut Criterion) {
     // Sets up criterion.
@@ -11,7 +11,7 @@ fn image_processing(criterion: &mut Criterion) {
     group
         .sampling_mode(SamplingMode::Linear)
         .plot_config(plot_cfg)
-        .sample_size(20);
+        .sample_size(10);
 
     // Parses the images.
     let images = std::fs::read_dir("benches/img/images")
