@@ -34,9 +34,6 @@ use raster::Image;
 use rayon::prelude::*;
 
 pub fn rayon(images: Vec<Image>, threads: usize) {
-    // You may want to properly address this. Rayon does not have a way of specifying replicated
-    // worker nodes. Also the code below models the "normal form" of the parallel computation and
-    // most people will write it like that when using rayon.
     let _ = rayon::ThreadPoolBuilder::new()
         .num_threads(threads * 5)
         .build_global();
