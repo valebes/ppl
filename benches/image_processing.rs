@@ -2,7 +2,7 @@ mod img;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, PlotConfiguration, SamplingMode};
 
-const THREADS: usize = 8; // Can be an array also.
+//const THREADS: usize = 8; // Can be an array also.
 
 fn image_processing(criterion: &mut Criterion) {
     // Sets up criterion.
@@ -28,45 +28,51 @@ fn image_processing(criterion: &mut Criterion) {
         })
         .expect("parsing error");
 
-    group.bench_function(BenchmarkId::new("rust_ssp", THREADS), |b| {
-        b.iter_batched(
-            || images.clone(),
-            |images| img::rust_ssp::rust_ssp(images, THREADS),
-            BatchSize::LargeInput,
-        )
-    });
+    let replicas_for_stage = 1..=(num_cpus::get()/5);
+    for replicas in replicas_for_stage {
+        group.bench_function(BenchmarkId::new(&format!("rust_ssp {replicas} threads for stage"), replicas), |b| {
+            b.iter_batched(
+                || images.clone(),
+                |images| img::rust_ssp::rust_ssp(images, replicas),
+                BatchSize::LargeInput,
+            )
+        });
+    
+        group.bench_function(BenchmarkId::new(&format!("std_threads {replicas} threads for stage"), replicas), |b| {
+            b.iter_batched(
+                || images.clone(),
+                |images| img::std_threads::std_threads(images, replicas),
+                BatchSize::LargeInput,
+            )
+        });
 
-    group.bench_function(BenchmarkId::new("std_threads", THREADS), |b| {
-        b.iter_batched(
-            || images.clone(),
-            |images| img::std_threads::std_threads(images, THREADS),
-            BatchSize::LargeInput,
-        )
-    });
+        group.bench_function(BenchmarkId::new(&format!("pspp {replicas} threads for stage"), replicas), |b| {
+            b.iter_batched(
+                || images.clone(),
+                |images| img::pspp::pspp(images, replicas),
+                BatchSize::LargeInput,
+            )
+        });
+    
+        let threads_map = replicas * 5;
 
-    group.bench_function(BenchmarkId::new("rayon", THREADS), |b| {
-        b.iter_batched(
-            || images.clone(),
-            |images| img::rayon::rayon(images, THREADS),
-            BatchSize::LargeInput,
-        )
-    });
+        group.bench_function(BenchmarkId::new(&format!("rayon {threads_map} threads"), replicas), |b| {
+            b.iter_batched(
+                || images.clone(),
+                |images| img::rayon::rayon(images, replicas),
+                BatchSize::LargeInput,
+            )
+        });
+    
+        group.bench_function(BenchmarkId::new(&format!("pspp map {threads_map} threads"), replicas), |b| {
+            b.iter_batched(
+                || images.clone(),
+                |images| img::pspp_map::pspp_map(images, replicas),
+                BatchSize::LargeInput,
+            )
+        });
+    }
 
-    group.bench_function(BenchmarkId::new("pspp", THREADS), |b| {
-        b.iter_batched(
-            || images.clone(),
-            |images| img::pspp::pspp(images, THREADS),
-            BatchSize::LargeInput,
-        )
-    });
-
-    group.bench_function(BenchmarkId::new("pspp_map", THREADS), |b| {
-        b.iter_batched(
-            || images.clone(),
-            |images| img::pspp_map::pspp_map(images, THREADS),
-            BatchSize::LargeInput,
-        )
-    });
 }
 
 criterion::criterion_group!(benches, image_processing);

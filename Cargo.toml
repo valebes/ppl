@@ -22,6 +22,7 @@ rand = "*"
 raster = {git = "https://github.com/valebes/raster.git"}
 rayon = "1.6.1"
 rust-spp = {git = "https://github.com/GMAP/rust-ssp.git"}
+num_cpus = "1.15.0"
 
 [[bench]]
 harness = false
