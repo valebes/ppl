@@ -30,7 +30,9 @@ fn image_processing(criterion: &mut Criterion) {
 
     let replicas_for_stage = 1..=(num_cpus::get()/5);
     for replicas in replicas_for_stage {
-        group.bench_function(BenchmarkId::new(&format!("rust_ssp {replicas} threads for stage"), replicas), |b| {
+        let threads = replicas * 5;
+
+        group.bench_function(BenchmarkId::new("rust-ssp", threads), |b| {
             b.iter_batched(
                 || images.clone(),
                 |images| img::rust_ssp::rust_ssp(images, replicas),
@@ -38,7 +40,7 @@ fn image_processing(criterion: &mut Criterion) {
             )
         });
     
-        group.bench_function(BenchmarkId::new(&format!("std_threads {replicas} threads for stage"), replicas), |b| {
+        group.bench_function(BenchmarkId::new("std-thread", threads), |b| {
             b.iter_batched(
                 || images.clone(),
                 |images| img::std_threads::std_threads(images, replicas),
@@ -46,17 +48,15 @@ fn image_processing(criterion: &mut Criterion) {
             )
         });
 
-        group.bench_function(BenchmarkId::new(&format!("pspp {replicas} threads for stage"), replicas), |b| {
+        group.bench_function(BenchmarkId::new("pspp", threads), |b| {
             b.iter_batched(
                 || images.clone(),
                 |images| img::pspp::pspp(images, replicas),
                 BatchSize::LargeInput,
             )
         });
-    
-        let threads_map = replicas * 5;
 
-        group.bench_function(BenchmarkId::new(&format!("rayon {threads_map} threads"), replicas), |b| {
+        group.bench_function(BenchmarkId::new("rayon", threads), |b| {
             b.iter_batched(
                 || images.clone(),
                 |images| img::rayon::rayon(images, replicas),
@@ -64,7 +64,7 @@ fn image_processing(criterion: &mut Criterion) {
             )
         });
     
-        group.bench_function(BenchmarkId::new(&format!("pspp map {threads_map} threads"), replicas), |b| {
+        group.bench_function(BenchmarkId::new("pspp-map", threads), |b| {
             b.iter_batched(
                 || images.clone(),
                 |images| img::pspp_map::pspp_map(images, replicas),
