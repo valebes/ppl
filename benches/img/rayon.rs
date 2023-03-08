@@ -39,7 +39,8 @@ pub fn rayon(images: Vec<Image>, threads: usize) {
         .build()
         .unwrap();
         pool.install( || {
-        let _collection: Vec<Image>  = images.into_iter()
+            /*
+                    let _collection: Vec<Image>  = images.into_iter()
             .par_bridge()
             .filter_map(|mut image: Image| { 
                 filter::saturation(&mut image, 0.2).unwrap();
@@ -62,5 +63,21 @@ pub fn rayon(images: Vec<Image>, threads: usize) {
                 Some(image)
             })
             .collect();
+            
+             */
+
+            let _collection: Vec<Image>  = images.into_iter()
+            .par_bridge()
+            .filter_map(|mut image: Image| { 
+                filter::saturation(&mut image, 0.2).unwrap();
+                filter::emboss(&mut image).unwrap();
+                filter::gamma(&mut image, 2.0).unwrap();
+                filter::sharpen(&mut image).unwrap();
+                filter::grayscale(&mut image).unwrap();
+                Some(image)
+            })
+            .collect();
+
+
 });
 }
