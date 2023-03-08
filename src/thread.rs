@@ -100,6 +100,7 @@ impl Thread {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_started(&self) -> bool {
         match &self.job {
             Some(_) => false,
@@ -107,6 +108,7 @@ impl Thread {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_ended(&self) -> bool {
         match &self.thread {
             Some(_) => false,
