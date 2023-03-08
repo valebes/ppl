@@ -63,8 +63,7 @@ pub fn rayon(images: Vec<Image>, threads: usize) {
                 Some(image)
             })
             .collect();
-            
-             */
+            */
 
             let _collection: Vec<Image>  = images.into_iter()
             .par_bridge()
