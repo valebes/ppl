@@ -2,8 +2,6 @@ mod img;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, PlotConfiguration, SamplingMode};
 
-//const THREADS: usize = 8; // Can be an array also.
-
 fn image_processing(criterion: &mut Criterion) {
     // Sets up criterion.
     let plot_cfg = PlotConfiguration::default();
