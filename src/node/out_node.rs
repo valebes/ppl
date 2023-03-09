@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
-use log::{trace, warn};
+use log::{trace};
 
 use crate::channel::ChannelError;
 use crate::task::{Message, Task};
@@ -122,7 +122,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                     if *mtx {
                         let err = nn.send(Message::new(Task::Terminate, order), counter);
                         if err.is_err() {
-                            warn!("Error: {}", err.unwrap_err())
+                            panic!("Error: {}", err.unwrap_err())
                         }
                         // to do cleanup
                         break;
@@ -139,14 +139,14 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                 Some(output) => {
                     let err = nn.send(Message::new(Task::NewTask(output), order), counter);
                     if err.is_err() {
-                        warn!("Error: {}", err.unwrap_err())
+                        panic!("Error: {}", err.unwrap_err())
                     }
                     order = order + 1;
                 }
                 None => {
                     let err = nn.send(Message::new(Task::Terminate, order), counter);
                     if err.is_err() {
-                        warn!("Error: {}", err.unwrap_err())
+                        panic!("Error: {}", err.unwrap_err())
                     }
                     break;
                 }

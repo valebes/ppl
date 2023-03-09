@@ -311,14 +311,14 @@ impl<
                                     let err = next_node
                                         .send(Message::new(Task::NewTask(msg), order), counter);
                                     if err.is_err() {
-                                        warn!("Error: {}", err.unwrap_err())
+                                        panic!("Error: {}", err.unwrap_err())
                                     }
                                 }
                                 None => {
                                     let err =
                                         next_node.send(Message::new(Task::Dropped, order), counter);
                                     if err.is_err() {
-                                        warn!("Error: {}", err.unwrap_err())
+                                        panic!("Error: {}", err.unwrap_err())
                                     }
                                 }
                             }
@@ -350,7 +350,7 @@ impl<
                                                 counter,
                                             );
                                             if err.is_err() {
-                                                warn!("Error: {}", err.unwrap_err())
+                                                panic!("Error: {}", err.unwrap_err())
                                             }
                                             count_splitter = count_splitter + 1;
                                         }
@@ -376,7 +376,7 @@ impl<
                                         counter,
                                     );
                                     if err.is_err() {
-                                        warn!("Error: {}", err.unwrap_err())
+                                        panic!("Error: {}", err.unwrap_err())
                                     }
                                 }
                             }
@@ -385,7 +385,7 @@ impl<
                     Task::Dropped => {
                         let err = next_node.send(Message::new(Task::Dropped, order), counter);
                         if err.is_err() {
-                            warn!("Error: {}", err.unwrap_err())
+                            panic!("Error: {}", err.unwrap_err())
                         }
                     }
                     Task::Terminate => {
