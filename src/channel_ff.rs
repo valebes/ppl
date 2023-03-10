@@ -1,5 +1,5 @@
 use ff_buffer::{self, FFReceiver, FFSender};
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, sync::Mutex};
 
 #[derive(Debug)]
 pub struct ChannelError {
@@ -51,15 +51,21 @@ impl<T: Send> InputChannel<T> {
 }
 
 pub struct OutputChannel<T> {
-    tx: FFSender<T>,
+    tx: Mutex<FFSender<T>>,
 }
 
 impl<T: Send> OutputChannel<T> {
     pub fn send(&self, msg: T) -> Result<(), ChannelError> {
-        let err = self.tx.push(Box::new(msg));
-        match err {
-            Some(_) => Err(ChannelError::new(&"Can't send the msg.".to_string())),
-            None => Ok(()),
+        let mtx = self.tx.lock();
+        match mtx {
+            Ok(ch) => {
+                let err = ch.push(Box::new(msg));
+                match err {
+                    Some(_) => Err(ChannelError::new(&"Can't send the msg.".to_string())),
+                    None => Ok(()),
+                }
+            },
+            Err(_) => panic!("Cannot lock mutex on this channel"),
         }
     }
 }
@@ -74,7 +80,7 @@ impl Channel {
                 rx: rx,
                 blocking: blocking,
             },
-            OutputChannel { tx: tx },
+            OutputChannel { tx: Mutex::new(tx) },
         )
     }
 }

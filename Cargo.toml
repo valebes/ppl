@@ -12,7 +12,7 @@ crossbeam-channel = "0.5.6"
 crossbeam-deque = "0.8.2"
 dyn-clone = "1.0.10"
 log = "0.4.17"
-#ff_buffer = { git = "https://github.com/lucarin91/ff_buffer.git" }
+ff_buffer = { git = "https://github.com/lucarin91/ff_buffer.git" }
 
 [dev-dependencies]
 criterion = {version = "0.4", features = ["html_reports"]}
