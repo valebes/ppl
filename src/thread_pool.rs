@@ -7,7 +7,7 @@ use std::sync::{Arc, Barrier, Mutex};
 use std::thread::JoinHandle;
 use std::{hint, iter, mem, thread};
 
-use crate::channel::Channel;
+use crate::channel_ff::Channel;
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 

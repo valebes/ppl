@@ -48,6 +48,10 @@ impl<T: Send> InputChannel<T> {
             }
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.rx.is_empty()
+    }
 }
 
 pub struct OutputChannel<T> {
