@@ -1,30 +1,8 @@
 use ff_buffer::{self, FFReceiver, FFSender};
-use std::{error::Error, fmt, sync::Mutex};
+use std::{sync::Mutex};
 
-#[derive(Debug)]
-pub struct ChannelError {
-    details: String,
-}
+use super::err::ChannelError;
 
-impl ChannelError {
-    fn new(msg: &str) -> ChannelError {
-        ChannelError {
-            details: msg.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for ChannelError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-
-impl Error for ChannelError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
 
 pub struct InputChannel<T> {
     rx: FFReceiver<T>,
@@ -65,10 +43,10 @@ impl<T: Send> OutputChannel<T> {
             Ok(ch) => {
                 let err = ch.push(Box::new(msg));
                 match err {
-                    Some(_) => Err(ChannelError::new(&"Can't send the msg.".to_string())),
+                    Some(_) => Err(ChannelError::new("Can't send the msg.")),
                     None => Ok(()),
                 }
-            },
+            }
             Err(_) => panic!("Cannot lock mutex on this channel"),
         }
     }
@@ -77,12 +55,12 @@ impl<T: Send> OutputChannel<T> {
 pub struct Channel {}
 
 impl Channel {
-    pub fn new<T: Send>(blocking: bool) -> (InputChannel<T>, OutputChannel<T>) {
+    pub fn channel<T: Send>(blocking: bool) -> (InputChannel<T>, OutputChannel<T>) {
         let (tx, rx) = ff_buffer::build::<T>();
         (
             InputChannel {
-                rx: rx,
-                blocking: blocking,
+                rx,
+                blocking,
             },
             OutputChannel { tx: Mutex::new(tx) },
         )

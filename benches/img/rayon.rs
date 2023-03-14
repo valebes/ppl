@@ -38,45 +38,44 @@ pub fn rayon(images: Vec<Image>, threads: usize) {
         .num_threads(threads * 5)
         .build()
         .unwrap();
-        pool.install( || {
-            /*
-                    let _collection: Vec<Image>  = images.into_iter()
+    pool.install(|| {
+        /*
+                let _collection: Vec<Image>  = images.into_iter()
+        .par_bridge()
+        .filter_map(|mut image: Image| {
+            filter::saturation(&mut image, 0.2).unwrap();
+            Some(image)
+        })
+        .filter_map(|mut image: Image| {
+            filter::emboss(&mut image).unwrap();
+            Some(image)
+        })
+        .filter_map(|mut image: Image| {
+            filter::gamma(&mut image, 2.0).unwrap();
+            Some(image)
+        })
+        .filter_map(|mut image: Image| {
+            filter::sharpen(&mut image).unwrap();
+            Some(image)
+        })
+        .filter_map(|mut image: Image| {
+            filter::grayscale(&mut image).unwrap();
+            Some(image)
+        })
+        .collect();
+        */
+
+        let _collection: Vec<Image> = images
+            .into_iter()
             .par_bridge()
-            .filter_map(|mut image: Image| { 
+            .filter_map(|mut image: Image| {
                 filter::saturation(&mut image, 0.2).unwrap();
-                Some(image)
-            })
-            .filter_map(|mut image: Image| { 
                 filter::emboss(&mut image).unwrap();
-                Some(image)
-            })
-            .filter_map(|mut image: Image| { 
                 filter::gamma(&mut image, 2.0).unwrap();
-                Some(image)
-            })
-            .filter_map(|mut image: Image| { 
                 filter::sharpen(&mut image).unwrap();
-                Some(image)
-            })
-            .filter_map(|mut image: Image| { 
                 filter::grayscale(&mut image).unwrap();
                 Some(image)
             })
             .collect();
-            */
-
-            let _collection: Vec<Image>  = images.into_iter()
-            .par_bridge()
-            .filter_map(|mut image: Image| { 
-                filter::saturation(&mut image, 0.2).unwrap();
-                filter::emboss(&mut image).unwrap();
-                filter::gamma(&mut image, 2.0).unwrap();
-                filter::sharpen(&mut image).unwrap();
-                filter::grayscale(&mut image).unwrap();
-                Some(image)
-            })
-            .collect();
-
-
-});
+    });
 }

@@ -91,14 +91,14 @@ impl<T> Clone for OutputChannel<T> {
 pub struct Channel {}
 
 impl Channel {
-    pub fn new<T: Send>(blocking: bool) -> (InputChannel<T>, OutputChannel<T>) {
+    pub fn channel<T: Send>(blocking: bool) -> (InputChannel<T>, OutputChannel<T>) {
         let (tx, rx) = crossbeam_channel::unbounded();
         (
             InputChannel {
-                rx: rx,
-                blocking: blocking,
+                rx,
+                blocking,
             },
-            OutputChannel { tx: tx },
+            OutputChannel { tx },
         )
     }
 }

@@ -19,8 +19,8 @@ struct Source {
 impl Out<usize> for Source {
     fn run(&mut self) -> Option<usize> {
         if self.counter < self.streamlen {
-            self.counter = self.counter + 1;
-            Some((self.counter).try_into().unwrap())
+            self.counter += 1;
+            Some(self.counter)
         } else {
             None
         }
@@ -83,7 +83,7 @@ impl In<usize, bool> for Sink {
         if input != self.counter {
             self.check = false;
         }
-        self.counter = self.counter + 1;
+        self.counter += 1;
     }
     fn is_ordered(&self) -> bool {
         true

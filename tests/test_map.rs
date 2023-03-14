@@ -16,7 +16,7 @@ struct Source {
 impl Out<Vec<i32>> for Source {
     fn run(&mut self) -> Option<Vec<i32>> {
         if self.counter < self.streamlen {
-            self.counter = self.counter + 1;
+            self.counter += 1;
             Some((0..99).collect())
         } else {
             None
@@ -48,7 +48,7 @@ fn test_map() {
             counter: 0
         },
         Map::new(2, |el: i32| -> String {
-            String::from("Hello from: ".to_string() + &el.to_string())
+            "Hello from: ".to_string() + &el.to_string()
         }),
         Sink { res: Vec::new() }
     ];
@@ -60,7 +60,7 @@ fn test_map() {
     for sub_res in res {
         let mut i = 0;
         for str in sub_res {
-            if str != String::from("Hello from: ".to_string() + &i.to_string()) {
+            if str != ("Hello from: ".to_string() + &i.to_string()) {
                 check = false;
             }
             i += 1;

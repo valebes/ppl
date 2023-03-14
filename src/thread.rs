@@ -41,10 +41,10 @@ pub struct Thread {
 impl Thread {
     pub fn new<F>(id: usize, f: F, pinning: bool) -> Thread
     where
-        F: FnOnce() -> () + Send + Sync + 'static,
+        F: FnOnce() + Send + Sync + 'static,
     {
         Thread {
-            id: id,
+            id,
             thread: None,
             job: Some(Box::new(f)),
             pin: pinning,
@@ -102,18 +102,12 @@ impl Thread {
 
     #[allow(dead_code)]
     pub fn is_started(&self) -> bool {
-        match &self.job {
-            Some(_) => false,
-            None => true,
-        }
+        self.job.is_none()
     }
 
     #[allow(dead_code)]
     pub fn is_ended(&self) -> bool {
-        match &self.thread {
-            Some(_) => false,
-            None => true,
-        }
+        self.thread.is_none()
     }
 
     pub fn is_pinned(&self) -> bool {

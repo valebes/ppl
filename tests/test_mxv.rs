@@ -53,14 +53,14 @@ impl In<i64, Vec<i64>> for Sink {
         true
     }
     fn finalize(self) -> Option<Vec<i64>> {
-        Some(self.res.clone())
+        Some(self.res)
     }
 }
 
-fn mult(m: Vec<i64>, v: &Vec<i64>) -> i64 {
+fn mult(m: Vec<i64>, v: &[i64]) -> i64 {
     let mut res = 0;
     for i in 0..m.len() {
-        res = res + m[i] * v[i];
+        res += m[i] * v[i];
     }
     res
 }
@@ -98,7 +98,7 @@ fn test_mxv() {
     // Compute the "reference" result
     for i in 0..matrix.len() {
         for j in 0..vec.len() {
-            correct_result[i] = correct_result[i] + matrix[i][j] * vec[j];
+            correct_result[i] += matrix[i][j] * vec[j];
         }
     }
 

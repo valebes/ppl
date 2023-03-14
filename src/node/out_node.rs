@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
-use log::{trace};
+use log::trace;
 
-use crate::channel_ff::ChannelError;
+use crate::channel::err::ChannelError;
 use crate::task::{Message, Task};
 use crate::thread::{Thread, ThreadError};
 
@@ -103,9 +103,9 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         );
 
         let node = OutNode {
-            thread: thread,
-            next_node: next_node,
-            stop: stop,
+            thread,
+            next_node,
+            stop,
             phantom: PhantomData,
         };
 
@@ -141,7 +141,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                     if err.is_err() {
                         panic!("Error: {}", err.unwrap_err())
                     }
-                    order = order + 1;
+                    order += 1;
                 }
                 None => {
                     let err = nn.send(Message::new(Task::Terminate, order), counter);
@@ -151,7 +151,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                     break;
                 }
             }
-            counter = counter + 1;
+            counter += 1;
         }
     }
 

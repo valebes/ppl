@@ -45,7 +45,6 @@ impl InOut<String, String> for Splitter {
     fn run(&mut self, input: String) -> Option<String> {
         self.tmp_buffer = input
             .split_whitespace()
-            .into_iter()
             .map(|s| {
                 s.to_lowercase()
                     .chars()
@@ -103,7 +102,7 @@ struct Sink {
 impl In<(String, usize), usize> for Sink {
     fn run(&mut self, _input: (String, usize)) {
         //println!("Received word {} with counter {}", input.0, input.1 );
-        self.counter = self.counter + 1;
+        self.counter += 1;
     }
     fn finalize(self) -> Option<usize> {
         Some(self.counter)
@@ -119,7 +118,7 @@ pub fn pspp(dataset: &str, threads: usize) {
 
     let hashmap = Arc::new(DashMap::with_shard_amount(256));
     let mut p = parallel![
-        Source { reader: reader },
+        Source { reader },
         Splitter {
             replicas: threads,
             tmp_buffer: VecDeque::new()
