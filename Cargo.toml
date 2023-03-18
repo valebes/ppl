@@ -3,16 +3,21 @@ edition = "2021"
 name = "pspp"
 version = "0.1.0"
 
+[features]
+default = ["crossbeam"]
+crossbeam = ["crossbeam-channel"]
+ff = ["ff_buffer"]
+
 [profile.release]
 debug = true
 
 [dependencies]
 core_affinity = "0.8.0"
-crossbeam-channel = "0.5.6"
+crossbeam-channel = { version = "0.5.6", optional = true }
 crossbeam-deque = "0.8.2"
 dyn-clone = "1.0.10"
 log = "0.4.17"
-ff_buffer = { git = "https://github.com/valebes/ff_buffer.git" }
+ff_buffer = { git = "https://github.com/valebes/ff_buffer.git", optional = true }
 
 [dev-dependencies]
 criterion = {version = "0.4", features = ["html_reports"]}

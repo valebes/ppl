@@ -1,4 +1,9 @@
-use super::{err::ChannelError, channel_ff};
+use super::{err::ChannelError};
+#[cfg(feature = "ff")]
+use super::channel_ff as backend;
+
+#[cfg(feature = "crossbeam")]
+use super::channel_cb as backend;
 
 pub trait Receiver<T> {
     fn receive(&self) -> Result<Option<T>, ChannelError>;
@@ -35,7 +40,7 @@ pub struct Channel;
 
 impl Channel {
     pub fn channel<T: Send + 'static>(blocking: bool) -> (InputChannel<T>, OutputChannel<T>) {
-      let (rx, tx) = channel_ff::Channel::channel(blocking);
+      let (rx, tx) = backend::Channel::channel(blocking);
       (
         InputChannel { rx: rx },
         OutputChannel { tx: tx }

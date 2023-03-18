@@ -1,86 +1,57 @@
-use crossbeam_channel::{Receiver, RecvError, Sender, TryRecvError};
-use std::{error::Error, fmt};
+use crossbeam_channel::{Receiver, Sender, TryRecvError};
+use super::{err::ChannelError, channel};
 
-#[derive(Debug)]
-pub struct ChannelError {
-    details: String,
-}
-
-impl ChannelError {
-    fn new(msg: &str) -> ChannelError {
-        ChannelError {
-            details: msg.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for ChannelError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-
-impl Error for ChannelError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
-
-pub struct InputChannel<T> {
+pub struct CBInputChannel<T> {
     rx: Receiver<T>,
-    blocking: bool,
 }
-impl<T: Send> InputChannel<T> {
-    fn non_block_receive(&self) -> Result<T, TryRecvError> {
-        self.rx.try_recv()
-    }
-    fn block_receive(&self) -> Result<T, RecvError> {
-        self.rx.recv()
-    }
-
-    pub fn receive(&self) -> Result<Option<T>, ChannelError> {
-        if self.blocking {
-            let err = self.block_receive();
-            match err {
-                Ok(msg) => Ok(Some(msg)),
-                Err(e) => Err(ChannelError::new(&e.to_string())),
-            }
-        } else {
-            let err = self.non_block_receive();
-            match err {
-                Ok(msg) => Ok(Some(msg)),
-                Err(e) => match e {
-                    TryRecvError::Empty => Ok(None),
-                    TryRecvError::Disconnected => Err(ChannelError::new(&e.to_string())),
-                },
-            }
+impl<T: Send> channel::Receiver<T> for CBInputChannel<T> {
+    fn receive(&self) -> Result<Option<T>, ChannelError> {
+        let err = self.rx.try_recv();
+        match err {
+            Ok(msg) => Ok(Some(msg)),
+            Err(e) => match e {
+                TryRecvError::Empty => Ok(None),
+                TryRecvError::Disconnected => Err(ChannelError::new(&e.to_string())),
+            },
         }
     }
 
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.rx.is_empty()
     }
 }
 
-pub struct OutputChannel<T> {
+pub struct CBBlockingInputChannel<T> {
+    rx: Receiver<T>,
+}
+impl<T: Send> channel::Receiver<T> for CBBlockingInputChannel<T> {
+    fn receive(&self) -> Result<Option<T>, ChannelError> {
+        let err = self.rx.recv();
+        match err {
+            Ok(msg) => Ok(Some(msg)),
+            Err(e) => Err(ChannelError::new(&e.to_string())),
+        }
+        }
+
+    fn is_empty(&self) -> bool {
+        self.rx.is_empty()
+    }
+}
+
+pub struct CBOutputChannel<T> {
     tx: Sender<T>,
 }
 
-impl<T: Send> OutputChannel<T> {
-    pub fn send(&self, msg: T) -> Result<(), ChannelError> {
+impl<T: Send> channel::Sender<T> for CBOutputChannel<T> {
+    fn send(&self, msg: T) -> Result<(), ChannelError> {
         let err = self.tx.send(msg);
         match err {
             Ok(()) => Ok(()),
             Err(e) => Err(ChannelError::new(&e.to_string())),
         }
     }
-
-    pub fn is_empty(&self) -> bool {
-        self.tx.is_empty()
-    }
 }
-
-impl<T> Clone for OutputChannel<T> {
+impl<T> Clone for CBOutputChannel<T> {
     fn clone(&self) -> Self {
         Self {
             tx: self.tx.clone(),
@@ -88,17 +59,28 @@ impl<T> Clone for OutputChannel<T> {
     }
 }
 
-pub struct Channel {}
+
+
+pub struct Channel;
 
 impl Channel {
-    pub fn channel<T: Send>(blocking: bool) -> (InputChannel<T>, OutputChannel<T>) {
+    pub fn channel<T: Send + 'static>(blocking: bool) -> (Box<dyn channel::Receiver<T> + Sync + Send>, Box<dyn channel::Sender<T> + Sync + Send>) {
         let (tx, rx) = crossbeam_channel::unbounded();
-        (
-            InputChannel {
-                rx,
-                blocking,
-            },
-            OutputChannel { tx },
-        )
+        if blocking {
+            (
+                Box::new(CBBlockingInputChannel {
+                    rx
+                }),
+                Box::new(CBOutputChannel { tx:tx })
+            )
+        } else {
+            (
+                Box::new(CBInputChannel {
+                    rx
+                }),
+                Box::new(CBOutputChannel { tx: tx })
+            )
+        }
+
     }
 }
