@@ -7,7 +7,7 @@ use std::sync::{Arc, Barrier, Mutex};
 use std::thread::JoinHandle;
 use std::{hint, iter, mem, thread};
 
-use crate::channel::channel_ff::Channel;
+use crate::channel::channel::{Channel};
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -199,7 +199,7 @@ impl ThreadPool {
     where
         F: FnOnce(Iter::Item) -> R + Send + Copy,
         <Iter as IntoIterator>::Item: Send,
-        R: Send,
+        R: Send + 'static,
     {
         let (rx, tx) = Channel::channel(true);
         let arc_tx = Arc::new(tx);

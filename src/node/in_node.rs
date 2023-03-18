@@ -9,9 +9,8 @@ use std::{
 use log::{trace, warn};
 
 use crate::{
-    channel::{channel_ff::{Channel, InputChannel, OutputChannel}, err::ChannelError},
     task::{Message, Task},
-    thread::{Thread, ThreadError},
+    thread::{Thread, ThreadError}, channel::{channel::{OutputChannel, Channel, InputChannel}, err::ChannelError},
 };
 
 
