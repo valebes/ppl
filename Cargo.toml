@@ -9,7 +9,7 @@ crossbeam = ["crossbeam-channel"]
 ff = ["ff_buffer"]
 
 [profile.release]
-debug = true
+debug = false
 
 [dependencies]
 core_affinity = "0.8.0"
