@@ -5,6 +5,9 @@ use super::channel_ff as backend;
 #[cfg(feature = "crossbeam")]
 use super::channel_cb as backend;
 
+#[cfg(feature = "kanal")]
+use super::channel_kanal as backend;
+
 pub trait Receiver<T> {
     fn receive(&self) -> Result<Option<T>, ChannelError>;
     fn is_empty(&self) -> bool;
