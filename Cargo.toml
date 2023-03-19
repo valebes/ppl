@@ -4,7 +4,8 @@ name = "pspp"
 version = "0.1.0"
 
 [features]
-default = ["crossbeam"]
+default = ["flume"]
+flume = ["dep:flume"]
 crossbeam = ["crossbeam-channel"]
 ff = ["ff_buffer"]
 kanal = ["dep:kanal"]
@@ -20,6 +21,7 @@ dyn-clone = "1.0.10"
 log = "0.4.17"
 ff_buffer = { git = "https://github.com/valebes/ff_buffer.git", optional = true }
 kanal = { git = "https://github.com/fereidani/kanal.git", optional = true }
+flume = { version = "0.10.14", optional = true }
 
 [dev-dependencies]
 criterion = {version = "0.4", features = ["html_reports"]}
