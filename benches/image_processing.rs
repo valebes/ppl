@@ -1,10 +1,10 @@
 mod img;
 
-use criterion::{BatchSize, BenchmarkId, Criterion, PlotConfiguration, SamplingMode};
+use criterion::{BatchSize, BenchmarkId, Criterion, PlotConfiguration, SamplingMode, AxisScale};
 
 fn image_processing(criterion: &mut Criterion) {
     // Sets up criterion.
-    let plot_cfg = PlotConfiguration::default();
+    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
     let mut group = criterion.benchmark_group("Processing time");
     group
         .sampling_mode(SamplingMode::Auto)
