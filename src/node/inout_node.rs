@@ -12,7 +12,10 @@ use log::{trace, warn};
 use std::collections::BTreeMap;
 
 use crate::{
-    channel_ff::{Channel, ChannelError, InputChannel, OutputChannel},
+    channel::{
+        channel::{Channel, InputChannel, OutputChannel},
+        err::ChannelError,
+    },
     task::{Message, Task},
     thread::{Thread, ThreadError},
 };
@@ -114,70 +117,69 @@ impl<
     fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), ChannelError> {
         let mut rec_id = rec_id;
         if rec_id >= self.threads.len() {
-            rec_id = rec_id % self.threads.len();
+            rec_id %= self.threads.len();
         }
 
-        match input {
-            Message { op, order } => match &op {
-                Task::NewTask(_e) => {
-                    if self.channels.len() == 1
-                        && self.ordered
-                        && order != self.next_msg.load(Ordering::SeqCst)
-                    {
-                        self.save_to_storage(Message::new(op, rec_id), order);
-                        self.send_pending();
-                    } else {
-                        let res = self.channels[rec_id].send(Message::new(op, order));
-                        if res.is_err() {
+        let Message { op, order } = input;
+        match &op {
+            Task::NewTask(_e) => {
+                if self.channels.len() == 1
+                    && self.ordered
+                    && order != self.next_msg.load(Ordering::SeqCst)
+                {
+                    self.save_to_storage(Message::new(op, rec_id), order);
+                    self.send_pending();
+                } else {
+                    let res = self.channels[rec_id].send(Message::new(op, order));
+                    if res.is_err() {
+                        panic!("Error: Cannot send message!");
+                    }
+
+                    if self.ordered {
+                        let old_c = self.next_msg.load(Ordering::SeqCst);
+                        self.next_msg.store(old_c + 1, Ordering::SeqCst);
+                    }
+                }
+            }
+            Task::Dropped => {
+                if self.channels.len() == 1
+                    && self.ordered
+                    && order != self.next_msg.load(Ordering::SeqCst)
+                {
+                    self.save_to_storage(Message::new(op, rec_id), order);
+                    self.send_pending();
+                } else {
+                    let res = self.channels[rec_id].send(Message::new(op, order));
+                    if res.is_err() {
+                        panic!("Error: Cannot send message!");
+                    }
+
+                    if self.ordered {
+                        let old_c = self.next_msg.load(Ordering::SeqCst);
+                        self.next_msg.store(old_c + 1, Ordering::SeqCst);
+                    }
+                }
+            }
+            Task::Terminate => {
+                if self.channels.len() == 1
+                    && self.ordered
+                    && order != self.next_msg.load(Ordering::SeqCst)
+                {
+                    self.save_to_storage(Message::new(op, order), order);
+                    self.send_pending();
+                } else {
+                    for ch in &self.channels {
+                        let err = ch.send(Message::new(Task::Terminate, order));
+                        if err.is_err() {
                             panic!("Error: Cannot send message!");
                         }
+                    }
 
-                        if self.ordered {
-                            let old_c = self.next_msg.load(Ordering::SeqCst);
-                            self.next_msg.store(old_c + 1, Ordering::SeqCst);
-                        }
+                    if self.ordered {
+                        self.next_msg.store(order, Ordering::SeqCst)
                     }
                 }
-                Task::Dropped => {
-                    if self.channels.len() == 1
-                        && self.ordered
-                        && order != self.next_msg.load(Ordering::SeqCst)
-                    {
-                        self.save_to_storage(Message::new(op, rec_id), order);
-                        self.send_pending();
-                    } else {
-                        let res = self.channels[rec_id].send(Message::new(op, order));
-                        if res.is_err() {
-                            panic!("Error: Cannot send message!");
-                        }
-
-                        if self.ordered {
-                            let old_c = self.next_msg.load(Ordering::SeqCst);
-                            self.next_msg.store(old_c + 1, Ordering::SeqCst);
-                        }
-                    }
-                }
-                Task::Terminate => {
-                    if self.channels.len() == 1
-                        && self.ordered
-                        && order != self.next_msg.load(Ordering::SeqCst)
-                    {
-                        self.save_to_storage(Message::new(op, order), order);
-                        self.send_pending();
-                    } else {
-                        for ch in &self.channels {
-                            let err = ch.send(Message::new(Task::Terminate, order));
-                            if err.is_err() {
-                                panic!("Error: Cannot send message!");
-                            }
-                        }
-
-                        if self.ordered {
-                            self.next_msg.store(order, Ordering::SeqCst)
-                        }
-                    }
-                }
-            },
+            }
         }
         Ok(())
     }
@@ -237,7 +239,7 @@ impl<
         let barrier = Arc::new(Barrier::new(replicas));
 
         for i in 0..replicas {
-            let (channel_in, channel_out) = Channel::new(blocking);
+            let (channel_in, channel_out) = Channel::channel(blocking);
             channels.push(channel_out);
             let nn = Arc::clone(&next_node);
             let splitter_copy = Arc::clone(&splitter);
@@ -260,11 +262,11 @@ impl<
         }
 
         let node = InOutNode {
-            channels: channels,
-            threads: threads,
-            next_node: next_node,
-            ordered: ordered,
-            producer: producer,
+            channels,
+            threads,
+            next_node,
+            ordered,
+            producer,
             ordered_splitter: splitter,
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
@@ -335,7 +337,7 @@ impl<
                             }
 
                             if node.is_ordered() {
-                                let (lock, cvar) = &*ordered_splitter_handler;
+                                let (lock, cvar) = ordered_splitter_handler;
                                 let mut ordered_splitter = lock.lock().unwrap();
                                 loop {
                                     let (latest, end) = ordered_splitter.get();
@@ -352,7 +354,7 @@ impl<
                                             if err.is_err() {
                                                 panic!("Error: {}", err.unwrap_err())
                                             }
-                                            count_splitter = count_splitter + 1;
+                                            count_splitter += 1;
                                         }
                                         ordered_splitter.set(order + 1, count_splitter);
                                         cvar.notify_all();
@@ -398,7 +400,7 @@ impl<
                 }
             }
             if next_node.get_num_of_replicas() > n_replicas {
-                counter = counter + 1;
+                counter += 1;
             }
         }
     }
@@ -444,27 +446,26 @@ impl<
                 let mut c = self.next_msg.load(Ordering::SeqCst);
                 while queue.contains_key(&c) {
                     let msg = queue.remove(&c).unwrap();
-                    match msg {
-                        Message { op, order } => match &op {
-                            Task::NewTask(_e) => {
-                                let err = self.send(Message::new(op, c), order);
-                                if err.is_err() {
-                                    panic!("Error: Cannot send message!");
-                                }
+                    let Message { op, order } = msg;
+                    match &op {
+                        Task::NewTask(_e) => {
+                            let err = self.send(Message::new(op, c), order);
+                            if err.is_err() {
+                                panic!("Error: Cannot send message!");
                             }
-                            Task::Dropped => {
-                                let err = self.send(Message::new(op, c), order);
-                                if err.is_err() {
-                                    panic!("Error: Cannot send message!");
-                                }
+                        }
+                        Task::Dropped => {
+                            let err = self.send(Message::new(op, c), order);
+                            if err.is_err() {
+                                panic!("Error: Cannot send message!");
                             }
-                            Task::Terminate => {
-                                let err = self.send(Message::new(op, c), 0);
-                                if err.is_err() {
-                                    panic!("Error: Cannot send message!");
-                                }
+                        }
+                        Task::Terminate => {
+                            let err = self.send(Message::new(op, c), 0);
+                            if err.is_err() {
+                                panic!("Error: Cannot send message!");
                             }
-                        },
+                        }
                     }
                     c = self.next_msg.load(Ordering::SeqCst);
                 }

@@ -26,7 +26,7 @@ fn image_processing(criterion: &mut Criterion) {
         })
         .expect("parsing error");
 
-    let replicas_for_stage = 1..=(num_cpus::get()/5);
+    let replicas_for_stage = 1..=(num_cpus::get() / 5);
     for replicas in replicas_for_stage {
         let threads = replicas * 5;
 
@@ -37,7 +37,7 @@ fn image_processing(criterion: &mut Criterion) {
                 BatchSize::LargeInput,
             )
         });
-    
+
         group.bench_function(BenchmarkId::new("std-thread", threads), |b| {
             b.iter_batched(
                 || images.clone(),
@@ -61,7 +61,7 @@ fn image_processing(criterion: &mut Criterion) {
                 BatchSize::LargeInput,
             )
         });
-    
+
         group.bench_function(BenchmarkId::new("pspp-map", threads), |b| {
             b.iter_batched(
                 || images.clone(),
@@ -70,7 +70,6 @@ fn image_processing(criterion: &mut Criterion) {
             )
         });
     }
-
 }
 
 criterion::criterion_group!(benches, image_processing);

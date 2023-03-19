@@ -9,7 +9,7 @@ pub struct Map<TIn: Send, TOut: Send, F: FnOnce(TIn) -> TOut + Send + Copy> {
     phantom: PhantomData<(TIn, TOut)>,
 }
 
-impl<TIn: Send + Clone, TOut: Send + Clone, F: FnOnce(TIn) -> TOut + Send + Copy>
+impl<TIn: Send + Clone, TOut: Send + Clone + 'static, F: FnOnce(TIn) -> TOut + Send + Copy>
     Map<TIn, TOut, F>
 {
     pub fn new<TInIter: IntoIterator<Item = TIn>, TOutIter: FromIterator<TOut>>(
@@ -26,7 +26,7 @@ impl<TIn: Send + Clone, TOut: Send + Clone, F: FnOnce(TIn) -> TOut + Send + Copy
 impl<
         TIn: Send + Clone,
         TInIter: IntoIterator<Item = TIn>,
-        TOut: Send + Clone,
+        TOut: Send + Clone + 'static,
         TOutIter: FromIterator<TOut>,
         F: FnOnce(TIn) -> TOut + Send + Copy,
     > InOut<TInIter, TOutIter> for Map<TIn, TOut, F>

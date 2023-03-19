@@ -22,7 +22,7 @@ struct Source {
 impl Out<i32> for Source {
     fn run(&mut self) -> Option<i32> {
         if self.counter < self.streamlen {
-            self.counter = self.counter + 1;
+            self.counter += 1;
             Some((self.counter).try_into().unwrap())
         } else {
             None
@@ -59,7 +59,7 @@ struct Sink {
 impl In<u64, usize> for Sink {
     fn run(&mut self, input: u64) {
         println!("{}", input);
-        self.counter = self.counter + 1;
+        self.counter += 1;
     }
 
     fn finalize(self) -> Option<usize> {

@@ -9,7 +9,10 @@ use std::{
 use log::{trace, warn};
 
 use crate::{
-    channel_ff::{Channel, ChannelError, InputChannel, OutputChannel},
+    channel::{
+        channel::{Channel, InputChannel, OutputChannel},
+        err::ChannelError,
+    },
     task::{Message, Task},
     thread::{Thread, ThreadError},
 };
@@ -23,7 +26,7 @@ use super::node::Node;
 /// A node that increment an internal counter each time an input is received
 /// and return the total count of input received:
 /// ```
-/// use pspp::node::{in_node::{In, InNode}}; 
+/// use pspp::node::{in_node::{In, InNode}};
 /// struct Sink {
 /// counter: usize,
 /// }
@@ -65,44 +68,41 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
     for InNode<TIn, TCollected>
 {
     fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), ChannelError> {
-        match input {
-            Message { op, order } => match &op {
-                Task::NewTask(_e) => {
-                    if self.ordered && order != self.counter.load(Ordering::SeqCst) {
-                        self.save_to_storage(Message::new(op, rec_id), order);
-                        self.send_pending();
-                    } else {
-                        let res = self.channel.send(Message::new(op, order));
-                        if res.is_err() {
-                            panic!("Error: Cannot send message!");
-                        }
-                        let old_c = self.counter.load(Ordering::SeqCst);
-                        self.counter.store(old_c + 1, Ordering::SeqCst);
+        let Message { op, order } = input;
+        match &op {
+            Task::NewTask(_e) => {
+                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                    self.save_to_storage(Message::new(op, rec_id), order);
+                    self.send_pending();
+                } else {
+                    let res = self.channel.send(Message::new(op, order));
+                    if res.is_err() {
+                        panic!("Error: Cannot send message!");
+                    }
+                    let old_c = self.counter.load(Ordering::SeqCst);
+                    self.counter.store(old_c + 1, Ordering::SeqCst);
+                }
+            }
+            Task::Dropped => {
+                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                    self.save_to_storage(Message::new(op, order), order);
+                    self.send_pending();
+                } else if self.ordered {
+                    let old_c = self.counter.load(Ordering::SeqCst);
+                    self.counter.store(old_c + 1, Ordering::SeqCst);
+                }
+            }
+            Task::Terminate => {
+                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                    self.save_to_storage(Message::new(op, order), order);
+                    self.send_pending();
+                } else {
+                    let res = self.channel.send(Message::new(op, order));
+                    if res.is_err() {
+                        panic!("Error: Cannot send message!");
                     }
                 }
-                Task::Dropped => {
-                    if self.ordered && order != self.counter.load(Ordering::SeqCst) {
-                        self.save_to_storage(Message::new(op, order), order);
-                        self.send_pending();
-                    } else {
-                        if self.ordered {
-                            let old_c = self.counter.load(Ordering::SeqCst);
-                            self.counter.store(old_c + 1, Ordering::SeqCst);
-                        }
-                    }
-                }
-                Task::Terminate => {
-                    if self.ordered && order != self.counter.load(Ordering::SeqCst) {
-                        self.save_to_storage(Message::new(op, order), order);
-                        self.send_pending();
-                    } else {
-                        let res = self.channel.send(Message::new(op, order));
-                        if res.is_err() {
-                            panic!("Error: Cannot send message!");
-                        }
-                    }
-                }
-            },
+            }
         }
         Ok(())
     }
@@ -119,9 +119,9 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
 
         let mut res = tmp.unwrap();
         if res.is_none() {
-            return None;
+            None
         } else {
-            return res.take();
+            res.take()
         }
     }
 
@@ -146,7 +146,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
     ) -> Result<InNode<TIn, TCollected>, ThreadError> {
         trace!("Created a new Sink! Id: {}", id);
 
-        let (channel_in, channel_out) = Channel::new(blocking);
+        let (channel_in, channel_out) = Channel::channel(blocking);
         let result = Arc::new(Mutex::new(None));
         let ordered = handler.is_ordered();
 
@@ -170,9 +170,9 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         );
 
         let mut node = InNode {
-            thread: thread,
+            thread,
             channel: channel_out,
-            ordered: ordered,
+            ordered,
             storage: Mutex::new(BTreeMap::new()),
             counter: AtomicUsize::new(0),
             result,
@@ -210,8 +210,8 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                 }
             }
         }
-        let res = node.finalize();
-        res
+
+        node.finalize()
     }
 
     fn wait(&mut self) -> std::result::Result<(), ThreadError> {
@@ -237,27 +237,26 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                 let mut c = self.counter.load(Ordering::SeqCst);
                 while queue.contains_key(&c) {
                     let msg = queue.remove(&c).unwrap();
-                    match msg {
-                        Message { op, order } => match &op {
-                            Task::NewTask(_e) => {
-                                let err = self.send(Message::new(op, c), order);
-                                if err.is_err() {
-                                    panic!("Error: Cannot send message!");
-                                }
+                    let Message { op, order } = msg;
+                    match &op {
+                        Task::NewTask(_e) => {
+                            let err = self.send(Message::new(op, c), order);
+                            if err.is_err() {
+                                panic!("Error: Cannot send message!");
                             }
-                            Task::Dropped => {
-                                let err = self.send(Message::new(op, c), 0);
-                                if err.is_err() {
-                                    panic!("Error: Cannot send message!");
-                                }
+                        }
+                        Task::Dropped => {
+                            let err = self.send(Message::new(op, c), 0);
+                            if err.is_err() {
+                                panic!("Error: Cannot send message!");
                             }
-                            Task::Terminate => {
-                                let err = self.send(Message::new(op, c), 0);
-                                if err.is_err() {
-                                    panic!("Error: Cannot send message!");
-                                }
+                        }
+                        Task::Terminate => {
+                            let err = self.send(Message::new(op, c), 0);
+                            if err.is_err() {
+                                panic!("Error: Cannot send message!");
                             }
-                        },
+                        }
                     }
                     c = self.counter.load(Ordering::SeqCst);
                 }

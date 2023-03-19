@@ -7,7 +7,7 @@ use std::sync::{Arc, Barrier, Mutex};
 use std::thread::JoinHandle;
 use std::{hint, iter, mem, thread};
 
-use crate::channel_ff::Channel;
+use crate::channel::channel::Channel;
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -175,7 +175,7 @@ impl ThreadPool {
         <Iter as IntoIterator>::Item: Send,
     {
         self.scoped(|s| {
-            iter.into_iter().for_each(|el| s.execute(move || (&f)(el)));
+            iter.into_iter().for_each(|el| s.execute(move || (f)(el)));
         });
     }
     /// Applies in parallel the function `f` on a iterable object `iter`,
@@ -199,18 +199,18 @@ impl ThreadPool {
     where
         F: FnOnce(Iter::Item) -> R + Send + Copy,
         <Iter as IntoIterator>::Item: Send,
-        R: Send,
+        R: Send + 'static,
     {
-        let (rx, tx) = Channel::new(true);
+        let (rx, tx) = Channel::channel(true);
         let arc_tx = Arc::new(tx);
         let mut unordered_map = BTreeMap::<usize, R>::new();
         self.scoped(|s| {
             iter.into_iter().enumerate().for_each(|el| {
                 let cp = Arc::clone(&arc_tx);
                 s.execute(move || {
-                    let err = cp.send((el.0, (&f)(el.1)));
+                    let err = cp.send((el.0, f(el.1)));
                     if err.is_err() {
-                        panic!("Error: {}", err.unwrap_err().to_string());
+                        panic!("Error: {}", err.unwrap_err());
                     }
                 });
             });
@@ -223,7 +223,7 @@ impl ThreadPool {
                     unordered_map.insert(order, result);
                 }
                 Ok(None) => continue,
-                Err(e) => panic!("Error: {}", e.to_string()),
+                Err(e) => panic!("Error: {}", e),
             };
         }
         unordered_map.into_values()
@@ -251,13 +251,12 @@ impl Drop for ThreadPool {
         match mtx {
             Ok(mut tp) => {
                 for th in &mut *tp {
-                    match th.take() {
-                        Some(thread) => thread.join().expect("Error while joining thread!"),
-                        None => (), // thread already joined
+                    if let Some(thread) = th.take() {
+                        thread.join().expect("Error while joining thread!")
                     }
                 }
             }
-            Err(e) => panic!("Error: {}", e.to_string()),
+            Err(e) => panic!("Error: {}", e),
         }
     }
 }
@@ -318,7 +317,7 @@ mod tests {
         tp.scoped(|s| {
             for e in vec.iter_mut() {
                 s.execute(move || {
-                    *e = *e + 1;
+                    *e += 1;
                 });
             }
         });
@@ -332,7 +331,7 @@ mod tests {
         let mut vec = vec![0; 100];
         let mut tp = ThreadPool::new(8, false);
 
-        tp.par_for(&mut vec, |el: &mut i32| *el = *el + 1);
+        tp.par_for(&mut vec, |el: &mut i32| *el += 1);
         tp.wait();
         assert_eq!(vec, vec![1i32; 100])
     }
@@ -355,7 +354,7 @@ mod tests {
         let mut check = true;
         let mut i = 0;
         for str in res {
-            if str != String::from("Hello from: ".to_string() + &i.to_string()) {
+            if str != "Hello from: ".to_string() + &i.to_string() {
                 check = false;
             }
             i += 1;

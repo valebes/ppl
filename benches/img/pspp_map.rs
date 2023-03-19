@@ -28,13 +28,14 @@ pub fn pspp_map(images: Vec<Image>, threads: usize) {
     .collect();
     */
 
-    let _res: Vec<Image> = pool.par_map(images, |mut image: Image| {
-        filter::saturation(&mut image, 0.2).unwrap();
-        filter::emboss(&mut image).unwrap();
-        filter::gamma(&mut image, 2.0).unwrap();
-        filter::sharpen(&mut image).unwrap();
-        filter::grayscale(&mut image).unwrap();
-        image
-    })
-    .collect();
+    let _res: Vec<Image> = pool
+        .par_map(images, |mut image: Image| {
+            filter::saturation(&mut image, 0.2).unwrap();
+            filter::emboss(&mut image).unwrap();
+            filter::gamma(&mut image, 2.0).unwrap();
+            filter::sharpen(&mut image).unwrap();
+            filter::grayscale(&mut image).unwrap();
+            image
+        })
+        .collect();
 }
