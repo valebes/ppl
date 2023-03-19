@@ -1,17 +1,20 @@
 use ff_buffer::{self, FFReceiver, FFSender};
-use std::{sync::Mutex};
+use std::sync::Mutex;
 
-use super::{err::ChannelError, channel::{Receiver, Sender}};
+use super::{
+    channel::{Receiver, Sender},
+    err::ChannelError,
+};
 
 pub struct FFInputChannel<T> {
     rx: FFReceiver<T>,
 }
 impl<T: Send> Receiver<T> for FFInputChannel<T> {
     fn receive(&self) -> Result<Option<T>, ChannelError> {
-            match self.rx.try_pop() {
-                Some(boxed) => Ok(Some(Box::into_inner(boxed))),
-                None => Ok(None),
-            }
+        match self.rx.try_pop() {
+            Some(boxed) => Ok(Some(Box::into_inner(boxed))),
+            None => Ok(None),
+        }
     }
 
     fn is_empty(&self) -> bool {
@@ -55,23 +58,23 @@ impl<T: Send> Sender<T> for FFOutputChannel<T> {
 pub struct Channel;
 
 impl Channel {
-    pub fn channel<T: Send + 'static>(blocking: bool) -> (Box<dyn Receiver<T> + Sync + Send>, Box<dyn Sender<T> + Sync + Send>) {
+    pub fn channel<T: Send + 'static>(
+        blocking: bool,
+    ) -> (
+        Box<dyn Receiver<T> + Sync + Send>,
+        Box<dyn Sender<T> + Sync + Send>,
+    ) {
         let (tx, rx) = ff_buffer::build::<T>();
         if blocking {
             (
-                Box::new(FFBlockingInputChannel {
-                    rx
-                }),
-                Box::new(FFOutputChannel { tx: Mutex::new(tx) })
+                Box::new(FFBlockingInputChannel { rx }),
+                Box::new(FFOutputChannel { tx: Mutex::new(tx) }),
             )
         } else {
             (
-                Box::new(FFInputChannel {
-                    rx
-                }),
-                Box::new(FFOutputChannel { tx: Mutex::new(tx) })
+                Box::new(FFInputChannel { rx }),
+                Box::new(FFOutputChannel { tx: Mutex::new(tx) }),
             )
         }
-
     }
 }

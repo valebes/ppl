@@ -9,10 +9,13 @@ use std::{
 use log::{trace, warn};
 
 use crate::{
+    channel::{
+        channel::{Channel, InputChannel, OutputChannel},
+        err::ChannelError,
+    },
     task::{Message, Task},
-    thread::{Thread, ThreadError}, channel::{channel::{OutputChannel, Channel, InputChannel}, err::ChannelError},
+    thread::{Thread, ThreadError},
 };
-
 
 use super::node::Node;
 
@@ -207,7 +210,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                 }
             }
         }
-        
+
         node.finalize()
     }
 

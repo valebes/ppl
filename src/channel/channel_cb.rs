@@ -1,5 +1,5 @@
+use super::{channel, err::ChannelError};
 use crossbeam_channel::{Receiver, Sender, TryRecvError};
-use super::{err::ChannelError, channel};
 
 pub struct CBInputChannel<T> {
     rx: Receiver<T>,
@@ -31,7 +31,7 @@ impl<T: Send> channel::Receiver<T> for CBBlockingInputChannel<T> {
             Ok(msg) => Ok(Some(msg)),
             Err(e) => Err(ChannelError::new(&e.to_string())),
         }
-        }
+    }
 
     fn is_empty(&self) -> bool {
         self.rx.is_empty()
@@ -59,28 +59,26 @@ impl<T> Clone for CBOutputChannel<T> {
     }
 }
 
-
-
 pub struct Channel;
 
 impl Channel {
-    pub fn channel<T: Send + 'static>(blocking: bool) -> (Box<dyn channel::Receiver<T> + Sync + Send>, Box<dyn channel::Sender<T> + Sync + Send>) {
+    pub fn channel<T: Send + 'static>(
+        blocking: bool,
+    ) -> (
+        Box<dyn channel::Receiver<T> + Sync + Send>,
+        Box<dyn channel::Sender<T> + Sync + Send>,
+    ) {
         let (tx, rx) = crossbeam_channel::unbounded();
         if blocking {
             (
-                Box::new(CBBlockingInputChannel {
-                    rx
-                }),
-                Box::new(CBOutputChannel { tx:tx })
+                Box::new(CBBlockingInputChannel { rx }),
+                Box::new(CBOutputChannel { tx: tx }),
             )
         } else {
             (
-                Box::new(CBInputChannel {
-                    rx
-                }),
-                Box::new(CBOutputChannel { tx: tx })
+                Box::new(CBInputChannel { rx }),
+                Box::new(CBOutputChannel { tx: tx }),
             )
         }
-
     }
 }

@@ -1,6 +1,6 @@
 use kanal::{Receiver, Sender};
 
-use super::{err::ChannelError, channel};
+use super::{channel, err::ChannelError};
 
 pub struct KanalInputChannel<T> {
     rx: Receiver<T>,
@@ -32,20 +32,18 @@ impl<T: Send> channel::Receiver<T> for KanalBlockingInputChannel<T> {
             Ok(msg) => Ok(Some(msg)),
             Err(e) => Err(ChannelError::new(&e.to_string())),
         }
-        }
+    }
 
     fn is_empty(&self) -> bool {
         self.rx.is_empty()
     }
 }
 
-pub struct KanalOutputChannel
-<T> {
+pub struct KanalOutputChannel<T> {
     tx: Sender<T>,
 }
 
-impl<T: Send> channel::Sender<T> for KanalOutputChannel
-<T> {
+impl<T: Send> channel::Sender<T> for KanalOutputChannel<T> {
     fn send(&self, msg: T) -> Result<(), ChannelError> {
         let err = self.tx.send(msg);
         match err {
@@ -54,8 +52,7 @@ impl<T: Send> channel::Sender<T> for KanalOutputChannel
         }
     }
 }
-impl<T> Clone for KanalOutputChannel
-<T> {
+impl<T> Clone for KanalOutputChannel<T> {
     fn clone(&self) -> Self {
         Self {
             tx: self.tx.clone(),
@@ -63,30 +60,26 @@ impl<T> Clone for KanalOutputChannel
     }
 }
 
-
-
 pub struct Channel;
 
 impl Channel {
-    pub fn channel<T: Send + 'static>(blocking: bool) -> (Box<dyn channel::Receiver<T> + Sync + Send>, Box<dyn channel::Sender<T> + Sync + Send>) {
-        let (tx, rx) =  kanal::unbounded();
+    pub fn channel<T: Send + 'static>(
+        blocking: bool,
+    ) -> (
+        Box<dyn channel::Receiver<T> + Sync + Send>,
+        Box<dyn channel::Sender<T> + Sync + Send>,
+    ) {
+        let (tx, rx) = kanal::unbounded();
         if blocking {
             (
-                Box::new(KanalBlockingInputChannel {
-                    rx
-                }),
-                Box::new(KanalOutputChannel
-                     { tx:tx })
+                Box::new(KanalBlockingInputChannel { rx }),
+                Box::new(KanalOutputChannel { tx: tx }),
             )
         } else {
             (
-                Box::new(KanalInputChannel {
-                    rx
-                }),
-                Box::new(KanalOutputChannel
-                     { tx: tx })
+                Box::new(KanalInputChannel { rx }),
+                Box::new(KanalOutputChannel { tx: tx }),
             )
         }
-
     }
 }

@@ -1,4 +1,4 @@
-use super::{err::ChannelError};
+use super::err::ChannelError;
 
 #[cfg(feature = "ff")]
 use super::channel_ff as backend;
@@ -22,7 +22,7 @@ pub trait Sender<T> {
 }
 
 pub struct InputChannel<T> {
-    rx: Box<dyn Receiver<T> + Sync + Send>
+    rx: Box<dyn Receiver<T> + Sync + Send>,
 }
 impl<T: Send> InputChannel<T> {
     pub fn receive(&self) -> Result<Option<T>, ChannelError> {
@@ -35,7 +35,7 @@ impl<T: Send> InputChannel<T> {
 }
 
 pub struct OutputChannel<T> {
-    tx: Box<dyn Sender<T> + Sync + Send>
+    tx: Box<dyn Sender<T> + Sync + Send>,
 }
 impl<T: Send> OutputChannel<T> {
     pub fn send(&self, msg: T) -> Result<(), ChannelError> {
@@ -47,10 +47,7 @@ pub struct Channel;
 
 impl Channel {
     pub fn channel<T: Send + 'static>(blocking: bool) -> (InputChannel<T>, OutputChannel<T>) {
-      let (rx, tx) = backend::Channel::channel(blocking);
-      (
-        InputChannel { rx: rx },
-        OutputChannel { tx: tx }
-      )
+        let (rx, tx) = backend::Channel::channel(blocking);
+        (InputChannel { rx: rx }, OutputChannel { tx: tx })
     }
 }

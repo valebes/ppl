@@ -1,6 +1,6 @@
-use flume::{Receiver, TryRecvError, Sender};
+use flume::{Receiver, Sender, TryRecvError};
 
-use super::{err::ChannelError, channel};
+use super::{channel, err::ChannelError};
 
 pub struct FlumeInputChannel<T> {
     rx: Receiver<T>,
@@ -32,7 +32,7 @@ impl<T: Send> channel::Receiver<T> for FlumeBlockingInputChannel<T> {
             Ok(msg) => Ok(Some(msg)),
             Err(e) => Err(ChannelError::new(&e.to_string())),
         }
-        }
+    }
 
     fn is_empty(&self) -> bool {
         self.rx.is_empty()
@@ -60,28 +60,26 @@ impl<T> Clone for FlumeOutputChannel<T> {
     }
 }
 
-
-
 pub struct Channel;
 
 impl Channel {
-    pub fn channel<T: Send + 'static>(blocking: bool) -> (Box<dyn channel::Receiver<T> + Sync + Send>, Box<dyn channel::Sender<T> + Sync + Send>) {
+    pub fn channel<T: Send + 'static>(
+        blocking: bool,
+    ) -> (
+        Box<dyn channel::Receiver<T> + Sync + Send>,
+        Box<dyn channel::Sender<T> + Sync + Send>,
+    ) {
         let (tx, rx) = flume::unbounded();
         if blocking {
             (
-                Box::new(FlumeBlockingInputChannel {
-                    rx
-                }),
-                Box::new(FlumeOutputChannel { tx:tx })
+                Box::new(FlumeBlockingInputChannel { rx }),
+                Box::new(FlumeOutputChannel { tx: tx }),
             )
         } else {
             (
-                Box::new(FlumeInputChannel {
-                    rx
-                }),
-                Box::new(FlumeOutputChannel { tx: tx })
+                Box::new(FlumeInputChannel { rx }),
+                Box::new(FlumeOutputChannel { tx: tx }),
             )
         }
-
     }
 }
