@@ -4,7 +4,7 @@ name = "pspp"
 version = "0.1.0"
 
 [features]
-default = ["flume"]
+default = ["crossbeam"]
 flume = ["dep:flume"]
 crossbeam = ["crossbeam-channel"]
 ff = ["ff_buffer"]
