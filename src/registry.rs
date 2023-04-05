@@ -56,6 +56,15 @@ impl Registry {
             global,
         }
     }
+    
+    /// Execute a function on a specific thread.
+    pub fn execute_on<F>(&self, id: usize, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        let job = Job::NewJob(Box::new(f));
+        self.workers[id].push(job);
+    }
 
     /// Execute a function in the threadpool.
     pub fn execute<F>(&self, f: F)
