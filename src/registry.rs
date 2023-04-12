@@ -1,6 +1,7 @@
-use std::{sync::{Arc, Mutex, Barrier, RwLock}, thread};
+use std::{sync::{Arc, Mutex, Barrier, RwLock}, thread, error::Error, fmt};
 
 use crossbeam_deque::{Stealer, Injector, Worker, Steal};
+use num_cpus;
 use log::{trace, error};
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
@@ -9,16 +10,80 @@ pub(super) enum Job {
     NewJob(Func<'static>),
     Terminate,
 }
+
+#[derive(Debug)]
+pub struct RegistryError {
+    details: String,
+}
+
+impl RegistryError {
+    fn new(msg: &str) -> RegistryError {
+        RegistryError {
+            details: msg.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for RegistryError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.details)
+    }
+}
+
+impl Error for RegistryError {
+    fn description(&self) -> &str {
+        &self.details
+    }
+}
+
+
 pub(super) struct Registry {
     workers: Vec<Arc<WorkerThread>>,
     threads: Vec<Thread>,
     global: Arc<Injector<Job>>,
+}
+
+/// Global Registry of threads.
+static mut REGISTRY: Option<Arc<Registry>> = None;
+static REGISTRY_INIT: std::sync::Once = std::sync::Once::new();
+
+/// Initialize the global registry.
+pub(super) fn new_global_registry(nthreads: usize, pinning: bool) -> Result<Arc<Registry>, RegistryError>  {
+    match unsafe { REGISTRY.as_ref() } {
+        Some(_) => Err(RegistryError::new("Global registry already initialized.")),
+        None => {
+            let registry = Arc::new(Registry::new(nthreads, pinning));
+            unsafe { REGISTRY = Some(Arc::clone(&registry)) };
+            Ok(registry)
+        }
+    }
+}
+
+/// Initialize the global registry with default settings.
+pub(super) fn default_global_registry() -> Result<Arc<Registry>, RegistryError> {
+    match unsafe { REGISTRY.as_ref() } {
+        Some(_) => Err(RegistryError::new("Global registry already initialized.")),
+        None => {
+            let registry = Arc::new(Registry::new( num_cpus::get(), true));
+            unsafe { REGISTRY = Some(Arc::clone(&registry)) };
+            Ok(registry)
+        }
+    }
+}
+
+/// Get the global registry.
+pub(super) fn get_global_registry() ->Arc<Registry> {
+    match unsafe { REGISTRY.as_ref() } {
+        Some(registry) => Arc::clone(registry),
+        None => default_global_registry().unwrap(),
+    }
 }
 impl Registry {
     /// Create a new threadpool with `nthreads` threads.
     /// If `pinning` is true, threads will be pinned to their cores.
     /// If `pinning` is false, threads will be free to move between cores.
     pub fn new(nthreads: usize, pinning: bool) -> Registry {
+        trace!("Creating new thread registry.");
         let mut workers = Vec::new();
         let mut threads = Vec::new();
         let global = Arc::new(Injector::new());
@@ -56,14 +121,18 @@ impl Registry {
             global,
         }
     }
-    
+
     /// Execute a function on a specific thread.
-    pub fn execute_on<F>(&self, id: usize, f: F)
+    pub fn execute_on<F>(&self, id: usize, f: F) -> Result<(), RegistryError>
     where
         F: FnOnce() + Send + 'static,
     {
+        if id >= self.get_nthreads() {
+            return Err(RegistryError::new("Invalid thread id."));
+        }
         let job = Job::NewJob(Box::new(f));
         self.workers[id].push(job);
+        Ok(())
     }
 
     /// Execute a function in the threadpool.
@@ -74,11 +143,15 @@ impl Registry {
         let job = Job::NewJob(Box::new(f));
         self.global.push(job);
     }
+
+    pub fn get_nthreads(&self) -> usize {
+        self.workers.len()
+    }
     
 }
 impl Drop for Registry {
     fn drop(&mut self) {
-        trace!("Closing threadpool");
+        trace!("Closing thread registry.");
         self.global.push(Job::Terminate);
         for thread in &mut self.threads {
             thread.join();
@@ -112,6 +185,7 @@ impl WorkerThread {
     }
 
     fn run(&self) {
+        trace!("Thread {} started.", self.id);
         let mut stop = false;
         loop {
             if let Some(job) = self.pop() {
@@ -143,6 +217,7 @@ impl WorkerThread {
                 thread::yield_now();
             }
         }
+        trace!("Thread {} stopped.", self.id);
     }
 
     fn pop(&self) -> Option<Job> {
@@ -156,10 +231,12 @@ impl WorkerThread {
     fn steal(&self) -> Option<Job> {
         let stealers = self.stealers.read().unwrap();
         for stealer in stealers.iter() {
-            match stealer.steal() {
-                Steal::Success(job) => return Some(job),
-                Steal::Empty => return None,
-                Steal::Retry => continue,
+            loop {
+                match stealer.steal() {
+                    Steal::Success(job) => return Some(job),
+                    Steal::Empty => break,
+                    Steal::Retry => continue,
+                }
             }
         }
         None
@@ -174,7 +251,6 @@ impl WorkerThread {
             };
         }
     }
-
 }
 
 /// A thread in the threadpool.
@@ -245,5 +321,23 @@ mod tests {
         thread::sleep(Duration::from_millis(100));
         drop(registry);
         assert_eq!(counter.load(Ordering::SeqCst), 1000);
+    }
+
+    #[test]
+    fn test_only_one_global() {
+        let mut check = false;
+        let registryA = new_global_registry(4, true);
+        let registryB = new_global_registry(4, true);
+        if registryB.is_err() && registryA.is_ok() {
+            check = true;
+        }
+
+        assert_eq!(check, true);
+    }
+
+    #[test]
+    fn default_global_registry() {
+        let registry = get_global_registry();
+        assert_eq!(registry.get_nthreads(), num_cpus::get());
     }
 }

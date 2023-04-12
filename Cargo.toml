@@ -19,6 +19,7 @@ crossbeam-channel = { version = "0.5.6", optional = true }
 crossbeam-deque = "0.8.2"
 dyn-clone = "1.0.10"
 log = "0.4.17"
+num_cpus = "1.0"
 ff_buffer = { git = "https://github.com/valebes/ff_buffer.git", optional = true }
 kanal = { git = "https://github.com/fereidani/kanal.git", optional = true }
 flume = { version = "0.10.14", optional = true }
