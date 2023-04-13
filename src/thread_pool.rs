@@ -1,13 +1,15 @@
 use crossbeam_deque::{Injector, Stealer, Worker};
 use log::{error, trace};
 use std::collections::BTreeMap;
+use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier, Mutex};
 use std::thread::JoinHandle;
-use std::{hint, iter, mem, thread};
+use std::{hint, iter, mem, thread, fmt};
 
 use crate::channel::channel::Channel;
+use crate::registry::{get_global_registry, Registry};
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -15,38 +17,72 @@ enum Job {
     NewJob(Func<'static>),
     Terminate,
 }
+
+#[derive(Debug)]
+pub struct ThreadPoolError {
+    details: String,
+}
+
+impl ThreadPoolError {
+    fn new(msg: &str) -> ThreadPoolError {
+        ThreadPoolError {
+            details: msg.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for ThreadPoolError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.details)
+    }
+}
+
+impl Error for ThreadPoolError {
+    fn description(&self) -> &str {
+        &self.details
+    }
+}
+
+
 ///Struct representing a thread pool.
 pub struct ThreadPool {
     num_threads: usize,
-    pinning: bool,
-    threads: Arc<Mutex<Vec<Option<JoinHandle<()>>>>>,
+    workers: Vec<Arc<Mutex<bool>>>,
     total_tasks: Arc<AtomicUsize>,
     injector: Arc<Injector<Job>>,
+    registry: Arc<Registry>,
 }
 
 impl Clone for ThreadPool {
+    /// Create a new threadpool from an existing one, using the same number of threads.
     fn clone(&self) -> Self {
-        ThreadPool::new(self.num_threads, self.pinning)
+        let registry = self.registry.clone();
+        let start = registry.get_range_of_contiguos_free_workers(self.num_threads);
+        match start {
+            Some(start) => {
+                ThreadPool::new(self.num_threads, start, registry)
+            },
+            None => panic!("Not enough free workers"),
+        }
     }
 }
+
 impl ThreadPool {
-    /// Create a new thread pool with `num_threads`threads.
-    /// If `pinning` is `true`, the threads will be pinned on the cpu.
-    /// # Examples
-    ///
-    /// Create a new thread pool with `8` threads:
-    ///
-    /// ```
-    /// use pspp::thread_pool::ThreadPool;
-    ///
-    /// let mut pool = ThreadPool::new(8, false);
-    ///
-    pub fn new(num_threads: usize, pinning: bool) -> Self {
+    fn new(num_threads: usize, from: usize, registry: Arc<Registry>) -> Self {
         trace!("Creating new threadpool");
-        let mut threads = Vec::with_capacity(num_threads);
+        let mut start = 0;
+        
+        // todo: maybe change this in the case of non pinned threads
+        match registry.get_range_of_contiguos_free_workers(num_threads) {
+            Some(s) => start = s,
+            None => panic!("Not enough free threads"),
+        }
+        
+        let threads = Vec::with_capacity(num_threads);
         let mut workers: Vec<Worker<Job>> = Vec::with_capacity(num_threads);
         let mut stealers = Vec::with_capacity(num_threads);
         let injector = Arc::new(Injector::new());
+
 
         for _ in 0..num_threads {
             workers.push(Worker::new_fifo());
@@ -65,21 +101,9 @@ impl ThreadPool {
             let local_barrier = Arc::clone(&barrier);
             let total_tasks_cp = Arc::clone(&total_tasks);
 
-            threads.push(Some(thread::spawn(move || {
-                if pinning {
-                    let mut core_ids = core_affinity::get_core_ids().unwrap();
-                    if core_ids.get(i).is_none() {
-                        error!("Cannot pin the thread in the choosen position.");
-                    } else {
-                        let core = core_ids.remove(i);
-                        let err = core_affinity::set_for_current(core);
-                        if !err {
-                            error!("Thread pinning for thread[{}] failed!", i);
-                        } else {
-                            trace!("Thread[{}] correctly pinned on {}!", i, core.id);
-                        }
-                    }
-                }
+            let mtx = Mutex::new(true);
+
+            let err = registry.execute_on(start + i, move || {
                 let mut stop = false;
                 // We wait that all threads start
                 local_barrier.wait();
@@ -103,16 +127,38 @@ impl ThreadPool {
                         }
                     }
                 }
-            })));
+                match mtx.lock() {
+                    Ok(mut b) => *b = false,
+                    Err(e) => panic!("Error while locking mutex: {}", e),
+                }
+                
+            }
+                );
+                match err {
+                    Ok(_) => (),
+                    Err(e) => panic!("Error while executing thread: {}", e),
+                }
         }
+
 
         Self {
             num_threads,
-            pinning,
-            threads: Arc::new(Mutex::new(threads)),
+            workers: threads,
             total_tasks,
             injector,
+            registry,
         }
+
+    }
+
+    pub fn new_with_local_registry(num_threads: usize, pinning: bool) -> Self {
+        let registry = Arc::new(Registry::new(num_threads, pinning));
+        Self::new(num_threads, 0, registry)
+    }
+
+    pub fn new_with_global_registry(num_threads: usize, from: usize) -> Self {
+        let registry = get_global_registry();
+        Self::new(num_threads, from, registry)
     }
 
     fn find_task<F>(
@@ -163,7 +209,7 @@ impl ThreadPool {
     /// ```
     /// use pspp::thread_pool::ThreadPool;
     ///
-    /// let mut pool = ThreadPool::new(8, false);
+    /// let mut pool = ThreadPool::new_with_local_registry(8, false);
     /// let mut vec = vec![0; 100];
     ///
     /// pool.par_for(&mut vec, |el: &mut i32| *el = *el + 1);
@@ -188,7 +234,7 @@ impl ThreadPool {
     /// ```
     /// use pspp::thread_pool::ThreadPool;
     ///
-    /// let mut pool = ThreadPool::new(8, false);
+    /// let mut pool = ThreadPool::new_with_local_registry(8, false);
     /// let mut vec = vec![0i32; 100];
     ///
     /// let res: Vec<String> = pool.par_map(&mut vec, |el| -> String {
@@ -247,16 +293,12 @@ impl Drop for ThreadPool {
     fn drop(&mut self) {
         trace!("Closing threadpool");
         self.injector.push(Job::Terminate);
-        let mtx = self.threads.lock();
-        match mtx {
-            Ok(mut tp) => {
-                for th in &mut *tp {
-                    if let Some(thread) = th.take() {
-                        thread.join().expect("Error while joining thread!")
-                    }
+        for worker in &self.workers {
+            loop {
+                if *worker.lock().unwrap() == false {
+                    break;
                 }
             }
-            Err(e) => panic!("Error: {}", e),
         }
     }
 }
@@ -301,7 +343,7 @@ mod tests {
 
     #[test]
     fn test_threadpool() {
-        let tp = ThreadPool::new(8, false);
+        let tp = ThreadPool::new_with_local_registry(8, true);
         for i in 1..45 {
             tp.execute(move || {
                 fib(i);
@@ -312,7 +354,7 @@ mod tests {
     #[test]
     fn test_scoped_thread() {
         let mut vec = vec![0; 100];
-        let mut tp = ThreadPool::new(8, false);
+        let mut tp = ThreadPool::new_with_local_registry(8, true);
 
         tp.scoped(|s| {
             for e in vec.iter_mut() {
@@ -329,7 +371,7 @@ mod tests {
     #[test]
     fn test_par_for() {
         let mut vec = vec![0; 100];
-        let mut tp = ThreadPool::new(8, false);
+        let mut tp = ThreadPool::new_with_local_registry(8, true);
 
         tp.par_for(&mut vec, |el: &mut i32| *el += 1);
         tp.wait();
@@ -340,7 +382,7 @@ mod tests {
     fn test_par_map() {
         env_logger::init();
         let mut vec = Vec::new();
-        let mut tp = ThreadPool::new(8, false);
+        let mut tp = ThreadPool::new_with_local_registry(8, true);
 
         for i in 0..1000 {
             vec.push(i);

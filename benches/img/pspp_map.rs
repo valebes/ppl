@@ -3,7 +3,11 @@ use raster::filter;
 use raster::Image;
 
 pub fn pspp_map(images: Vec<Image>, threads: usize) {
-    let mut pool = ThreadPool::new(threads * 5, true);
+    let mut pinning = false;
+    if num_cpus::get() >= threads * 5 {
+        pinning = true;
+    }
+    let mut pool = ThreadPool::new_with_local_registry(threads * 5, pinning);
     /*
         let a = pool.par_map(images, |mut image: Image| -> Image {
         filter::saturation(&mut image, 0.2).unwrap();

@@ -6,7 +6,7 @@
 #![feature(box_into_inner)]
 
 pub mod channel;
-pub mod map;
+//pub mod map;
 pub mod node;
 pub mod pspp;
 mod task;

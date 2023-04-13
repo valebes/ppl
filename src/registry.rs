@@ -1,4 +1,4 @@
-use std::{sync::{Arc, Mutex, Barrier, RwLock}, thread, error::Error, fmt};
+use std::{sync::{Arc, Mutex, Barrier, RwLock, atomic::{Ordering, AtomicBool}}, thread, error::Error, fmt};
 
 use crossbeam_deque::{Stealer, Injector, Worker, Steal};
 use num_cpus;
@@ -59,13 +59,16 @@ pub(super) fn new_global_registry(nthreads: usize, pinning: bool) -> Result<Arc<
     }
 }
 
+pub(super) fn new_local_registry(nthreads: usize, pinning: bool) -> Arc<Registry> {
+    Arc::new(Registry::new(nthreads, pinning))
+}
 /// Initialize the global registry with default settings.
 pub(super) fn default_global_registry() -> Result<Arc<Registry>, RegistryError> {
     match unsafe { REGISTRY.as_ref() } {
         Some(_) => Err(RegistryError::new("Global registry already initialized.")),
         None => {
-            let registry = Arc::new(Registry::new( num_cpus::get(), true));
-            unsafe { REGISTRY = Some(Arc::clone(&registry)) };
+            let registry = Arc::new(Registry::new( num_cpus::get(), false));
+            set_global_registry(registry.clone());
             Ok(registry)
         }
     }
@@ -78,11 +81,25 @@ pub(super) fn get_global_registry() ->Arc<Registry> {
         None => default_global_registry().unwrap(),
     }
 }
+
+/// Set the global registry.
+pub(super) fn set_global_registry(registry: Arc<Registry>) {
+    REGISTRY_INIT.call_once(|| {
+        unsafe { REGISTRY = Some(registry) };
+    });
+}
+
 impl Registry {
     /// Create a new threadpool with `nthreads` threads.
     /// If `pinning` is true, threads will be pinned to their cores.
     /// If `pinning` is false, threads will be free to move between cores.
     pub fn new(nthreads: usize, pinning: bool) -> Registry {
+        if nthreads == 0 {
+            panic!("Cannot create a threadpool with 0 threads.");
+        } else if (nthreads > num_cpus::get()) && pinning {
+            panic!("Cannot create a threadpool with more pinned threads than available cores. ({} > {})", nthreads, num_cpus::get());
+        }
+
         trace!("Creating new thread registry.");
         let mut workers = Vec::new();
         let mut threads = Vec::new();
@@ -120,6 +137,57 @@ impl Registry {
             threads,
             global,
         }
+    }
+
+    /// Add a new thread to the threadpool.
+    pub(super) fn add_worker(&mut self, pinning: bool) {
+        let worker = WorkerThread::new(self.workers.len(), Arc::clone(&self.global));
+        for other in &self.workers {
+            worker.register_stealer(other.get_stealer());
+        }
+        self.workers.push(Arc::new(worker));
+        let worker_copy = Arc::clone(&self.workers[self.workers.len() - 1]);
+        let thread = Thread::new(worker_copy.id, move || worker_copy.run(), pinning);
+        self.threads.push(thread);
+    }
+
+    ///
+    pub(super) fn get_free_workers(&self) -> usize {
+        let mut count = 0;
+        for worker in &self.workers {
+            if !worker.is_busy() {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    pub(super) fn get_range_of_contiguos_free_workers(&self, n: usize) -> Option<usize> {
+        let mut count = 0;
+        let mut start = 0;
+        for i in 0..self.workers.len() {
+            if !self.workers[i].is_busy() {
+                count += 1;
+                if count == n {
+                    return Some(start);
+                }
+            } else {
+                count = 0;
+                start = i + 1;
+            }
+        }
+        None
+    }
+
+    
+    pub(super) fn contiguos_free_workers(&self, from: usize, to: usize) -> bool {
+        let mut count = 0;
+        for i in from..to {
+            if !self.workers[i].is_busy() {
+                count += 1;
+            }
+        }
+        count == to - from
     }
 
     /// Execute a function on a specific thread.
@@ -161,6 +229,7 @@ impl Drop for Registry {
 /// A thread in the threadpool.
 struct WorkerThread {
     id: usize,
+    busy: AtomicBool,
     global: Arc<Injector<Job>>,
     worker: Mutex<Worker<Job>>,
     stealers: RwLock<Vec<Stealer<Job>>>,
@@ -170,10 +239,15 @@ impl WorkerThread {
         let worker = Worker::new_fifo();
         WorkerThread {
             id,
+            busy: AtomicBool::new(false),
             global,
             worker: Mutex::new(worker),
             stealers: RwLock::new(Vec::new()),
         }
+    }
+
+    fn is_busy(&self) -> bool {
+        self.busy.load(Ordering::Relaxed)
     }
 
     fn get_stealer(&self) -> Stealer<Job> {
@@ -190,21 +264,33 @@ impl WorkerThread {
         loop {
             if let Some(job) = self.pop() {
                 match job {
-                    Job::NewJob(f) => f(),
+                    Job::NewJob(f) => {
+                        self.busy.store(true, Ordering::SeqCst);
+                        f();
+                        self.busy.store(false, Ordering::SeqCst);
+                    },
                     Job::Terminate => {
                         stop = true;
                     }
                 }
             } else if let Some(job) = self.steal() {
                 match job {
-                    Job::NewJob(f) => f(),
+                    Job::NewJob(f) => {
+                        self.busy.store(true, Ordering::SeqCst);
+                        f();
+                        self.busy.store(false, Ordering::SeqCst);
+                    },
                     Job::Terminate => {
                         stop = true;
                     }
                 }
             } else if let Some(job) = self.steal_from_global() {
                 match job {
-                    Job::NewJob(f) => f(),
+                    Job::NewJob(f) => {
+                        self.busy.store(true, Ordering::SeqCst);
+                        f();
+                        self.busy.store(false, Ordering::SeqCst);
+                    },
                     Job::Terminate => {
                         stop = true;
                     }
@@ -257,6 +343,7 @@ impl WorkerThread {
 pub struct Thread {
     id: usize,
     thread: Option<thread::JoinHandle<()>>,
+    pinned: bool,
 }
 impl Thread {
     /// Create a new thread.
@@ -285,6 +372,7 @@ impl Thread {
                 (f)();
                 trace!("{:?} now will end.", thread::current().id());
             })),
+            pinned: pinning,
         }
     }
 
