@@ -37,7 +37,7 @@ impl Error for RegistryError {
 }
 
 
-pub(super) struct Registry {
+pub struct Registry {
     workers: Vec<Arc<WorkerThread>>,
     threads: Vec<Thread>,
     global: Arc<Injector<Job>>,
@@ -75,7 +75,7 @@ pub(super) fn default_global_registry() -> Result<Arc<Registry>, RegistryError> 
 }
 
 /// Get the global registry.
-pub(super) fn get_global_registry() ->Arc<Registry> {
+pub fn get_global_registry() ->Arc<Registry> {
     match unsafe { REGISTRY.as_ref() } {
         Some(registry) => Arc::clone(registry),
         None => default_global_registry().unwrap(),
@@ -108,7 +108,7 @@ impl Registry {
         let barrier = Arc::new(Barrier::new(nthreads));
 
         for i in 0..nthreads {
-            let worker = WorkerThread::new(i, Arc::clone(&global));
+            let worker = WorkerThread::new(i, pinning, Arc::clone(&global));
             workers.push(Arc::new(worker));
         }
 
@@ -141,7 +141,7 @@ impl Registry {
 
     /// Add a new thread to the threadpool.
     pub(super) fn add_worker(&mut self, pinning: bool) {
-        let worker = WorkerThread::new(self.workers.len(), Arc::clone(&self.global));
+        let worker = WorkerThread::new(self.workers.len(), pinning, Arc::clone(&self.global));
         for other in &self.workers {
             worker.register_stealer(other.get_stealer());
         }
@@ -152,10 +152,10 @@ impl Registry {
     }
 
     ///
-    pub(super) fn get_free_workers(&self) -> usize {
+    pub(super) fn get_free_workers(&self, pinning: bool) -> usize {
         let mut count = 0;
         for worker in &self.workers {
-            if !worker.is_busy() {
+            if !worker.is_busy() && worker.is_pinned() == pinning {
                 count += 1;
             }
         }
@@ -180,16 +180,6 @@ impl Registry {
     }
 
     
-    pub(super) fn contiguos_free_workers(&self, from: usize, to: usize) -> bool {
-        let mut count = 0;
-        for i in from..to {
-            if !self.workers[i].is_busy() {
-                count += 1;
-            }
-        }
-        count == to - from
-    }
-
     /// Execute a function on a specific thread.
     pub fn execute_on<F>(&self, id: usize, f: F) -> Result<(), RegistryError>
     where
@@ -230,20 +220,26 @@ impl Drop for Registry {
 struct WorkerThread {
     id: usize,
     busy: AtomicBool,
+    pinning: bool,
     global: Arc<Injector<Job>>,
     worker: Mutex<Worker<Job>>,
     stealers: RwLock<Vec<Stealer<Job>>>,
 }
 impl WorkerThread {
-    fn new(id: usize, global: Arc<Injector<Job>>) -> WorkerThread {
+    fn new(id: usize, pinning: bool, global: Arc<Injector<Job>>) -> WorkerThread {
         let worker = Worker::new_fifo();
         WorkerThread {
             id,
             busy: AtomicBool::new(false),
+            pinning,
             global,
             worker: Mutex::new(worker),
             stealers: RwLock::new(Vec::new()),
         }
+    }
+
+    fn is_pinned(&self) -> bool {
+        self.pinning
     }
 
     fn is_busy(&self) -> bool {
@@ -343,7 +339,7 @@ impl WorkerThread {
 pub struct Thread {
     id: usize,
     thread: Option<thread::JoinHandle<()>>,
-    pinned: bool,
+    pinning: bool,
 }
 impl Thread {
     /// Create a new thread.
@@ -351,13 +347,18 @@ impl Thread {
     where
         F: FnOnce() + Send + 'static,
     {
+        let mut pinning = pinning;
+        if id > num_cpus::get() && pinning {
+            error!("Cannot pin a thread in a position greater than the number of cores. Proceding without pinning.");
+            pinning = false;
+        }
         Thread {
             id,
             thread: Some(thread::spawn(move || {
                 if pinning {
                     let mut core_ids = core_affinity::get_core_ids().unwrap();
                     if core_ids.get(id).is_none() {
-                        error!("Cannot pin the thread in the choosen position.");
+                        panic!("Cannot pin the thread in the choosen position.");
                     } else {
                         let core = core_ids.remove(id);
                         let err = core_affinity::set_for_current(core);
@@ -372,12 +373,16 @@ impl Thread {
                 (f)();
                 trace!("{:?} now will end.", thread::current().id());
             })),
-            pinned: pinning,
+            pinning,
         }
     }
 
     fn id(&self) -> usize {
         self.id
+    }
+
+    fn is_pinned(&self) -> bool {
+        self.pinning
     }
 
     /// Join the thread.
@@ -414,9 +419,9 @@ mod tests {
     #[test]
     fn test_only_one_global() {
         let mut check = false;
-        let registryA = new_global_registry(4, true);
-        let registryB = new_global_registry(4, true);
-        if registryB.is_err() && registryA.is_ok() {
+        let registry_a = new_global_registry(4, true);
+        let registry_b = new_global_registry(4, true);
+        if registry_b.is_err() && registry_a.is_ok() {
             check = true;
         }
 

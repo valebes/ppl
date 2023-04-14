@@ -1,4 +1,5 @@
 use crate::node::{node::Node, out_node::*};
+
 pub struct Parallel<
     TOut: Send + 'static,
     TCollected,
@@ -17,10 +18,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     pub fn start(&mut self) {
         match &mut self.first_block {
             Some(block) => {
-                let err = block.start();
-                if err.is_err() {
-                    panic!("Error: Cannot start thread!");
-                }
+                block.start();
             }
             None => panic!("Error: Cannot start the pipeline!"),
         }
@@ -78,12 +76,14 @@ macro_rules! propagate {
     };
 }
 
+//todo: add macro for parallel using local registry
 #[macro_export]
 macro_rules! parallel {
     ($s1:expr $(, $tail:expr)*) => {
         {
+            let registry = pspp::registry::get_global_registry();
             let mut block = OutNode::new(0, Box::new($s1),
-                propagate!(1, $($tail),*), true).unwrap();
+                propagate!(1, $($tail),*), true, registry).unwrap();
 
             let mut pipeline = Parallel::new(block);
             pipeline

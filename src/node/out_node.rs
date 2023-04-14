@@ -4,8 +4,8 @@ use std::sync::{Arc, Mutex};
 use log::trace;
 
 use crate::channel::err::ChannelError;
+use crate::registry::Registry;
 use crate::task::{Message, Task};
-use crate::thread::{Thread, ThreadError};
 
 use super::node::Node;
 
@@ -38,9 +38,9 @@ pub trait Out<TOut: 'static + Send> {
 }
 
 pub struct OutNode<TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
-    thread: Thread,
     next_node: Arc<TNext>,
     stop: Arc<Mutex<bool>>,
+    terminated: Arc<Mutex<bool>>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
@@ -56,10 +56,8 @@ impl<
     }
 
     fn collect(mut self) -> Option<TCollected> {
-        let err = self.wait();
-        if err.is_err() {
-            panic!("Error: Cannot wait thread.");
-        }
+        self.wait();
+
         match Arc::try_unwrap(self.next_node) {
             Ok(nn) => nn.collect(),
             Err(_) => panic!("Error: Cannot collect results"),
@@ -85,27 +83,35 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         handler: Box<dyn Out<TOut> + Send + Sync>,
         next_node: TNext,
         pinning: bool,
+        registry: Arc<Registry>
     ) -> Result<OutNode<TOut, TCollected, TNext>, ()> {
         trace!("Created a new Source! Id: {}", id);
-        let stop = Arc::new(Mutex::new(false));
+        let stop = Arc::new(Mutex::new(true));
         let stop_copy = Arc::clone(&stop);
 
         let next_node = Arc::new(next_node);
 
         let nn = Arc::clone(&next_node);
+        let terminated = Arc::new(Mutex::new(false));
+        let terminated_copy = Arc::clone(&terminated);
 
-        let thread = Thread::new(
-            id,
-            move || {
-                Self::rts(handler, &nn, &stop_copy);
-            },
-            pinning,
-        );
+        let err = registry.execute_on(id, move || {
+            Self::rts(handler, &nn, &stop_copy);
+            let mtx = terminated_copy.lock();
+            match mtx {
+                Ok(mut m) => *m = true,
+                Err(_) => panic!("Error: Cannot lock mutex."),
+            }
+        });
+
+        if err.is_err() {
+            panic!("Error: {}", err.unwrap_err());
+        }
 
         let node = OutNode {
-            thread,
             next_node,
             stop,
+            terminated,
             phantom: PhantomData,
         };
 
@@ -115,6 +121,17 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     fn rts(mut node: Box<dyn Out<TOut>>, nn: &TNext, stop: &Mutex<bool>) {
         let mut order = 0;
         let mut counter = 0;
+        loop {
+            let stop_mtx = stop.lock();
+            match stop_mtx {
+                Ok(mtx) => {
+                    if !*mtx {
+                        break;
+                    }
+                }
+                Err(_) => panic!("Error: Cannot lock mutex."),
+            }
+        }
         loop {
             let stop_mtx = stop.lock();
             match stop_mtx {
@@ -156,36 +173,30 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     }
 
     /// Start the node.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the thread cannot be created.
-    pub fn start(&mut self) -> std::result::Result<(), ThreadError> {
-        self.thread.start()
+    pub fn start(&mut self) {
+        self.send_start();
     }
 
     /// Terminate the current node and the following ones.
-    ///
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the thread cannot be terminated.
-    pub fn terminate(mut self) -> std::result::Result<(), ThreadError> {
+    pub fn terminate(mut self) {
         self.send_stop();
-        let err = self.wait();
-        if err.is_err() {
-            return err;
-        }
-
+        self.wait();
         match Arc::try_unwrap(self.next_node) {
             Ok(nn) => {
                 nn.collect();
             }
             Err(_) => panic!("Error: Cannot collect results"),
         }
-
-        Ok(())
     }
+
+    fn send_start(&self) {
+        let mtx = self.stop.lock();
+        match mtx {
+            Ok(mut stop) => *stop = false,
+            Err(_) => panic!("Error: Cannot lock mutex."),
+        }
+    }
+
     fn send_stop(&self) {
         let mtx = self.stop.lock();
         match mtx {
@@ -194,7 +205,17 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
-    fn wait(&mut self) -> std::result::Result<(), ThreadError> {
-        self.thread.wait()
+    fn wait(&mut self) {
+        loop {
+            let mtx = self.terminated.lock();
+            match mtx {
+                Ok(term) => {
+                    if *term {
+                        break;
+                    }
+                }
+                Err(_) => panic!("Error: Cannot lock mutex."),
+            }
+        }
     }
 }
