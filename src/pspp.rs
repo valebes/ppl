@@ -81,7 +81,7 @@ macro_rules! propagate {
 macro_rules! parallel {
     ($s1:expr $(, $tail:expr)*) => {
         {
-            let registry = pspp::registry::get_global_registry();
+            let registry = pspp::core::registry::get_global_registry();
             let mut block = OutNode::new(0, Box::new($s1),
                 propagate!(1, $($tail),*), true, registry).unwrap();
 

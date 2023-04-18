@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use log::trace;
 
 use crate::channel::err::ChannelError;
-use crate::registry::Registry;
+use crate::core::registry::{Registry, JobInfo};
 use crate::task::{Message, Task};
 
 use super::node::Node;
@@ -40,7 +40,7 @@ pub trait Out<TOut: 'static + Send> {
 pub struct OutNode<TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     next_node: Arc<TNext>,
     stop: Arc<Mutex<bool>>,
-    terminated: Arc<Mutex<bool>>,
+    job_info: JobInfo,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
@@ -92,26 +92,19 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         let next_node = Arc::new(next_node);
 
         let nn = Arc::clone(&next_node);
-        let terminated = Arc::new(Mutex::new(false));
-        let terminated_copy = Arc::clone(&terminated);
-
-        let err = registry.execute_on(id, move || {
+   
+        let res = registry.execute_on(id, move || {
             Self::rts(handler, &nn, &stop_copy);
-            let mtx = terminated_copy.lock();
-            match mtx {
-                Ok(mut m) => *m = true,
-                Err(_) => panic!("Error: Cannot lock mutex."),
-            }
         });
 
-        if err.is_err() {
-            panic!("Error: {}", err.unwrap_err());
+        if res.is_err() {
+            panic!("Error: {}", res.unwrap_err());
         }
 
         let node = OutNode {
             next_node,
             stop,
-            terminated,
+            job_info: res.unwrap(),
             phantom: PhantomData,
         };
 
@@ -206,16 +199,6 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     }
 
     fn wait(&mut self) {
-        loop {
-            let mtx = self.terminated.lock();
-            match mtx {
-                Ok(term) => {
-                    if *term {
-                        break;
-                    }
-                }
-                Err(_) => panic!("Error: Cannot lock mutex."),
-            }
-        }
+        self.job_info.wait();
     }
 }

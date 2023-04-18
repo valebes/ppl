@@ -9,7 +9,8 @@ use std::thread::JoinHandle;
 use std::{hint, iter, mem, thread, fmt};
 
 use crate::channel::channel::Channel;
-use crate::registry::{get_global_registry, Registry};
+use crate::core::registry::{Registry, JobInfo, get_global_registry};
+
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -47,7 +48,7 @@ impl Error for ThreadPoolError {
 ///Struct representing a thread pool.
 pub struct ThreadPool {
     num_threads: usize,
-    workers: Vec<Arc<Mutex<bool>>>,
+    workers_info: Vec<JobInfo>,
     total_tasks: Arc<AtomicUsize>,
     injector: Arc<Injector<Job>>,
     registry: Arc<Registry>,
@@ -78,7 +79,7 @@ impl ThreadPool {
             None => panic!("Not enough free threads"),
         }
         
-        let threads = Vec::with_capacity(num_threads);
+        let mut workers_info = Vec::with_capacity(num_threads);
         let mut workers: Vec<Worker<Job>> = Vec::with_capacity(num_threads);
         let mut stealers = Vec::with_capacity(num_threads);
         let injector = Arc::new(Injector::new());
@@ -100,8 +101,6 @@ impl ThreadPool {
             let local_stealers = stealers.clone();
             let local_barrier = Arc::clone(&barrier);
             let total_tasks_cp = Arc::clone(&total_tasks);
-
-            let mtx = Mutex::new(true);
 
             let err = registry.execute_on(start + i, move || {
                 let mut stop = false;
@@ -127,23 +126,19 @@ impl ThreadPool {
                         }
                     }
                 }
-                match mtx.lock() {
-                    Ok(mut b) => *b = false,
-                    Err(e) => panic!("Error while locking mutex: {}", e),
-                }
                 
             }
-                );
-                match err {
-                    Ok(_) => (),
-                    Err(e) => panic!("Error while executing thread: {}", e),
+            );
+            match err {
+                Ok(job) => workers_info.push(job),
+                Err(e) => panic!("Error while executing thread: {}", e),
                 }
         }
 
 
         Self {
             num_threads,
-            workers: threads,
+            workers_info,
             total_tasks,
             injector,
             registry,
@@ -152,7 +147,7 @@ impl ThreadPool {
     }
 
     pub fn new_with_local_registry(num_threads: usize, pinning: bool) -> Self {
-        let registry = Arc::new(Registry::new(num_threads, pinning));
+        let registry = crate::core::registry::new_local_registry(num_threads, pinning);
         Self::new(num_threads, 0, registry)
     }
 
@@ -192,6 +187,7 @@ impl ThreadPool {
         self.total_tasks
             .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     }
+    
     /// Block until all current jobs in the thread pool are finished.
     pub fn wait(&self) {
         while (self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0)
@@ -293,12 +289,9 @@ impl Drop for ThreadPool {
     fn drop(&mut self) {
         trace!("Closing threadpool");
         self.injector.push(Job::Terminate);
-        for worker in &self.workers {
-            loop {
-                if *worker.lock().unwrap() == false {
-                    break;
-                }
-            }
+
+        for job in &self.workers_info {
+            job.wait();
         }
     }
 }

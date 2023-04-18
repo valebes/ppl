@@ -12,4 +12,4 @@ pub mod pspp;
 mod task;
 mod thread;
 pub mod thread_pool;
-pub mod registry;
+pub mod core;
