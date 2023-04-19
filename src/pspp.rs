@@ -9,12 +9,14 @@ pub struct Parallel<
 }
 impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static>
     Parallel<TOut, TCollected, TNext>
-{
+{   
+    /// Creates a new parallel pipeline.
     pub fn new(first_block: OutNode<TOut, TCollected, TNext>) -> Parallel<TOut, TCollected, TNext> {
         Parallel {
             first_block: Some(first_block),
         }
     }
+    /// Starts the pipeline.
     pub fn start(&mut self) {
         match &mut self.first_block {
             Some(block) => {
@@ -23,7 +25,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
             None => panic!("Error: Cannot start the pipeline!"),
         }
     }
-
+    /// Waits for the pipeline to terminate and collects the results.
     pub fn wait_and_collect(&mut self) -> Option<TCollected> {
         match &mut self.first_block {
             Some(_block) => {
@@ -77,6 +79,11 @@ macro_rules! propagate {
 }
 
 //todo: add macro for parallel using local registry
+/// Creates a new parallel pipeline.
+/// The macro takes as input a list of stages.
+/// The stages are executed in parallel.
+/// The output of the pipeline is the output of the last stage.
+/// The macro returns a `Parallel` struct that can be used to start and wait for the pipeline.
 #[macro_export]
 macro_rules! parallel {
     ($s1:expr $(, $tail:expr)*) => {

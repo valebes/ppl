@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
-use std::sync::{Arc, Barrier, Mutex};
+use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
 use std::{hint, iter, mem, thread, fmt};
 
@@ -71,7 +71,7 @@ impl Clone for ThreadPool {
 impl ThreadPool {
     fn new(num_threads: usize, from: usize, registry: Arc<Registry>) -> Self {
         trace!("Creating new threadpool");
-        let mut start = 0;
+        let start;
         
         // todo: maybe change this in the case of non pinned threads
         match registry.get_range_of_contiguos_free_workers(num_threads) {
@@ -318,6 +318,7 @@ impl<'pool, 'scope> Scope<'pool, 'scope> {
 #[cfg(test)]
 mod tests {
     use super::ThreadPool;
+    use serial_test::*;
 
     fn fib(n: i32) -> u64 {
         if n < 0 {
@@ -335,6 +336,7 @@ mod tests {
     }
 
     #[test]
+    #[parallel]
     fn test_threadpool() {
         let tp = ThreadPool::new_with_local_registry(8, true);
         for i in 1..45 {
@@ -345,6 +347,7 @@ mod tests {
     }
 
     #[test]
+    #[parallel]
     fn test_scoped_thread() {
         let mut vec = vec![0; 100];
         let mut tp = ThreadPool::new_with_local_registry(8, true);
@@ -362,6 +365,7 @@ mod tests {
     }
 
     #[test]
+    #[parallel]
     fn test_par_for() {
         let mut vec = vec![0; 100];
         let mut tp = ThreadPool::new_with_local_registry(8, true);
@@ -372,6 +376,7 @@ mod tests {
     }
 
     #[test]
+    #[parallel]
     fn test_par_map() {
         env_logger::init();
         let mut vec = Vec::new();
