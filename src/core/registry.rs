@@ -102,7 +102,7 @@ pub fn get_global_registry() -> Arc<Registry> {
 
 /// Set the global registry.
 fn set_global_registry(registry: Arc<Registry>) -> Result<Arc<Registry>, RegistryError> {
-    let mut result = Err(RegistryError::new("Woops! Something went wrong.")); // Nobody should see this.
+    let mut result = Err(RegistryError::new("Error setting global registry."));
     unsafe { let _err = REGISTRY
         .set(registry)
         .map(|_| {
