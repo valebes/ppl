@@ -1,3 +1,4 @@
+use pspp::core::orchestrator::Orchestrator;
 use pspp::core::orchestrator::get_global_orchestrator;
 use raster::filter;
 use raster::Image;
@@ -117,4 +118,5 @@ pub fn pspp(images: Vec<Image>, threads: usize) {
 
     p.start();
     let _res = p.wait_and_collect();
+    Orchestrator::delete_global_orchestrator();
 }
