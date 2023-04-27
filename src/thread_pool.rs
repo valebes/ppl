@@ -6,11 +6,10 @@ use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
-use std::{hint, iter, mem, thread, fmt};
+use std::{fmt, hint, iter, mem, thread};
 
 use crate::channel::channel::Channel;
-use crate::core::registry::{Registry, JobInfo, get_global_registry};
-
+use crate::core::orchestrator::{Orchestrator, self, get_global_orchestrator, JobInfo};
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -44,46 +43,32 @@ impl Error for ThreadPoolError {
     }
 }
 
-
 ///Struct representing a thread pool.
 pub struct ThreadPool {
     num_threads: usize,
     workers_info: Vec<JobInfo>,
     total_tasks: Arc<AtomicUsize>,
     injector: Arc<Injector<Job>>,
-    registry: Arc<Registry>,
+    orchestrator: Arc<Orchestrator>,
 }
 
 impl Clone for ThreadPool {
     /// Create a new threadpool from an existing one, using the same number of threads.
     fn clone(&self) -> Self {
-        let registry = self.registry.clone();
-        let start = registry.get_range_of_contiguos_free_workers(self.num_threads);
-        match start {
-            Some(start) => {
-                ThreadPool::new(self.num_threads, start, registry)
-            },
-            None => panic!("Not enough free workers"),
-        }
+        let orchestrator = self.orchestrator.clone();
+        ThreadPool::new(self.num_threads, orchestrator)
     }
 }
 
 impl ThreadPool {
-    fn new(num_threads: usize, from: usize, registry: Arc<Registry>) -> Self {
+    fn new(num_threads: usize, orchestrator: Arc<Orchestrator>) -> Self {
         trace!("Creating new threadpool");
-        let start;
-        
-        // todo: maybe change this in the case of non pinned threads
-        match registry.get_range_of_contiguos_free_workers(num_threads) {
-            Some(s) => start = s,
-            None => panic!("Not enough free threads"),
-        }
-        
+        let mut start = 0;
+
         let mut workers_info = Vec::with_capacity(num_threads);
         let mut workers: Vec<Worker<Job>> = Vec::with_capacity(num_threads);
         let mut stealers = Vec::with_capacity(num_threads);
         let injector = Arc::new(Injector::new());
-
 
         for _ in 0..num_threads {
             workers.push(Worker::new_fifo());
@@ -94,6 +79,7 @@ impl ThreadPool {
 
         let total_tasks = Arc::new(AtomicUsize::new(0));
         let barrier = Arc::new(Barrier::new(num_threads));
+        let mut funcs = Vec::new();
 
         for i in 0..num_threads {
             let local_injector = Arc::clone(&injector);
@@ -102,9 +88,11 @@ impl ThreadPool {
             let local_barrier = Arc::clone(&barrier);
             let total_tasks_cp = Arc::clone(&total_tasks);
 
-            let err = registry.execute_on(start + i, move || {
+            funcs.push(move || {
                 let mut stop = false;
                 // We wait that all threads start
+                println!("HELLO from thread {}", i);
+
                 local_barrier.wait();
                 loop {
                     let res = Self::find_task(&local_worker, &local_injector, &local_stealers);
@@ -126,34 +114,24 @@ impl ThreadPool {
                         }
                     }
                 }
-                
-            }
-            );
-            match err {
-                Ok(job) => workers_info.push(job),
-                Err(e) => panic!("Error while executing thread: {}", e),
-                }
+            });
+        
         }
 
+        workers_info = orchestrator.push_multiple(funcs);
 
         Self {
             num_threads,
             workers_info,
             total_tasks,
             injector,
-            registry,
+            orchestrator,
         }
-
     }
 
-    pub fn new_with_local_registry(num_threads: usize, pinning: bool) -> Self {
-        let registry = crate::core::registry::new_local_registry(num_threads, pinning);
-        Self::new(num_threads, 0, registry)
-    }
-
-    pub fn new_with_global_registry(num_threads: usize, from: usize) -> Self {
-        let registry = get_global_registry();
-        Self::new(num_threads, from, registry)
+    pub fn new_with_global_registry(num_threads: usize) -> Self {
+        let orchestrator = get_global_orchestrator();
+        Self::new(num_threads, orchestrator)
     }
 
     fn find_task<F>(
@@ -187,7 +165,7 @@ impl ThreadPool {
         self.total_tasks
             .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     }
-    
+
     /// Block until all current jobs in the thread pool are finished.
     pub fn wait(&self) {
         while (self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0)
@@ -205,7 +183,7 @@ impl ThreadPool {
     /// ```
     /// use pspp::thread_pool::ThreadPool;
     ///
-    /// let mut pool = ThreadPool::new_with_local_registry(8, false);
+    /// let mut pool = ThreadPool::new_with_global_registry(8);
     /// let mut vec = vec![0; 100];
     ///
     /// pool.par_for(&mut vec, |el: &mut i32| *el = *el + 1);
@@ -230,7 +208,7 @@ impl ThreadPool {
     /// ```
     /// use pspp::thread_pool::ThreadPool;
     ///
-    /// let mut pool = ThreadPool::new_with_local_registry(8, false);
+    /// let mut pool = ThreadPool::new_with_global_registry(8);
     /// let mut vec = vec![0i32; 100];
     ///
     /// let res: Vec<String> = pool.par_map(&mut vec, |el| -> String {
@@ -317,8 +295,9 @@ impl<'pool, 'scope> Scope<'pool, 'scope> {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::orchestrator::Orchestrator;
     use super::ThreadPool;
-    use serial_test::*;
+    use serial_test::serial;
 
     fn fib(n: i32) -> u64 {
         if n < 0 {
@@ -336,21 +315,23 @@ mod tests {
     }
 
     #[test]
-    #[parallel]
+    #[serial]
     fn test_threadpool() {
-        let tp = ThreadPool::new_with_local_registry(8, true);
+        let tp = ThreadPool::new_with_global_registry(8);
         for i in 1..45 {
             tp.execute(move || {
                 fib(i);
             });
         }
+        tp.wait();
+        Orchestrator::delete_global_orchestrator();
     }
 
     #[test]
-    #[parallel]
+    #[serial]
     fn test_scoped_thread() {
         let mut vec = vec![0; 100];
-        let mut tp = ThreadPool::new_with_local_registry(8, true);
+        let mut tp = ThreadPool::new_with_global_registry(8);
 
         tp.scoped(|s| {
             for e in vec.iter_mut() {
@@ -361,26 +342,28 @@ mod tests {
         });
 
         tp.wait();
+        Orchestrator::delete_global_orchestrator();
         assert_eq!(vec, vec![1i32; 100])
     }
 
     #[test]
-    #[parallel]
+    #[serial]
     fn test_par_for() {
         let mut vec = vec![0; 100];
-        let mut tp = ThreadPool::new_with_local_registry(8, true);
+        let mut tp = ThreadPool::new_with_global_registry(8);
 
         tp.par_for(&mut vec, |el: &mut i32| *el += 1);
         tp.wait();
+        Orchestrator::delete_global_orchestrator();
         assert_eq!(vec, vec![1i32; 100])
     }
 
     #[test]
-    #[parallel]
+    #[serial]
     fn test_par_map() {
         env_logger::init();
         let mut vec = Vec::new();
-        let mut tp = ThreadPool::new_with_local_registry(8, true);
+        let mut tp = ThreadPool::new_with_global_registry(8);
 
         for i in 0..1000 {
             vec.push(i);
@@ -399,6 +382,20 @@ mod tests {
             }
             i += 1;
         }
+        Orchestrator::delete_global_orchestrator();
         assert!(check)
     }
+    /*
+    #[test]
+    #[serial]
+    fn test_multiple_threadpool() {
+        let mut tp_1 = ThreadPool::new_with_global_registry(4);
+        let mut tp_2 = ThreadPool::new_with_global_registry(4);
+        ::scopeguard::defer! {
+            tp_1.wait();
+            tp_2.wait();
+
+        }
+    }
+    */
 }

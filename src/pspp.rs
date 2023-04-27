@@ -1,4 +1,4 @@
-use crate::node::{node::Node, out_node::*};
+pub use crate::node::{node::Node, out_node::*};
 
 pub struct Parallel<
     TOut: Send + 'static,
@@ -9,7 +9,7 @@ pub struct Parallel<
 }
 impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static>
     Parallel<TOut, TCollected, TNext>
-{   
+{
     /// Creates a new parallel pipeline.
     pub fn new(first_block: OutNode<TOut, TCollected, TNext>) -> Parallel<TOut, TCollected, TNext> {
         Parallel {
@@ -88,9 +88,9 @@ macro_rules! propagate {
 macro_rules! parallel {
     ($s1:expr $(, $tail:expr)*) => {
         {
-            let registry = pspp::core::registry::get_global_registry();
+            let orchestrator = get_global_orchestrator();
             let mut block = OutNode::new(0, Box::new($s1),
-                propagate!(1, $($tail),*), true, registry).unwrap();
+                propagate!(1, $($tail),*), true, orchestrator).unwrap();
 
             let mut pipeline = Parallel::new(block);
             pipeline

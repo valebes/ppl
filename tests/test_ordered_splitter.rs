@@ -1,7 +1,7 @@
 /*
   Ordered FlatMap example.
 */
-
+use pspp::core::orchestrator::get_global_orchestrator;
 use pspp::{
     node::{
         in_node::{In, InNode},

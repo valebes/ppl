@@ -1,6 +1,6 @@
 mod img;
 
-use criterion::{BatchSize, BenchmarkId, Criterion, PlotConfiguration, SamplingMode, AxisScale};
+use criterion::{AxisScale, BatchSize, BenchmarkId, Criterion, PlotConfiguration, SamplingMode};
 
 fn image_processing(criterion: &mut Criterion) {
     // Sets up criterion.

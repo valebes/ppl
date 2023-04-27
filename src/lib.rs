@@ -4,12 +4,13 @@
 //#![warn(missing_docs)]
 #![feature(unsized_fn_params)]
 #![feature(box_into_inner)]
+#![feature(once_cell)]
 
 pub mod channel;
 //pub mod map;
+pub mod core;
 pub mod node;
 pub mod pspp;
 mod task;
 mod thread;
 pub mod thread_pool;
-pub mod core;

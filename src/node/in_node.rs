@@ -71,7 +71,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
         let Message { op, order } = input;
         match &op {
             Task::NewTask(_e) => {
-                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                if self.ordered && order != self.counter.load(Ordering::SeqCst) { //change to acquire ordering
                     self.save_to_storage(Message::new(op, rec_id), order);
                     self.send_pending();
                 } else {

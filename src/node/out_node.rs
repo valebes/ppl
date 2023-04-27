@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use log::trace;
 
 use crate::channel::err::ChannelError;
-use crate::core::registry::{Registry, JobInfo};
+use crate::core::orchestrator::{JobInfo, Orchestrator};
 use crate::task::{Message, Task};
 
 use super::node::Node;
@@ -83,7 +83,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         handler: Box<dyn Out<TOut> + Send + Sync>,
         next_node: TNext,
         pinning: bool,
-        registry: Arc<Registry>
+        orchestrator: Arc<Orchestrator>,
     ) -> Result<OutNode<TOut, TCollected, TNext>, ()> {
         trace!("Created a new Source! Id: {}", id);
         let stop = Arc::new(Mutex::new(true));
@@ -92,19 +92,15 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         let next_node = Arc::new(next_node);
 
         let nn = Arc::clone(&next_node);
-   
-        let res = registry.execute_on(id, move || {
+
+        let res = orchestrator.push(move || {
             Self::rts(handler, &nn, &stop_copy);
         });
-
-        if res.is_err() {
-            panic!("Error: {}", res.unwrap_err());
-        }
 
         let node = OutNode {
             next_node,
             stop,
-            job_info: res.unwrap(),
+            job_info: res,
             phantom: PhantomData,
         };
 

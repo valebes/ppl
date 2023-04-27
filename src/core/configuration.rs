@@ -25,11 +25,9 @@ impl std::error::Error for ConfError {
     }
 }
 
-
-
 /// Global configuration.
 pub struct Configuration {
-    max_threads: usize,
+    max_cores: usize,
     thread_mapping: Vec<usize>,
     pinning: bool,
     blocking_channel: bool,
@@ -54,15 +52,14 @@ fn parse_core_mapping() -> Vec<usize> {
     thread_mapping
 }
 
-
 impl Configuration {
-    pub fn new(max_threads: usize, pinning: bool, blocking_channel: bool) -> Configuration {
+    pub fn new(max_cores: usize, pinning: bool, blocking_channel: bool) -> Configuration {
         let thread_mapping = parse_core_mapping();
-        if thread_mapping.len() < max_threads {
+        if thread_mapping.len() < max_cores {
             panic!("Error: Thread mapping length does not match max threads!");
         }
         Configuration {
-            max_threads,
+            max_cores,
             thread_mapping,
             pinning,
             blocking_channel,
@@ -70,7 +67,7 @@ impl Configuration {
     }
 
     pub fn new_default() -> Configuration {
-        let max_threads = match env::var("PSPP_MAX_THREADS") {
+        let max_threads = match env::var("PSPP_MAX_CORES") {
             Ok(val) => val.parse::<usize>().unwrap(),
             Err(_) => num_cpus::get(),
         };
@@ -85,9 +82,9 @@ impl Configuration {
         Configuration::new(max_threads, pinning, blocking_channel)
     }
 
-    /// Get the maximum number of threads allowed.
-    pub(crate) fn get_max_threads(&self) -> usize {
-        self.max_threads
+    /// Get the maximum number of cores allowed.
+    pub(crate) fn get_max_cores(&self) -> usize {
+        self.max_cores
     }
 
     /// Get the thread mapping.
@@ -106,14 +103,13 @@ impl Configuration {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use ::serial_test::serial;
 
     fn reset_env() {
-        env::remove_var("PSPP_MAX_THREADS");
+        env::remove_var("PSPP_MAX_CORES");
         env::remove_var("PSPP_PINNING");
         env::remove_var("PSPP_BLOCKING_CHANNEL");
         env::remove_var("PSPP_THREAD_MAPPING");
@@ -123,7 +119,7 @@ mod tests {
     #[serial]
     fn test_configuration() {
         let conf = Configuration::new_default();
-        assert_eq!(conf.max_threads, num_cpus::get());
+        assert_eq!(conf.max_cores, num_cpus::get());
         assert_eq!(conf.pinning, false);
         assert_eq!(conf.blocking_channel, false);
     }
@@ -131,11 +127,11 @@ mod tests {
     #[test]
     #[serial]
     fn test_configuration_with_env() {
-        env::set_var("PSPP_MAX_THREADS", "4");
+        env::set_var("PSPP_MAX_CORES", "4");
         env::set_var("PSPP_PINNING", "true");
         env::set_var("PSPP_BLOCKING_CHANNEL", "true");
         let conf = Configuration::new_default();
-        assert_eq!(conf.max_threads, 4);
+        assert_eq!(conf.max_cores, 4);
         assert_eq!(conf.pinning, true);
         assert_eq!(conf.blocking_channel, true);
         reset_env();
@@ -144,12 +140,11 @@ mod tests {
     #[test]
     #[serial]
     fn test_configuration_with_mapping() {
-        env::set_var("PSPP_MAX_THREADS", "4");
+        env::set_var("PSPP_MAX_CORES", "4");
         env::set_var("PSPP_THREAD_MAPPING", "1,0,2,3");
         let conf = Configuration::new_default();
-        assert_eq!(conf.max_threads, 4);
+        assert_eq!(conf.max_cores, 4);
         assert_eq!(conf.thread_mapping, vec![1, 0, 2, 3]);
         reset_env();
     }
-
 }

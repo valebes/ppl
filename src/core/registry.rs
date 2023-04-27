@@ -1,10 +1,18 @@
-use std::{sync::{Arc, Mutex, RwLock, atomic::{Ordering, AtomicBool}}, thread, error::Error, fmt, hint};
-use once_cell::sync::{Lazy, OnceCell};
-use crossbeam_deque::{Stealer, Injector, Worker, Steal};
+use crossbeam_deque::{Injector, Steal, Stealer, Worker};
+use log::{error, trace};
 use num_cpus;
-use log::{trace, error};
+use std::{
+    error::Error,
+    fmt, hint,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Barrier, Mutex, RwLock,
+    },
+    thread::{self, sleep},
+    time::Duration, cell::OnceCell,
+};
 
-use super::configuration::{Configuration};
+use super::configuration::Configuration;
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -36,7 +44,7 @@ impl JobInfo {
         }
     }
 }
-    
+
 #[derive(Debug)]
 pub struct RegistryError {
     details: String,
@@ -62,9 +70,8 @@ impl Error for RegistryError {
     }
 }
 
-
 pub struct Registry {
-    workers: Vec<WorkerThread>,
+    workers: RwLock<Vec<WorkerThread>>,
     global: Arc<Injector<Job>>,
     configuration: Arc<Configuration>,
 }
@@ -73,7 +80,10 @@ pub struct Registry {
 static mut REGISTRY: OnceCell<Arc<Registry>> = OnceCell::new();
 
 /// Initialize the global registry with custom settings.
-pub(crate) fn new_custom_global_registry(nthreads: usize, pinning: bool) -> Result<Arc<Registry>, RegistryError>  {
+pub(crate) fn new_custom_global_registry(
+    nthreads: usize,
+    pinning: bool,
+) -> Result<Arc<Registry>, RegistryError> {
     let configuration = Configuration::new(nthreads, pinning, false);
     let registry = Arc::new(Registry::new(configuration));
     set_global_registry(registry.clone())
@@ -81,7 +91,7 @@ pub(crate) fn new_custom_global_registry(nthreads: usize, pinning: bool) -> Resu
 
 /// Initialize a local registry with custom settings.
 pub(crate) fn new_local_registry(nthreads: usize, pinning: bool) -> Arc<Registry> {
-    let configuration =Configuration::new(nthreads, pinning, false);
+    let configuration = Configuration::new(nthreads, pinning, false);
     Arc::new(Registry::new(configuration))
 }
 
@@ -94,20 +104,24 @@ pub(crate) fn default_global_registry() -> Result<Arc<Registry>, RegistryError> 
 
 /// Get the global registry.
 pub fn get_global_registry() -> Arc<Registry> {
-    unsafe { REGISTRY.get_or_init(|| -> Arc<Registry> {
-        let configuration = Configuration::new_default();
-        Arc::new(Registry::new(configuration))
-    }).clone() }
+    unsafe {
+        REGISTRY
+            .get_or_init(|| -> Arc<Registry> {
+                let configuration = Configuration::new_default();
+                Arc::new(Registry::new(configuration))
+            })
+            .clone()
+    }
 }
 
 /// Set the global registry.
 fn set_global_registry(registry: Arc<Registry>) -> Result<Arc<Registry>, RegistryError> {
-    let mut result = Err(RegistryError::new("Error setting global registry."));
-    unsafe { let _err = REGISTRY
-        .set(registry)
-        .map(|_| {
-            result = Ok(get_global_registry())}
-        ); };
+    let mut result = Err(RegistryError::new("Global registry already initialized."));
+    unsafe {
+        let _err = REGISTRY
+            .set(registry)
+            .map(|_| result = Ok(get_global_registry()));
+    };
     result
 }
 
@@ -119,7 +133,7 @@ impl Registry {
         let global = Arc::new(Injector::new());
         let configuration = Arc::new(configuration);
 
-        for i in 0..configuration.get_max_threads() {
+        for i in 0..configuration.get_max_cores() {
             let worker = WorkerThread::new(i, configuration.clone(), Arc::clone(&global));
             workers.push(worker);
         }
@@ -133,7 +147,7 @@ impl Registry {
         }
 
         Registry {
-            workers,
+            workers: RwLock::new(workers),
             global,
             configuration,
         }
@@ -144,21 +158,34 @@ impl Registry {
     pub(crate) fn get_range_of_contiguos_free_workers(&self, n: usize) -> Option<usize> {
         let mut count = 0;
         let mut start = 0;
-        for i in 0..self.workers.len() {
-            if !self.workers[i].is_busy() {
-                count += 1;
-                if count == n {
-                    return Some(start);
+        let workers = self.workers.read().unwrap();
+        for i in 0..workers.len() {
+            if !workers[i].is_busy() {
+                if count == 0 {
+                    start = i;
                 }
+                count += 1;
             } else {
                 count = 0;
-                start = i + 1;
+            }
+            if count == n {
+                return Some(start);
             }
         }
         None
     }
 
-    
+    pub(crate) fn get_num_free_workers(&self) -> usize {
+        let mut count = 0;
+        let workers = self.workers.read().unwrap();
+        for i in 0..workers.len() {
+            if !workers[i].is_busy() {
+                count += 1;
+            }
+        }
+        count
+    }
+
     /// Execute a function on a specific thread.
     pub(crate) fn execute_on<F>(&self, id: usize, f: F) -> Result<JobInfo, RegistryError>
     where
@@ -171,11 +198,11 @@ impl Registry {
         let job_info = JobInfo::new(id);
         let status_copy = Arc::clone(&job_info.status);
 
-        self.workers[id].push(Job::NewJob(Box::new(move || {
+        let workers = self.workers.read().unwrap();
+        workers[id].push(Job::NewJob(Box::new(move || {
             f();
             status_copy.store(true, Ordering::SeqCst);
-    }
-    )));
+        })));
 
         Ok(job_info)
     }
@@ -191,8 +218,7 @@ impl Registry {
         self.global.push(Job::NewJob(Box::new(move || {
             f();
             status_copy.store(true, Ordering::SeqCst);
-    }
-    )));
+        })));
 
         job_info
     }
@@ -203,15 +229,17 @@ impl Registry {
 
     /// Get the number of threads in the registry.
     pub(crate) fn get_max_threads(&self) -> usize {
-        self.configuration.get_max_threads()
+        self.configuration.get_max_cores()
     }
-    
 }
 impl Drop for Registry {
     fn drop(&mut self) {
         trace!("Closing thread registry.");
         self.global.push(Job::Terminate);
-        for worker in &mut self.workers {
+
+        let mut workers = self.workers.write().unwrap();
+        // Join the workers
+        for mut worker in workers.drain(..) {
             worker.join();
         }
     }
@@ -230,10 +258,16 @@ impl WorkerThread {
     /// Create a new worker thread.
     /// It will start executing jobs immediately.
     /// It will terminate when it receives a terminate message.
-    fn new (id: usize, config: Arc<Configuration>, global: Arc<Injector<Job>>) -> WorkerThread {
+    fn new(id: usize, config: Arc<Configuration>, global: Arc<Injector<Job>>) -> WorkerThread {
         let worker = Arc::new(WorkerInfo::new(id, global));
         let worker_copy = Arc::clone(&worker);
-        let thread = Thread::new(worker_copy.id, move || worker_copy.run(), config.clone());
+        let thread = Thread::new(
+            worker_copy.id,
+            move || {
+                worker_copy.run();
+            },
+            config.clone(),
+        );
         WorkerThread {
             worker_info: worker,
             thread,
@@ -269,7 +303,6 @@ impl WorkerThread {
     fn register_stealer(&self, stealer: Stealer<Job>) {
         self.worker_info.register_stealer(stealer);
     }
-
 }
 
 /// Information about a worker thread.
@@ -320,7 +353,7 @@ impl WorkerInfo {
                         self.busy.store(true, Ordering::SeqCst);
                         f();
                         self.busy.store(false, Ordering::SeqCst);
-                    },
+                    }
                     Job::Terminate => {
                         stop = true;
                     }
@@ -331,7 +364,7 @@ impl WorkerInfo {
                         self.busy.store(true, Ordering::SeqCst);
                         f();
                         self.busy.store(false, Ordering::SeqCst);
-                    },
+                    }
                     Job::Terminate => {
                         stop = true;
                     }
@@ -342,7 +375,7 @@ impl WorkerInfo {
                         self.busy.store(true, Ordering::SeqCst);
                         f();
                         self.busy.store(false, Ordering::SeqCst);
-                    },
+                    }
                     Job::Terminate => {
                         stop = true;
                     }
@@ -362,7 +395,7 @@ impl WorkerInfo {
     fn pop(&self) -> Option<Job> {
         self.worker.lock().unwrap().pop()
     }
-    
+
     /// Push a job to the thread queue.
     fn push(&self, job: Job) {
         self.worker.lock().unwrap().push(job);
@@ -405,7 +438,7 @@ impl Thread {
     fn new<F>(id: usize, f: F, configuration: Arc<Configuration>) -> Thread
     where
         F: FnOnce() + Send + 'static,
-    {   
+    {
         // Get the pinning position
         let pinning_position = configuration.get_thread_mapping().get(id).unwrap().clone();
         // Create the thread and pin it if needed
@@ -420,7 +453,10 @@ impl Thread {
                         let core = core_ids.remove(pinning_position);
                         let err = core_affinity::set_for_current(core);
                         if !err {
-                            error!("Thread pinning for thread[{}] on core {} failed!", pinning_position, core.id);
+                            error!(
+                                "Thread pinning for thread[{}] on core {} failed!",
+                                pinning_position, core.id
+                            );
                         } else {
                             trace!("Thread[{}] correctly pinned on {}!", id, core.id);
                         }
@@ -444,7 +480,6 @@ impl Thread {
             thread.join().unwrap();
         }
     }
-
 }
 
 #[cfg(test)]
@@ -460,13 +495,12 @@ mod tests {
     fn test_registry() {
         let registry = get_global_registry();
         // Drop the registry at the end of the test
-        ::scopeguard::defer!( unsafe {drop(REGISTRY.take())});
-       
+        ::scopeguard::defer!(unsafe { drop(REGISTRY.take()) });
 
         let counter = Arc::new(AtomicUsize::new(0));
         for _ in 0..1000 {
             let counter_copy = Arc::clone(&counter);
-            registry.execute( move || {
+            registry.execute(move || {
                 counter_copy.fetch_add(1, Ordering::SeqCst);
             });
         }
@@ -483,8 +517,9 @@ mod tests {
         let registry_b = new_custom_global_registry(4, true);
         assert!(registry_b.is_err());
         // Drop the registry at the end of the test
-        ::scopeguard::defer!({ unsafe {
-            drop(REGISTRY.take());
+        ::scopeguard::defer!({
+            unsafe {
+                drop(REGISTRY.take());
             }
         });
     }
@@ -493,11 +528,12 @@ mod tests {
     #[serial]
     fn test_default_global_registry() {
         let registry = default_global_registry().unwrap();
-                // Drop the registry at the end of the test
-                ::scopeguard::defer!({ unsafe {
-                    drop(REGISTRY.take());
-                }
-                });
+        // Drop the registry at the end of the test
+        ::scopeguard::defer!({
+            unsafe {
+                drop(REGISTRY.take());
+            }
+        });
 
         assert_eq!(registry.get_max_threads(), num_cpus::get());
     }
@@ -507,7 +543,8 @@ mod tests {
     fn test_custom_global_registry() {
         let registry = new_custom_global_registry(4, true).unwrap();
         // Drop the registry at the end of the test
-        ::scopeguard::defer!({ unsafe {
+        ::scopeguard::defer!({
+            unsafe {
                 drop(REGISTRY.take());
             }
         });
