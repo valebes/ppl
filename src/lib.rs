@@ -12,5 +12,4 @@ pub mod core;
 pub mod node;
 pub mod pspp;
 mod task;
-mod thread;
 pub mod thread_pool;

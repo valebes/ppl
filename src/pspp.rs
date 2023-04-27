@@ -61,7 +61,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
 macro_rules! propagate {
     ($id:expr, $s1:expr) => {
         {
-            let mut block = InNode::new($id, Box::new($s1), false, true).unwrap();
+            let mut block = InNode::new($id, Box::new($s1), false, true, get_global_orchestrator());
             block
         }
     };
@@ -72,7 +72,7 @@ macro_rules! propagate {
             let replicas = node.number_of_replicas();
             let mut block = InOutNode::new($id, Box::new(node),
                 propagate!($id + (1 * replicas), $($tail),*),
-                false, true).unwrap();
+                false, true, get_global_orchestrator());
             block
         }
     };
