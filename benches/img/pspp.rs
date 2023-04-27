@@ -1,5 +1,5 @@
-use pspp::core::orchestrator::Orchestrator;
 use pspp::core::orchestrator::get_global_orchestrator;
+use pspp::core::orchestrator::Orchestrator;
 use raster::filter;
 use raster::Image;
 

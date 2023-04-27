@@ -13,8 +13,8 @@ use crate::{
         channel::{Channel, InputChannel, OutputChannel},
         err::ChannelError,
     },
+    core::orchestrator::{self, JobInfo, Orchestrator},
     task::{Message, Task},
-     core::orchestrator::{JobInfo, self, Orchestrator},
 };
 
 use super::node::Node;
@@ -71,7 +71,8 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
         let Message { op, order } = input;
         match &op {
             Task::NewTask(_e) => {
-                if self.ordered && order != self.counter.load(Ordering::SeqCst) { //change to acquire ordering
+                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                    //change to acquire ordering
                     self.save_to_storage(Message::new(op, rec_id), order);
                     self.send_pending();
                 } else {
@@ -150,20 +151,18 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
         let bucket = Arc::clone(&result);
 
-        let job_info = orchestrator.push(
-            move || {
-                let res = InNode::rts(handler, channel_in);
-                if res.is_some() {
-                    let err = bucket.lock();
-                    if err.is_ok() {
-                        let mut lock_bucket = err.unwrap();
-                        *lock_bucket = res;
-                    } else if err.is_err() {
-                        panic!("Error: Cannot collect results.")
-                    }
+        let job_info = orchestrator.push(move || {
+            let res = InNode::rts(handler, channel_in);
+            if res.is_some() {
+                let err = bucket.lock();
+                if err.is_ok() {
+                    let mut lock_bucket = err.unwrap();
+                    *lock_bucket = res;
+                } else if err.is_err() {
+                    panic!("Error: Cannot collect results.")
                 }
-            },
-        );
+            }
+        });
 
         let mut node = InNode {
             job_info,
@@ -207,7 +206,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         node.finalize()
     }
 
-    fn wait(&mut self)  {
+    fn wait(&mut self) {
         self.job_info.wait()
     }
 

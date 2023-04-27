@@ -9,7 +9,7 @@ use std::thread::JoinHandle;
 use std::{fmt, hint, iter, mem, thread};
 
 use crate::channel::channel::Channel;
-use crate::core::orchestrator::{Orchestrator, self, get_global_orchestrator, JobInfo};
+use crate::core::orchestrator::{self, get_global_orchestrator, JobInfo, Orchestrator};
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -91,7 +91,7 @@ impl ThreadPool {
             funcs.push(move || {
                 let mut stop = false;
                 // We wait that all threads start
-                println!("HELLO from thread {}", i);
+                //println!("HELLO from thread {}", i);
 
                 local_barrier.wait();
                 loop {
@@ -115,7 +115,6 @@ impl ThreadPool {
                     }
                 }
             });
-        
         }
 
         workers_info = orchestrator.push_multiple(funcs);
@@ -295,8 +294,8 @@ impl<'pool, 'scope> Scope<'pool, 'scope> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::orchestrator::Orchestrator;
     use super::ThreadPool;
+    use crate::core::orchestrator::Orchestrator;
     use serial_test::serial;
 
     fn fib(n: i32) -> u64 {

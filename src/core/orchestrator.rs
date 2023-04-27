@@ -1,7 +1,16 @@
-use std::{sync::{atomic::{AtomicBool, Ordering, AtomicUsize}, Arc, Mutex, RwLock, Barrier}, hint, thread::{self, sleep}, cell::OnceCell, time::Duration};
+use std::{
+    cell::OnceCell,
+    hint,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc, Barrier, Mutex, RwLock,
+    },
+    thread::{self, sleep},
+    time::Duration,
+};
 
-use crossbeam_deque::{Injector, Stealer, Worker, Steal};
-use log::{trace, error};
+use crossbeam_deque::{Injector, Steal, Stealer, Worker};
+use log::{error, trace};
 
 use super::configuration::Configuration;
 
@@ -11,7 +20,6 @@ pub enum Job {
     NewJob(Func<'static>),
     Terminate,
 }
-
 
 #[derive(Debug)]
 pub(crate) struct JobInfo {
@@ -219,7 +227,11 @@ impl Thread {
         F: FnOnce() + Send + 'static,
     {
         // Get the pinning position
-        let pinning_position = configuration.get_thread_mapping().get(core_id).unwrap().clone();
+        let pinning_position = configuration
+            .get_thread_mapping()
+            .get(core_id)
+            .unwrap()
+            .clone();
         // Create the thread and pin it if needed
         Thread {
             thread: Some(thread::spawn(move || {
@@ -231,10 +243,7 @@ impl Thread {
                         let core = core_ids.remove(pinning_position);
                         let err = core_affinity::set_for_current(core);
                         if !err {
-                            error!(
-                                "Thread pinning on core {} failed!",
-                                core.id
-                            );
+                            error!("Thread pinning on core {} failed!", core.id);
                         } else {
                             trace!("Thread pinned on core {}.", core.id);
                             assert_eq!(core_id, core.id)
@@ -280,7 +289,11 @@ impl Partition {
     /// Add a worker to the partition.
     fn add_worker(&self) {
         let mut workers = self.workers.write().unwrap();
-        let worker = WorkerThread::new(self.core_id, self.configuration.clone(), self.global.clone());
+        let worker = WorkerThread::new(
+            self.core_id,
+            self.configuration.clone(),
+            self.global.clone(),
+        );
 
         for other in workers.iter() {
             worker.register_stealer(other.get_stealer());
@@ -327,13 +340,11 @@ impl Partition {
         let job_info = JobInfo::new();
         let job_info_clone = Arc::clone(&job_info.status);
 
-        let job = Job::NewJob(
-            Box::new(move || {
-                f();
-                job_info_clone.store(true, Ordering::Release);
-            })
-        );
-          
+        let job = Job::NewJob(Box::new(move || {
+            f();
+            job_info_clone.store(true, Ordering::Release);
+        }));
+
         self.global.push(job);
 
         job_info
@@ -342,7 +353,11 @@ impl Partition {
 
 impl Drop for Partition {
     fn drop(&mut self) {
-        trace!("Dropping partition on core {}, total worker: {}.", self.core_id, self.get_worker_count());
+        trace!(
+            "Dropping partition on core {}, total worker: {}.",
+            self.core_id,
+            self.get_worker_count()
+        );
         self.global.push(Job::Terminate);
         let mut worker = self.workers.write().unwrap();
         for worker in worker.iter_mut() {
@@ -380,7 +395,9 @@ pub struct Orchestrator {
 
 static mut ORCHESTRATOR: OnceCell<Arc<Orchestrator>> = OnceCell::new();
 
-pub(crate) fn new_global_orchestrator(configuration: Arc<Configuration>) -> Result<Arc<Orchestrator>, OrchestratorError> {
+pub(crate) fn new_global_orchestrator(
+    configuration: Arc<Configuration>,
+) -> Result<Arc<Orchestrator>, OrchestratorError> {
     let orchestrator = Orchestrator::new(configuration);
     set_global_orchestrator(orchestrator)
 }
@@ -392,13 +409,13 @@ pub(crate) fn new_default_orchestrator() -> Arc<Orchestrator> {
 pub fn get_global_orchestrator() -> Arc<Orchestrator> {
     unsafe {
         ORCHESTRATOR
-            .get_or_init(|| -> Arc<Orchestrator> {
-                new_default_orchestrator()
-            })
+            .get_or_init(|| -> Arc<Orchestrator> { new_default_orchestrator() })
             .clone()
     }
 }
-fn set_global_orchestrator(orchestrator: Orchestrator) -> Result<Arc<Orchestrator>, OrchestratorError> {
+fn set_global_orchestrator(
+    orchestrator: Orchestrator,
+) -> Result<Arc<Orchestrator>, OrchestratorError> {
     unsafe {
         ORCHESTRATOR
             .set(Arc::new(orchestrator))
@@ -445,7 +462,6 @@ impl Orchestrator {
         min
     }
 
-
     /// Find a contiguos interval of 'count' partitions that minimize the number of busy workers contained in each partition of the interval.
     /// If there are more than one partition with the same number of workers, the first sequence found is returned.
     /// If there are no workers in any partition, the first sequence of 'count' partitions is returned.
@@ -471,13 +487,11 @@ impl Orchestrator {
         }
         min
     }
-    
+
     /// Get the number of partitions of the orchestrator.
     pub fn get_partition_count(&self) -> usize {
         self.partitions.len()
     }
-
-
 
     /// Push a function into the orchestrator.
     /// This method return a JobInfo that can be used to wait for the Job to finish.
@@ -510,47 +524,43 @@ impl Orchestrator {
             Some(p) => {
                 for partition in p {
                     let func = f.remove(0);
-                    job_info.push(partition.push(move ||
-                        {
-                            func();
-                        }));
+                    job_info.push(partition.push(move || {
+                        func();
+                    }));
                 }
             }
             None => {
                 for i in 0..f.len() {
                     let func = f.remove(0);
-                    job_info.push(self.push(move ||
-                        {
-                            func();
-                        }));
+                    job_info.push(self.push(move || {
+                        func();
+                    }));
                 }
             }
         }
         job_info
-}
+    }
 
     pub fn delete_global_orchestrator() {
         unsafe {
             drop(ORCHESTRATOR.take());
         }
     }
-
 }
 
 impl Drop for Orchestrator {
     fn drop(&mut self) {
-        for partition in self.partitions.iter_mut() {
-            drop(partition);
+        while self.partitions.len() > 0 {
+            drop(self.partitions.remove(0));
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serial_test::serial;
-    use std::{sync::Arc, time::Duration, thread::sleep};
+    use std::{sync::Arc, thread::sleep, time::Duration};
 
     #[test]
     #[serial]
@@ -616,4 +626,3 @@ mod tests {
         }
     }
 }
-

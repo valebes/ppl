@@ -16,8 +16,8 @@ use crate::{
         channel::{Channel, InputChannel, OutputChannel},
         err::ChannelError,
     },
+    core::orchestrator::{self, JobInfo, Orchestrator},
     task::{Message, Task},
-     core::orchestrator::{JobInfo, self, Orchestrator},
 };
 
 use super::node::Node;
@@ -217,7 +217,7 @@ impl<
         next_node: TNext,
         blocking: bool,
         pinning: bool,
-        orchestrator: Arc<Orchestrator>
+        orchestrator: Arc<Orchestrator>,
     ) -> InOutNode<TIn, TOut, TCollected, TNext> {
         let mut funcs = Vec::new();
         let mut channels = Vec::new();
