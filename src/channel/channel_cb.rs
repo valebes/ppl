@@ -72,12 +72,12 @@ impl Channel {
         if blocking {
             (
                 Box::new(CBBlockingInputChannel { rx }),
-                Box::new(CBOutputChannel { tx: tx }),
+                Box::new(CBOutputChannel { tx }),
             )
         } else {
             (
                 Box::new(CBInputChannel { rx }),
-                Box::new(CBOutputChannel { tx: tx }),
+                Box::new(CBOutputChannel { tx }),
             )
         }
     }

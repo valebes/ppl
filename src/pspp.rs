@@ -49,7 +49,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
             Some(_block) => {
                 let block = std::mem::replace(&mut self.first_block, None);
                 if block.is_some() {
-                    let _err = block.unwrap().terminate();
+                    block.unwrap().terminate();
                 }
             }
             None => (),
@@ -61,7 +61,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
 macro_rules! propagate {
     ($id:expr, $s1:expr) => {
         {
-            let mut block = InNode::new($id, Box::new($s1), false, true, get_global_orchestrator());
+            let mut block = InNode::new($id, Box::new($s1), false, get_global_orchestrator());
             block
         }
     };
@@ -72,7 +72,7 @@ macro_rules! propagate {
             let replicas = node.number_of_replicas();
             let mut block = InOutNode::new($id, Box::new(node),
                 propagate!($id + (1 * replicas), $($tail),*),
-                false, true, get_global_orchestrator());
+                false, get_global_orchestrator());
             block
         }
     };
@@ -90,7 +90,7 @@ macro_rules! parallel {
         {
             let orchestrator = get_global_orchestrator();
             let mut block = OutNode::new(0, Box::new($s1),
-                propagate!(1, $($tail),*), true, orchestrator).unwrap();
+                propagate!(1, $($tail),*), orchestrator);
 
             let mut pipeline = Parallel::new(block);
             pipeline

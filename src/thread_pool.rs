@@ -1,15 +1,14 @@
 use crossbeam_deque::{Injector, Stealer, Worker};
-use log::{error, trace};
+use log::trace;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier};
-use std::thread::JoinHandle;
-use std::{fmt, hint, iter, mem, thread};
+use std::{fmt, hint, iter, mem};
 
 use crate::channel::channel::Channel;
-use crate::core::orchestrator::{self, get_global_orchestrator, JobInfo, Orchestrator};
+use crate::core::orchestrator::{get_global_orchestrator, JobInfo, Orchestrator};
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -63,9 +62,7 @@ impl Clone for ThreadPool {
 impl ThreadPool {
     fn new(num_threads: usize, orchestrator: Arc<Orchestrator>) -> Self {
         trace!("Creating new threadpool");
-        let mut start = 0;
-
-        let mut workers_info = Vec::with_capacity(num_threads);
+        let workers_info;
         let mut workers: Vec<Worker<Job>> = Vec::with_capacity(num_threads);
         let mut stealers = Vec::with_capacity(num_threads);
         let injector = Arc::new(Injector::new());
@@ -81,7 +78,7 @@ impl ThreadPool {
         let barrier = Arc::new(Barrier::new(num_threads));
         let mut funcs = Vec::new();
 
-        for i in 0..num_threads {
+        for _i in 0..num_threads {
             let local_injector = Arc::clone(&injector);
             let local_worker = workers.remove(0);
             let local_stealers = stealers.clone();
@@ -306,9 +303,6 @@ mod tests {
             0 => panic!("zero is not a right argument to fib()!"),
             1 | 2 => 1,
             3 => 2,
-            /*
-            50    => 12586269025,
-            */
             _ => fib(n - 1) + fib(n - 2),
         }
     }
@@ -369,32 +363,30 @@ mod tests {
         }
         let res: Vec<String> = tp
             .par_map(vec, |el| -> String {
-                String::from("Hello from: ".to_string() + &el.to_string())
+                "Hello from: ".to_string() + &el.to_string()
             })
             .collect();
 
         let mut check = true;
-        let mut i = 0;
-        for str in res {
+        for (i, str) in res.into_iter().enumerate() {
             if str != "Hello from: ".to_string() + &i.to_string() {
                 check = false;
             }
-            i += 1;
         }
         Orchestrator::delete_global_orchestrator();
         assert!(check)
     }
-    /*
+
     #[test]
     #[serial]
     fn test_multiple_threadpool() {
-        let mut tp_1 = ThreadPool::new_with_global_registry(4);
-        let mut tp_2 = ThreadPool::new_with_global_registry(4);
+        let tp_1 = ThreadPool::new_with_global_registry(4);
+        let tp_2 = ThreadPool::new_with_global_registry(4);
         ::scopeguard::defer! {
             tp_1.wait();
             tp_2.wait();
 
         }
+        Orchestrator::delete_global_orchestrator();
     }
-    */
 }

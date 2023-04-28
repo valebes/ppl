@@ -16,7 +16,7 @@ use crate::{
         channel::{Channel, InputChannel, OutputChannel},
         err::ChannelError,
     },
-    core::orchestrator::{self, JobInfo, Orchestrator},
+    core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
 };
 
@@ -216,7 +216,6 @@ impl<
         handler: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: TNext,
         blocking: bool,
-        pinning: bool,
         orchestrator: Arc<Orchestrator>,
     ) -> InOutNode<TIn, TOut, TCollected, TNext> {
         let mut funcs = Vec::new();
@@ -244,7 +243,7 @@ impl<
             let copy = handler_copies.pop().unwrap();
             let local_barrier = Arc::clone(&barrier);
 
-            let mut func = move || {
+            let func = move || {
                 local_barrier.wait();
                 Self::rts(i + id, copy, channel_in, &nn, replicas, &splitter_copy);
             };
@@ -252,7 +251,7 @@ impl<
             funcs.push(func);
         }
 
-        let node = InOutNode {
+        InOutNode {
             channels,
             job_infos: orchestrator.push_multiple(funcs),
             next_node,
@@ -262,9 +261,7 @@ impl<
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
             phantom: PhantomData,
-        };
-
-        node
+        }
     }
 
     fn rts(

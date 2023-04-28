@@ -13,7 +13,7 @@ use crate::{
         channel::{Channel, InputChannel, OutputChannel},
         err::ChannelError,
     },
-    core::orchestrator::{self, JobInfo, Orchestrator},
+    core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
 };
 
@@ -140,7 +140,6 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         id: usize,
         handler: Box<dyn In<TIn, TCollected> + Send + Sync>,
         blocking: bool,
-        pinning: bool,
         orchestrator: Arc<Orchestrator>,
     ) -> InNode<TIn, TCollected> {
         trace!("Created a new Sink! Id: {}", id);
@@ -164,16 +163,14 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
             }
         });
 
-        let mut node = InNode {
+        InNode {
             job_info,
             channel: channel_out,
             ordered,
             storage: Mutex::new(BTreeMap::new()),
             counter: AtomicUsize::new(0),
             result,
-        };
-
-        node
+        }
     }
 
     fn rts(

@@ -1,30 +1,5 @@
 use std::env;
 
-#[derive(Debug)]
-pub struct ConfError {
-    details: String,
-}
-
-impl ConfError {
-    fn new(msg: &str) -> ConfError {
-        ConfError {
-            details: msg.to_string(),
-        }
-    }
-}
-
-impl std::fmt::Display for ConfError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-
-impl std::error::Error for ConfError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
-
 /// Global configuration.
 pub struct Configuration {
     max_cores: usize,
@@ -38,10 +13,10 @@ fn parse_core_mapping() -> Vec<usize> {
     let mut thread_mapping = Vec::new();
     match env::var("PSPP_THREAD_MAPPING") {
         Ok(val) => {
-            let mapping: Vec<&str> = val.split(",").collect();
-            for i in 0..mapping.len() {
+            let mapping: Vec<&str> = val.split(',').collect();
+            (0..mapping.len()).for_each(|i| {
                 thread_mapping.push(mapping[i].parse::<usize>().unwrap());
-            }
+            });
         }
         Err(_) => {
             for i in 0..num_cpus::get() {
@@ -120,8 +95,8 @@ mod tests {
     fn test_configuration() {
         let conf = Configuration::new_default();
         assert_eq!(conf.max_cores, num_cpus::get());
-        assert_eq!(conf.pinning, false);
-        assert_eq!(conf.blocking_channel, false);
+        assert!(!conf.pinning);
+        assert!(!conf.blocking_channel);
     }
 
     #[test]
@@ -132,8 +107,8 @@ mod tests {
         env::set_var("PSPP_BLOCKING_CHANNEL", "true");
         let conf = Configuration::new_default();
         assert_eq!(conf.max_cores, 4);
-        assert_eq!(conf.pinning, true);
-        assert_eq!(conf.blocking_channel, true);
+        assert!(conf.pinning);
+        assert!(conf.blocking_channel);
         reset_env();
     }
 

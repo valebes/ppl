@@ -4,10 +4,6 @@ use raster::filter;
 use raster::Image;
 
 pub fn pspp_map(images: Vec<Image>, threads: usize) {
-    let mut pinning = false;
-    if num_cpus::get() >= threads * 5 {
-        pinning = true;
-    }
     let mut pool = ThreadPool::new_with_global_registry(threads * 5);
     /*
         let a = pool.par_map(images, |mut image: Image| -> Image {

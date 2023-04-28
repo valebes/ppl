@@ -2,11 +2,10 @@ use std::{
     cell::OnceCell,
     hint,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Barrier, Mutex, RwLock,
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, RwLock,
     },
-    thread::{self, sleep},
-    time::Duration,
+    thread::{self},
 };
 
 use crossbeam_deque::{Injector, Steal, Stealer, Worker};
@@ -60,7 +59,7 @@ impl WorkerThread {
             move || {
                 worker_copy.run();
             },
-            config.clone(),
+            config,
         );
         WorkerThread {
             worker_info: worker,
@@ -227,11 +226,10 @@ impl Thread {
         F: FnOnce() + Send + 'static,
     {
         // Get the pinning position
-        let pinning_position = configuration
+        let pinning_position = *configuration
             .get_thread_mapping()
             .get(core_id)
-            .unwrap()
-            .clone();
+            .unwrap();
         // Create the thread and pin it if needed
         Thread {
             thread: Some(thread::spawn(move || {
@@ -276,7 +274,7 @@ impl Partition {
     /// Create a new partition.
     fn new(core_id: usize, configuration: Arc<Configuration>) -> Partition {
         let global = Arc::new(Injector::new());
-        let mut workers = Vec::new();
+        let workers = Vec::new();
 
         Partition {
             core_id,
@@ -530,7 +528,7 @@ impl Orchestrator {
                 }
             }
             None => {
-                for i in 0..f.len() {
+                for _i in 0..f.len() {
                     let func = f.remove(0);
                     job_info.push(self.push(move || {
                         func();
@@ -539,6 +537,10 @@ impl Orchestrator {
             }
         }
         job_info
+    }
+
+    pub(crate) fn get_configuration(&self) -> Arc<Configuration> {
+        Arc::clone(&self.configuration)
     }
 
     pub fn delete_global_orchestrator() {

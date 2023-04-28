@@ -82,9 +82,8 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         id: usize,
         handler: Box<dyn Out<TOut> + Send + Sync>,
         next_node: TNext,
-        pinning: bool,
         orchestrator: Arc<Orchestrator>,
-    ) -> Result<OutNode<TOut, TCollected, TNext>, ()> {
+    ) -> OutNode<TOut, TCollected, TNext> {
         trace!("Created a new Source! Id: {}", id);
         let stop = Arc::new(Mutex::new(true));
         let stop_copy = Arc::clone(&stop);
@@ -97,14 +96,12 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
             Self::rts(handler, &nn, &stop_copy);
         });
 
-        let node = OutNode {
+        OutNode {
             next_node,
             stop,
             job_info: res,
             phantom: PhantomData,
-        };
-
-        Ok(node)
+        }
     }
 
     fn rts(mut node: Box<dyn Out<TOut>>, nn: &TNext, stop: &Mutex<bool>) {
