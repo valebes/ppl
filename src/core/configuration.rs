@@ -5,6 +5,7 @@ pub struct Configuration {
     max_cores: usize,
     thread_mapping: Vec<usize>,
     pinning: bool,
+    scheduling: bool,
     blocking_channel: bool,
 }
 
@@ -28,13 +29,14 @@ fn parse_core_mapping() -> Vec<usize> {
 }
 
 impl Configuration {
-    pub fn new(max_cores: usize, pinning: bool, blocking_channel: bool) -> Configuration {
+    pub fn new(max_cores: usize, pinning: bool, scheduling: bool, blocking_channel: bool) -> Configuration {
         let thread_mapping = parse_core_mapping();
 
         Configuration {
             max_cores,
             thread_mapping,
             pinning,
+            scheduling,
             blocking_channel,
         }
     }
@@ -48,11 +50,23 @@ impl Configuration {
             Ok(val) => val.parse::<bool>().unwrap(),
             Err(_) => false,
         };
+        let scheduling = match env::var("PSPP_SCHEDULING") {
+            Ok(val) => {
+                if val == "static" {
+                    false
+                } else if val == "dynamic" {
+                    true
+                } else {
+                    panic!("Invalid scheduling policy");
+                }
+            },
+            Err(_) => false,
+        };
         let blocking_channel = match env::var("PSPP_BLOCKING_CHANNEL") {
             Ok(val) => val.parse::<bool>().unwrap(),
             Err(_) => false,
         };
-        Configuration::new(max_threads, pinning, blocking_channel)
+        Configuration::new(max_threads, pinning, scheduling, blocking_channel)
     }
 
     /// Get the maximum number of cores allowed.
@@ -68,6 +82,13 @@ impl Configuration {
     /// Get the pinning flag.
     pub(crate) fn get_pinning(&self) -> bool {
         self.pinning
+    }
+
+    /// Get the scheduling flag.
+    /// If true, the scheduling policy is dynamic, otherwise it is static.
+    /// The default is static.
+    pub(crate) fn get_scheduling(&self) -> bool {
+        self.scheduling
     }
 
     /// Get the blocking channel flag.
@@ -86,6 +107,7 @@ mod tests {
         env::remove_var("PSPP_PINNING");
         env::remove_var("PSPP_BLOCKING_CHANNEL");
         env::remove_var("PSPP_THREAD_MAPPING");
+        env::remove_var("PSPP_SCHEDULING");
     }
 
     #[test]
@@ -103,10 +125,13 @@ mod tests {
         env::set_var("PSPP_MAX_CORES", "4");
         env::set_var("PSPP_PINNING", "true");
         env::set_var("PSPP_BLOCKING_CHANNEL", "true");
+        env::set_var("PSPP_SCHEDULING", "dynamic");
+
         let conf = Configuration::new_default();
         assert_eq!(conf.max_cores, 4);
         assert!(conf.pinning);
         assert!(conf.blocking_channel);
+        assert!(conf.scheduling);
         reset_env();
     }
 

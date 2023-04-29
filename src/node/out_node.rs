@@ -64,6 +64,10 @@ impl<
         }
     }
 
+    fn get_free_node(&self) -> Option<usize> {
+        None
+    }
+
     fn get_num_of_replicas(&self) -> usize {
         1
     }
@@ -92,8 +96,10 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
 
         let nn = Arc::clone(&next_node);
 
+        let scheduling = orchestrator.get_configuration().get_scheduling();
+
         let res = orchestrator.push(move || {
-            Self::rts(handler, &nn, &stop_copy);
+            Self::rts(handler, &nn, scheduling, &stop_copy);
         });
 
         OutNode {
@@ -104,7 +110,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
-    fn rts(mut node: Box<dyn Out<TOut>>, nn: &TNext, stop: &Mutex<bool>) {
+    fn rts(mut node: Box<dyn Out<TOut>>, nn: &TNext, scheduling: bool, stop: &Mutex<bool>) {
         let mut order = 0;
         let mut counter = 0;
 
@@ -133,9 +139,20 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                 Err(_) => panic!("Error: Cannot lock mutex."),
             }
 
-            counter = counter % nn.get_num_of_replicas();
+            
 
-            let res = node.run();
+            let res = node.run(); // Run the node and get the output
+
+            counter = counter % nn.get_num_of_replicas(); // Get the next node
+            let latest = counter; // Save the latest node
+
+            // If scheduling is enabled, get the next free node
+            if scheduling {
+                match nn.get_free_node() {
+                    Some(id) => counter = id,
+                    None => (),
+                }
+            }
             match res {
                 Some(output) => {
                     let err = nn.send(Message::new(Task::NewTask(output), order), counter);
@@ -152,7 +169,12 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                     break;
                 }
             }
-            counter += 1;
+            
+            if scheduling {
+                counter = latest;
+            } else {
+                counter += 1;
+            }
         }
     }
 

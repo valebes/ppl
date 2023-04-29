@@ -72,7 +72,7 @@ macro_rules! propagate {
             let replicas = node.number_of_replicas();
             let mut block = InOutNode::new($id, Box::new(node),
                 propagate!($id + (1 * replicas), $($tail),*),
-                false, get_global_orchestrator());
+                get_global_orchestrator());
             block
         }
     };

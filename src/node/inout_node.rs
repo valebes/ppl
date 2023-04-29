@@ -7,6 +7,7 @@ use std::{
     },
 };
 
+use crossbeam_deque::{Injector, Steal};
 use dyn_clone::DynClone;
 use log::{trace, warn};
 use std::collections::BTreeMap;
@@ -103,6 +104,7 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     ordered_splitter: Arc<(Mutex<OrderedSplitter>, Condvar)>,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
+    scheduler: Arc<Injector<usize>>,
     job_infos: Vec<JobInfo>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
@@ -190,6 +192,22 @@ impl<
         }
     }
 
+    fn get_free_node(&self) -> Option<usize> {
+        loop {
+            match self.scheduler.steal() {
+                Steal::Success(id) => {
+                    return Some(id);
+                }
+                Steal::Empty => {
+                    continue;
+                }
+                Steal::Retry => {
+                    continue;
+                }
+            }
+        }
+    }
+
     fn get_num_of_replicas(&self) -> usize {
         self.job_infos.len()
     }
@@ -213,13 +231,16 @@ impl<
         id: usize,
         handler: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: TNext,
-        blocking: bool,
         orchestrator: Arc<Orchestrator>,
     ) -> InOutNode<TIn, TOut, TCollected, TNext> {
         let mut funcs = Vec::new();
         let mut channels = Vec::new();
         let next_node = Arc::new(next_node);
         let replicas = handler.number_of_replicas();
+
+        let scheduler = Arc::new(Injector::new());
+        let scheduling = orchestrator.get_configuration().get_scheduling();
+        let blocking = orchestrator.get_configuration().get_blocking_channel();
 
         let splitter = Arc::new((Mutex::new(OrderedSplitter::new()), Condvar::new()));
         let ordered = handler.is_ordered();
@@ -240,12 +261,14 @@ impl<
             let splitter_copy = Arc::clone(&splitter);
             let copy = handler_copies.pop().unwrap();
             let local_barrier = Arc::clone(&barrier);
+            let local_scheduler = Arc::clone(&scheduler);
 
             let func = move || {
                 local_barrier.wait();
-                Self::rts(i + id, copy, channel_in, &nn, replicas, &splitter_copy);
+                Self::rts(i, copy, channel_in, &nn, replicas, &splitter_copy, scheduling, &local_scheduler);
             };
 
+            scheduler.push(i);
             funcs.push(func);
         }
 
@@ -257,6 +280,7 @@ impl<
             ordered_splitter: splitter,
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
+            scheduler,
             job_infos: orchestrator.push_multiple(funcs),
             phantom: PhantomData,
         }
@@ -269,30 +293,40 @@ impl<
         next_node: &TNext,
         n_replicas: usize,
         ordered_splitter_handler: &(Mutex<OrderedSplitter>, Condvar),
+        scheduling: bool,
+        scheduler: &Injector<usize>,
     ) {
         // If next node have more replicas, i specify the first next node where i send my msg
         let mut counter = 0;
         if (next_node.get_num_of_replicas() > n_replicas) && n_replicas != 1 {
-            counter = id * (next_node.get_num_of_replicas() / n_replicas);
+            counter = id * (next_node.get_num_of_replicas() / n_replicas); 
         } else if next_node.get_num_of_replicas() <= n_replicas {
             // Standard case, not a2a
             counter = id;
         }
+        
         trace!("Created a new Node! Id: {}", id);
         loop {
-            // If next node have more replicas, when counter > next_replicas i reset the counter
-            if (next_node.get_num_of_replicas() > n_replicas)
-                && counter >= next_node.get_num_of_replicas()
-            {
-                counter = 0;
-            }
-
             let input = channel_in.receive();
 
             match input {
-                Ok(Some(Message { op, order })) => match op {
+                Ok(Some(Message { op, order })) => {
+                    // If next node have more replicas, when counter > next_replicas i reset the counter
+                    counter = counter % next_node.get_num_of_replicas();
+                    let latest = counter; // Save the latest node
+
+                    match op {
                     Task::NewTask(arg) => {
                         let output = node.run(arg);
+                        
+                    // If scheduling is enabled, get the next free node
+                    if scheduling {
+                        match next_node.get_free_node() {
+                            Some(id) => counter = id,
+                            None => (),
+                        }
+                    }
+
                         if !node.is_producer() {
                             match output {
                                 Some(msg) => {
@@ -384,15 +418,23 @@ impl<
                     Task::Terminate => {
                         break;
                     }
+                }
+                
+                if scheduling {
+                    counter = latest;
+                } else {
+                    counter += 1;
+                }
+
+                scheduler.push(id);
+
                 },
                 Ok(None) => (),
                 Err(e) => {
                     warn!("Error: {}", e);
                 }
             }
-            if next_node.get_num_of_replicas() > n_replicas {
-                counter += 1;
-            }
+
         }
     }
 

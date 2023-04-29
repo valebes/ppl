@@ -121,6 +121,10 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
         }
     }
 
+    fn get_free_node(&self) -> Option<usize> {
+        Some(0)
+    }
+
     fn get_num_of_replicas(&self) -> usize {
         1
     }
