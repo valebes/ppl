@@ -30,9 +30,7 @@ fn parse_core_mapping() -> Vec<usize> {
 impl Configuration {
     pub fn new(max_cores: usize, pinning: bool, blocking_channel: bool) -> Configuration {
         let thread_mapping = parse_core_mapping();
-        if thread_mapping.len() < max_cores {
-            //panic!("Error: Thread mapping length does not match max threads!");
-        }
+
         Configuration {
             max_cores,
             thread_mapping,

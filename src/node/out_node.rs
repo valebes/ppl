@@ -107,7 +107,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     fn rts(mut node: Box<dyn Out<TOut>>, nn: &TNext, stop: &Mutex<bool>) {
         let mut order = 0;
         let mut counter = 0;
-        loop {
+        loop { // Maybe this could be better
             let stop_mtx = stop.lock();
             match stop_mtx {
                 Ok(mtx) => {
