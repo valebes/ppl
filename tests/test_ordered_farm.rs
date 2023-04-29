@@ -38,7 +38,7 @@ impl InOut<usize, usize> for WorkerA {
         true
     }
     fn number_of_replicas(&self) -> usize {
-        2
+        4
     }
 }
 
@@ -101,7 +101,7 @@ fn test_ordered_farm() {
 
     let mut p = parallel![
         Source {
-            streamlen: 100,
+            streamlen: 1000,
             counter: 0
         },
         WorkerA {},

@@ -96,7 +96,6 @@ impl OrderedSplitter {
 }
 
 pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
-    job_infos: Vec<JobInfo>,
     channels: Vec<OutputChannel<Message<TIn>>>,
     next_node: Arc<TNext>,
     ordered: bool,
@@ -104,6 +103,7 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     ordered_splitter: Arc<(Mutex<OrderedSplitter>, Condvar)>,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
+    job_infos: Vec<JobInfo>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
@@ -136,15 +136,14 @@ impl<
                     }
 
                     if self.ordered {
-                        let old_c = self.next_msg.load(Ordering::SeqCst);
-                        self.next_msg.store(old_c + 1, Ordering::SeqCst);
+                        self.next_msg.fetch_add(1, Ordering::AcqRel);
                     }
                 }
             }
             Task::Dropped => {
                 if self.channels.len() == 1
                     && self.ordered
-                    && order != self.next_msg.load(Ordering::SeqCst)
+                    && order != self.next_msg.load(Ordering::Acquire)
                 {
                     self.save_to_storage(Message::new(op, rec_id), order);
                     self.send_pending();
@@ -155,15 +154,14 @@ impl<
                     }
 
                     if self.ordered {
-                        let old_c = self.next_msg.load(Ordering::SeqCst);
-                        self.next_msg.store(old_c + 1, Ordering::SeqCst);
+                        self.next_msg.fetch_add(1, Ordering::AcqRel);
                     }
                 }
             }
             Task::Terminate => {
                 if self.channels.len() == 1
                     && self.ordered
-                    && order != self.next_msg.load(Ordering::SeqCst)
+                    && order != self.next_msg.load(Ordering::Acquire)
                 {
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
@@ -176,7 +174,7 @@ impl<
                     }
 
                     if self.ordered {
-                        self.next_msg.store(order, Ordering::SeqCst)
+                        self.next_msg.store(order, Ordering::Release);
                     }
                 }
             }
@@ -253,13 +251,13 @@ impl<
 
         InOutNode {
             channels,
-            job_infos: orchestrator.push_multiple(funcs),
             next_node,
             ordered,
             producer,
             ordered_splitter: splitter,
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
+            job_infos: orchestrator.push_multiple(funcs),
             phantom: PhantomData,
         }
     }
@@ -324,9 +322,14 @@ impl<
                                 }
                             }
 
+                            // If the node is ordered i need to wait the right order
+                            // before sending the messages to the next node
+                            // If the node is not ordered i send the messages to the next node immediately
                             if node.is_ordered() {
                                 let (lock, cvar) = ordered_splitter_handler;
                                 let mut ordered_splitter = lock.lock().unwrap();
+                                // If the order is the right one i send the messages to the next node 
+                                // otherwise I wait for the right order
                                 loop {
                                     let (latest, end) = ordered_splitter.get();
                                     if latest == order {
@@ -401,7 +404,7 @@ impl<
         // Change this that is really shitty
         let mut c = 0;
         if self.ordered && !self.producer {
-            c = self.next_msg.load(Ordering::SeqCst); // No need to be seq_cst
+            c = self.next_msg.load(Ordering::Acquire); // No need to be seq_cst
         } else if self.ordered && self.producer {
             let (lock, _) = self.ordered_splitter.as_ref();
             let ordered_splitter = lock.lock().unwrap();
@@ -429,7 +432,7 @@ impl<
 
         match mtx {
             Ok(mut queue) => {
-                let mut c = self.next_msg.load(Ordering::SeqCst);
+                let mut c = self.next_msg.load(Ordering::Acquire);
                 while queue.contains_key(&c) {
                     let msg = queue.remove(&c).unwrap();
                     let Message { op, order } = msg;
@@ -453,7 +456,7 @@ impl<
                             }
                         }
                     }
-                    c = self.next_msg.load(Ordering::SeqCst);
+                    c = self.next_msg.load(Ordering::Acquire);
                 }
             }
             Err(_) => panic!("Error: Cannot lock the storage!"),

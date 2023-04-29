@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 use log::trace;
 
@@ -107,17 +107,17 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     fn rts(mut node: Box<dyn Out<TOut>>, nn: &TNext, stop: &Mutex<bool>) {
         let mut order = 0;
         let mut counter = 0;
-        loop { // Maybe this could be better
-            let stop_mtx = stop.lock();
-            match stop_mtx {
-                Ok(mtx) => {
-                    if !*mtx {
-                        break;
-                    }
-                }
-                Err(_) => panic!("Error: Cannot lock mutex."),
-            }
+
+        let mut stop_mtx = stop.lock().unwrap();
+        let cvar = Condvar::new();
+
+        // Wait until the node is started
+        while *stop_mtx {
+            stop_mtx = cvar.wait(stop_mtx).unwrap();
         }
+
+        drop(stop_mtx); // Release the lock to avoid deadlock
+
         loop {
             let stop_mtx = stop.lock();
             match stop_mtx {
@@ -127,16 +127,14 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                         if err.is_err() {
                             panic!("Error: {}", err.unwrap_err())
                         }
-                        // to do cleanup
                         break;
                     }
                 }
                 Err(_) => panic!("Error: Cannot lock mutex."),
             }
 
-            if counter >= nn.get_num_of_replicas() {
-                counter = 0;
-            }
+            counter = counter % nn.get_num_of_replicas();
+
             let res = node.run();
             match res {
                 Some(output) => {

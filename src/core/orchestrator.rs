@@ -226,10 +226,7 @@ impl Thread {
         F: FnOnce() + Send + 'static,
     {
         // Get the pinning position
-        let pinning_position = *configuration
-            .get_thread_mapping()
-            .get(core_id)
-            .unwrap();
+        let pinning_position = *configuration.get_thread_mapping().get(core_id).unwrap();
         // Create the thread and pin it if needed
         Thread {
             thread: Some(thread::spawn(move || {

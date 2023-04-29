@@ -56,12 +56,12 @@ pub trait In<TIn: 'static + Send, TOut> {
 }
 
 pub struct InNode<TIn: Send, TCollected> {
-    job_info: JobInfo,
     channel: OutputChannel<Message<TIn>>,
     ordered: bool,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     counter: AtomicUsize,
     result: Arc<Mutex<Option<TCollected>>>,
+    job_info: JobInfo,
 }
 
 impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
@@ -71,7 +71,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
         let Message { op, order } = input;
         match &op {
             Task::NewTask(_e) => {
-                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                if self.ordered && order != self.counter.load(Ordering::Acquire) {
                     //change to acquire ordering
                     self.save_to_storage(Message::new(op, rec_id), order);
                     self.send_pending();
@@ -80,21 +80,19 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
                     if res.is_err() {
                         panic!("Error: Cannot send message!");
                     }
-                    let old_c = self.counter.load(Ordering::SeqCst);
-                    self.counter.store(old_c + 1, Ordering::SeqCst);
+                    self.counter.fetch_add(1, Ordering::AcqRel);
                 }
             }
             Task::Dropped => {
-                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                if self.ordered && order != self.counter.load(Ordering::Acquire) {
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else if self.ordered {
-                    let old_c = self.counter.load(Ordering::SeqCst);
-                    self.counter.store(old_c + 1, Ordering::SeqCst);
+                    self.counter.fetch_add(1, Ordering::AcqRel);
                 }
             }
             Task::Terminate => {
-                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                if self.ordered && order != self.counter.load(Ordering::Acquire) {
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else {
@@ -223,7 +221,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
         match mtx {
             Ok(mut queue) => {
-                let mut c = self.counter.load(Ordering::SeqCst);
+                let mut c = self.counter.load(Ordering::Acquire);
                 while queue.contains_key(&c) {
                     let msg = queue.remove(&c).unwrap();
                     let Message { op, order } = msg;
@@ -247,7 +245,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                             }
                         }
                     }
-                    c = self.counter.load(Ordering::SeqCst);
+                    c = self.counter.load(Ordering::Acquire);
                 }
             }
             Err(_) => panic!("Error: Cannot lock the storage!"),
