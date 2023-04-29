@@ -1,9 +1,10 @@
+use pspp::core::orchestrator::Orchestrator;
 use pspp::thread_pool::ThreadPool;
 use raster::filter;
 use raster::Image;
 
 pub fn pspp_map(images: Vec<Image>, threads: usize) {
-    let mut pool = ThreadPool::new(threads * 5, true);
+    let mut pool = ThreadPool::new_with_global_registry(threads * 5);
     /*
         let a = pool.par_map(images, |mut image: Image| -> Image {
         filter::saturation(&mut image, 0.2).unwrap();
@@ -38,4 +39,6 @@ pub fn pspp_map(images: Vec<Image>, threads: usize) {
             image
         })
         .collect();
+
+    Orchestrator::delete_global_orchestrator();
 }

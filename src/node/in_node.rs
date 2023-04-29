@@ -13,8 +13,8 @@ use crate::{
         channel::{Channel, InputChannel, OutputChannel},
         err::ChannelError,
     },
+    core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
-    thread::{Thread, ThreadError},
 };
 
 use super::node::Node;
@@ -56,7 +56,7 @@ pub trait In<TIn: 'static + Send, TOut> {
 }
 
 pub struct InNode<TIn: Send, TCollected> {
-    thread: Thread,
+    job_info: JobInfo,
     channel: OutputChannel<Message<TIn>>,
     ordered: bool,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
@@ -72,6 +72,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
         match &op {
             Task::NewTask(_e) => {
                 if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                    //change to acquire ordering
                     self.save_to_storage(Message::new(op, rec_id), order);
                     self.send_pending();
                 } else {
@@ -108,10 +109,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
     }
 
     fn collect(mut self) -> Option<TCollected> {
-        let err = self.wait();
-        if err.is_err() {
-            panic!("Error: Cannot wait thread.");
-        }
+        self.wait();
         let tmp = self.result.lock();
         if tmp.is_err() {
             panic!("Error: Cannot collect results in.");
@@ -142,8 +140,8 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         id: usize,
         handler: Box<dyn In<TIn, TCollected> + Send + Sync>,
         blocking: bool,
-        pinning: bool,
-    ) -> Result<InNode<TIn, TCollected>, ThreadError> {
+        orchestrator: Arc<Orchestrator>,
+    ) -> InNode<TIn, TCollected> {
         trace!("Created a new Sink! Id: {}", id);
 
         let (channel_in, channel_out) = Channel::channel(blocking);
@@ -152,36 +150,27 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
         let bucket = Arc::clone(&result);
 
-        let thread = Thread::new(
-            id,
-            move || {
-                let res = InNode::rts(handler, channel_in);
-                if res.is_some() {
-                    let err = bucket.lock();
-                    if err.is_ok() {
-                        let mut lock_bucket = err.unwrap();
-                        *lock_bucket = res;
-                    } else if err.is_err() {
-                        panic!("Error: Cannot collect results.")
-                    }
+        let job_info = orchestrator.push(move || {
+            let res = InNode::rts(handler, channel_in);
+            if res.is_some() {
+                let err = bucket.lock();
+                if err.is_ok() {
+                    let mut lock_bucket = err.unwrap();
+                    *lock_bucket = res;
+                } else if err.is_err() {
+                    panic!("Error: Cannot collect results.")
                 }
-            },
-            pinning,
-        );
+            }
+        });
 
-        let mut node = InNode {
-            thread,
+        InNode {
+            job_info,
             channel: channel_out,
             ordered,
             storage: Mutex::new(BTreeMap::new()),
             counter: AtomicUsize::new(0),
             result,
-        };
-        let err = node.thread.start();
-        if err.is_err() {
-            return Err(err.unwrap_err());
         }
-        Ok(node)
     }
 
     fn rts(
@@ -214,8 +203,8 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         node.finalize()
     }
 
-    fn wait(&mut self) -> std::result::Result<(), ThreadError> {
-        self.thread.wait()
+    fn wait(&mut self) {
+        self.job_info.wait()
     }
 
     fn save_to_storage(&self, task: Message<TIn>, order: usize) {

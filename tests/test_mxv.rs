@@ -1,3 +1,4 @@
+use pspp::core::orchestrator::get_global_orchestrator;
 use pspp::{
     node::{
         in_node::{In, InNode},
@@ -97,9 +98,9 @@ fn test_mxv() {
 
     // Compute the "reference" result
     for i in 0..matrix.len() {
-        for j in 0..vec.len() {
+        (0..vec.len()).for_each(|j| {
             correct_result[i] += matrix[i][j] * vec[j];
-        }
+        });
     }
 
     assert_eq!(res, correct_result);

@@ -48,6 +48,6 @@ pub struct Channel;
 impl Channel {
     pub fn channel<T: Send + 'static>(blocking: bool) -> (InputChannel<T>, OutputChannel<T>) {
         let (rx, tx) = backend::Channel::channel(blocking);
-        (InputChannel { rx: rx }, OutputChannel { tx: tx })
+        (InputChannel { rx }, OutputChannel { tx })
     }
 }

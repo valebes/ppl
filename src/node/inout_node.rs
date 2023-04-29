@@ -16,8 +16,8 @@ use crate::{
         channel::{Channel, InputChannel, OutputChannel},
         err::ChannelError,
     },
+    core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
-    thread::{Thread, ThreadError},
 };
 
 use super::node::Node;
@@ -96,7 +96,7 @@ impl OrderedSplitter {
 }
 
 pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
-    threads: Vec<Thread>,
+    job_infos: Vec<JobInfo>,
     channels: Vec<OutputChannel<Message<TIn>>>,
     next_node: Arc<TNext>,
     ordered: bool,
@@ -116,8 +116,8 @@ impl<
 {
     fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), ChannelError> {
         let mut rec_id = rec_id;
-        if rec_id >= self.threads.len() {
-            rec_id %= self.threads.len();
+        if rec_id >= self.job_infos.len() {
+            rec_id %= self.job_infos.len();
         }
 
         let Message { op, order } = input;
@@ -185,10 +185,7 @@ impl<
     }
 
     fn collect(mut self) -> Option<TCollected> {
-        let err = self.wait();
-        if err.is_err() {
-            panic!("Error: Cannot wait thread.");
-        }
+        self.wait();
         match Arc::try_unwrap(self.next_node) {
             Ok(nn) => nn.collect(),
             Err(_) => panic!("Error: Cannot collect results inout."),
@@ -196,7 +193,7 @@ impl<
     }
 
     fn get_num_of_replicas(&self) -> usize {
-        self.threads.len()
+        self.job_infos.len()
     }
 }
 
@@ -219,9 +216,9 @@ impl<
         handler: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: TNext,
         blocking: bool,
-        pinning: bool,
-    ) -> Result<InOutNode<TIn, TOut, TCollected, TNext>, ThreadError> {
-        let mut threads = Vec::new();
+        orchestrator: Arc<Orchestrator>,
+    ) -> InOutNode<TIn, TOut, TCollected, TNext> {
+        let mut funcs = Vec::new();
         let mut channels = Vec::new();
         let next_node = Arc::new(next_node);
         let replicas = handler.number_of_replicas();
@@ -246,24 +243,17 @@ impl<
             let copy = handler_copies.pop().unwrap();
             let local_barrier = Arc::clone(&barrier);
 
-            let mut thread = Thread::new(
-                i + id,
-                move || {
-                    local_barrier.wait();
-                    Self::rts(i + id, copy, channel_in, &nn, replicas, &splitter_copy);
-                },
-                pinning,
-            );
-            let err = thread.start();
-            if err.is_err() {
-                return Err(err.unwrap_err());
-            }
-            threads.push(thread);
+            let func = move || {
+                local_barrier.wait();
+                Self::rts(i + id, copy, channel_in, &nn, replicas, &splitter_copy);
+            };
+
+            funcs.push(func);
         }
 
-        let node = InOutNode {
+        InOutNode {
             channels,
-            threads,
+            job_infos: orchestrator.push_multiple(funcs),
             next_node,
             ordered,
             producer,
@@ -271,9 +261,7 @@ impl<
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
             phantom: PhantomData,
-        };
-
-        Ok(node)
+        }
     }
 
     fn rts(
@@ -405,16 +393,15 @@ impl<
         }
     }
 
-    fn wait(&mut self) -> std::result::Result<(), ThreadError> {
-        for th in &mut self.threads {
-            let err = th.wait();
-            if err.is_err() {
-                return Err(err.unwrap_err());
-            }
+    fn wait(&mut self) {
+        for job in &self.job_infos {
+            job.wait();
         }
+
+        // Change this that is really shitty
         let mut c = 0;
         if self.ordered && !self.producer {
-            c = self.next_msg.load(Ordering::SeqCst);
+            c = self.next_msg.load(Ordering::SeqCst); // No need to be seq_cst
         } else if self.ordered && self.producer {
             let (lock, _) = self.ordered_splitter.as_ref();
             let ordered_splitter = lock.lock().unwrap();
@@ -424,7 +411,6 @@ impl<
         if err.is_err() {
             panic!("Error: Cannot send message!");
         }
-        Ok(())
     }
 
     fn save_to_storage(&self, msg: Message<TIn>, order: usize) {
