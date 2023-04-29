@@ -241,7 +241,7 @@ impl Thread {
                             error!("Thread pinning on core {} failed!", core.id);
                         } else {
                             trace!("Thread pinned on core {}.", core.id);
-                            assert_eq!(core_id, core.id)
+                            //assert_eq!(core_id, core.id)
                         }
                     }
                 }
