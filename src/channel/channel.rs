@@ -29,6 +29,14 @@ impl<T: Send> InputChannel<T> {
         self.rx.receive()
     }
 
+    pub fn receive_all(&self) -> Result<Vec<T>, ChannelError> {
+        let mut res = Vec::new();
+        while let Some(msg) = self.receive()? {
+            res.push(msg);
+        }
+        Ok(res)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.rx.is_empty()
     }

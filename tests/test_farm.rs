@@ -18,16 +18,15 @@ use pspp::{
 
 struct Source {
     streamlen: usize,
-    counter: usize,
 }
 impl Out<i32> for Source {
     fn run(&mut self) -> Option<i32> {
-        if self.counter < self.streamlen {
-            self.counter += 1;
-            Some((self.counter).try_into().unwrap())
-        } else {
-            None
+        let mut ret = None;
+        if self.streamlen > 0 {
+            ret = Some(self.streamlen as i32);
+            self.streamlen = self.streamlen - 1;
         }
+        ret
     }
 }
 
@@ -76,14 +75,7 @@ impl In<u64, usize> for Sink {
 fn test_farm() {
     env_logger::init();
 
-    let mut p = parallel![
-        Source {
-            streamlen: 45,
-            counter: 0
-        },
-        WorkerA {},
-        Sink { counter: 0 }
-    ];
+    let mut p = parallel![Source { streamlen: 45 }, WorkerA {}, Sink { counter: 0 }];
     p.start();
     let res = p.wait_and_collect();
     assert_eq!(res.unwrap(), 45);

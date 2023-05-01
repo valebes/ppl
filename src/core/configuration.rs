@@ -29,7 +29,12 @@ fn parse_core_mapping() -> Vec<usize> {
 }
 
 impl Configuration {
-    pub fn new(max_cores: usize, pinning: bool, scheduling: bool, blocking_channel: bool) -> Configuration {
+    pub fn new(
+        max_cores: usize,
+        pinning: bool,
+        scheduling: bool,
+        blocking_channel: bool,
+    ) -> Configuration {
         let thread_mapping = parse_core_mapping();
 
         Configuration {
@@ -59,7 +64,7 @@ impl Configuration {
                 } else {
                     panic!("Invalid scheduling policy");
                 }
-            },
+            }
             Err(_) => false,
         };
         let blocking_channel = match env::var("PSPP_BLOCKING_CHANNEL") {

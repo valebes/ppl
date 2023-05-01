@@ -3,11 +3,12 @@ use std::{
     marker::PhantomData,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, Barrier, Condvar, Mutex,
+        Arc, Barrier, Condvar, Mutex, RwLock,
     },
+    thread,
 };
 
-use crossbeam_deque::{Injector, Steal};
+use crossbeam_deque::{Injector, Steal, Stealer, Worker};
 use dyn_clone::DynClone;
 use log::{trace, warn};
 use std::collections::BTreeMap;
@@ -96,23 +97,470 @@ impl OrderedSplitter {
     }
 }
 
+struct WorkerNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
+    id: usize,
+    channel_rx: Option<InputChannel<Message<TIn>>>,
+    node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
+    next_node: Arc<TNext>,
+    feedback: Option<Arc<Injector<usize>>>,
+    splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
+    global_queue: Option<Arc<Injector<Message<TIn>>>>,
+    local_queue: Option<Mutex<Worker<Message<TIn>>>>,
+    stealers: Option<RwLock<Vec<Stealer<Message<TIn>>>>>,
+    num_replicas: usize,
+    phantom: PhantomData<(TOut, TCollected)>,
+}
+impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
+    WorkerNode<TIn, TOut, TCollected, TNext>
+{
+    // Create a new workernode with default values.
+    // Is created a new channel for the input and the output.
+    // Feedback is set to None.
+    // Splitter is set to None.
+    fn new(
+        id: usize,
+        node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
+        next_node: Arc<TNext>,
+        num_replicas: usize,
+    ) -> WorkerNode<TIn, TOut, TCollected, TNext> {
+        WorkerNode {
+            id,
+            channel_rx: None,
+            node,
+            next_node,
+            feedback: None,
+            splitter: None,
+            global_queue: None,
+            local_queue: None,
+            stealers: None,
+            num_replicas,
+            phantom: PhantomData,
+        }
+    }
+
+    // Get id
+    fn get_id(&self) -> usize {
+        self.id
+    }
+
+    // Steal batch of messages from the other workers.
+    fn steal_batch(&mut self) {
+        match &mut self.stealers {
+            Some(stealers) => {
+                let mut stealers = stealers.write().unwrap();
+                for stealer in stealers.iter_mut() {
+                    loop {
+                        match stealer
+                            .steal_batch(&mut self.local_queue.as_ref().unwrap().lock().unwrap())
+                        {
+                            Steal::Success(_) => {
+                                break;
+                            }
+                            Steal::Empty => {
+                                break;
+                            }
+                            Steal::Retry => {
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            None => {}
+        }
+    }
+
+    // Get a new message from the local queue or steal a message from the other workers.
+    fn get_message_from_local_queue(&mut self) -> Option<Message<TIn>> {
+        match &mut self.local_queue {
+            Some(local_queue) => match local_queue.lock().unwrap().pop() {
+                Some(message) => Some(message),
+                None => None,
+            },
+            None => None,
+        }
+    }
+
+    // Get a new message from the global queue.
+    fn get_message_from_global_queue(&mut self) -> Option<Message<TIn>> {
+        match &mut self.global_queue {
+            Some(global_queue) => loop {
+                match global_queue.steal() {
+                    Steal::Success(message) => {
+                        return Some(message);
+                    }
+                    Steal::Empty => {
+                        return None;
+                    }
+                    Steal::Retry => {
+                        continue;
+                    }
+                }
+            },
+            None => None,
+        }
+    }
+
+    // Get a new message from the channel.
+    // If there are more than one message in the channel, then the worker steal all the messages
+    // and put them in the local queue, after return the first message.
+    // If the channel is empty, then the worker return None.
+    fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
+        match &mut self.channel_rx {
+            Some(channel_rx) => match channel_rx.receive() {
+                Ok(Some(message)) => {
+                    match &mut self.local_queue {
+                        Some(local_queue) => {
+                            let local_queue = local_queue.lock().unwrap();
+                            channel_rx
+                                .receive_all()
+                                .unwrap()
+                                .into_iter()
+                                .for_each(|message| {
+                                    local_queue.push(message);
+                                });
+                        }
+                        None => (),
+                    }
+                    return Some(message);
+                }
+                Ok(None) => return None,
+                Err(e) => {
+                    warn!("Error: {}", e);
+                }
+            },
+            None => return None,
+        }
+        None
+    }
+
+    // Get a new message.
+    // It first try to get a message from the local queue.
+    // If the local queue is empty, then the worker steal a message from the other workers.
+    // If the worker can't steal a message, then it try to receive a message from the channel.
+    // If there are more than one message in the channel, then the worker steal all the messages
+    // and put them in the local queue, after return the first message.
+    // If the channel is empty, then the worker return None.
+    fn get_message(&mut self) -> Option<Message<TIn>> {
+        self.steal_batch();
+        match self.get_message_from_local_queue() {
+            Some(message) => Some(message),
+            None => match self.get_message_from_channel() {
+                Some(message) => Some(message),
+                None => match self.get_message_from_global_queue() {
+                    Some(message) => Some(message),
+                    None => None,
+                },
+            },
+        }
+    }
+
+    fn get_stealer(&self) -> Option<Stealer<Message<TIn>>> {
+        match &self.local_queue {
+            Some(local_queue) => Some(local_queue.lock().unwrap().stealer()),
+            None => None,
+        }
+    }
+
+    fn register_stealer(&mut self, stealer: Stealer<Message<TIn>>) {
+        match &mut self.stealers {
+            Some(stealers) => {
+                stealers.write().unwrap().push(stealer);
+            }
+            None => {
+                let mut stealers = Vec::new();
+                stealers.push(stealer);
+                self.stealers = Some(RwLock::new(stealers));
+            }
+        }
+    }
+
+    // Add global queue to the worker.
+    fn set_global_queue(&mut self, global_queue: Arc<Injector<Message<TIn>>>) {
+        self.global_queue = Some(global_queue);
+    }
+
+    // Create a local queue for the worker.
+    fn create_local_queue(&mut self) {
+        self.local_queue = Some(Mutex::new(Worker::new_fifo()));
+    }
+    // Create a new channel for the input.
+    // Return the sender of the channel.
+    fn create_channel(&mut self, blocking: bool) -> OutputChannel<Message<TIn>> {
+        let (channel_rx, channel_tx) = Channel::channel(blocking);
+        self.channel_rx = Some(channel_rx);
+        channel_tx
+    }
+
+    // Set a splitter for the node.
+    fn set_splitter(&mut self, splitter: Arc<(Mutex<OrderedSplitter>, Condvar)>) {
+        self.splitter = Some(splitter);
+    }
+
+    // Set a feedback queue for the node.
+    fn set_feedback(&mut self, feedback: Arc<Injector<usize>>) {
+        self.feedback = Some(feedback);
+    }
+
+    // Send to global queue a message.
+    fn send_to_global_queue(&mut self, message: Message<TIn>) {
+        match &mut self.global_queue {
+            Some(global_queue) => {
+                global_queue.push(message);
+            }
+            None => (),
+        }
+    }
+
+    fn init_counter(&self) -> usize {
+        // If next node have more replicas, i specify the first next node where i send my msg
+        let mut counter = 0;
+        if (self.next_node.get_num_of_replicas() > self.num_replicas) && self.num_replicas != 1 {
+            counter = self.id * (self.next_node.get_num_of_replicas() / self.num_replicas);
+        } else if self.next_node.get_num_of_replicas() <= self.num_replicas {
+            // Standard case, not a2a
+            counter = self.id;
+        }
+        counter
+    }
+
+    // Run the node.
+    // Depending on the options, the node can be run in different ways.
+    fn rts(&mut self) {
+        if self.node.is_producer() {
+            self.rts_producer();
+        } else {
+            self.rts_default();
+        }
+    }
+
+    fn rts_default(&mut self) {
+        let mut counter = self.init_counter();
+        trace!("InOutNode {} started", self.id);
+
+        loop {
+            let input = self.get_message();
+            match input {
+                Some(Message { op, order }) => {
+                    counter = counter % self.next_node.get_num_of_replicas();
+                    let latest = counter;
+
+                    match op {
+                        Task::NewTask(task) => {
+                            let result = self.node.run(task);
+
+                            // if there is feedback enabled, then i check for a free node
+                            // and i send the message to the free node
+                            match self.feedback {
+                                Some(_) => match self.next_node.get_free_node() {
+                                    Some(id) => counter = id,
+                                    None => (),
+                                },
+                                None => (),
+                            }
+
+                            match result {
+                                Some(msg) => {
+                                    let err = self
+                                        .next_node
+                                        .send(Message::new(Task::NewTask(msg), order), counter);
+                                    if err.is_err() {
+                                        panic!("Error: {}", err.unwrap_err())
+                                    }
+                                }
+                                None => {
+                                    let err = self
+                                        .next_node
+                                        .send(Message::new(Task::Dropped, order), counter);
+                                    if err.is_err() {
+                                        panic!("Error: {}", err.unwrap_err())
+                                    }
+                                }
+                            }
+                        }
+                        Task::Dropped => {
+                            let err = self
+                                .next_node
+                                .send(Message::new(Task::Dropped, order), counter);
+                            if err.is_err() {
+                                panic!("Error: {}", err.unwrap_err())
+                            }
+                        }
+                        Task::Terminate => {
+                            self.send_to_global_queue(Message::new(Task::Terminate, order));
+                            break;
+                        }
+                    }
+
+                    // if there is feedback enabled, then i send the id of the node to the feedback queue
+                    match &self.feedback {
+                        Some(feedback) => {
+                            feedback.push(self.id);
+                        }
+                        None => counter += 1,
+                    }
+                }
+                None => thread::yield_now(),
+            }
+        }
+    }
+
+    fn rts_producer(&mut self) {
+        let mut counter = self.init_counter();
+        trace!("InOutNode {} started", self.id);
+
+        loop {
+            let input = self.get_message();
+            match input {
+                Some(Message { op, order }) => {
+                    counter = counter % self.next_node.get_num_of_replicas();
+                    let latest = counter;
+
+                    match op {
+                        Task::NewTask(task) => {
+                            let _ = self.node.run(task);
+                            let mut tmp = VecDeque::new();
+                            loop {
+                                let producer_out = self.node.produce();
+                                match producer_out {
+                                    Some(producer_out) => {
+                                        tmp.push_back(producer_out);
+                                    }
+                                    None => {
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // If the node is ordered, then i have to send the messages in order
+                            // to the next node.
+                            if self.node.is_ordered() {
+                                match &self.splitter {
+                                    Some(splitter_ref) => {
+                                        let mut splitter = splitter_ref.0.lock().unwrap();
+                                        let cvar = &splitter_ref.1;
+                                        loop {
+                                            let (expected, start) = splitter.get();
+                                            if expected == order {
+                                                // if there is feedback enabled, then i check for a free node
+                                                // and i send the message to the free node
+                                                match self.feedback {
+                                                    Some(_) => {
+                                                        match self.next_node.get_free_node() {
+                                                            Some(id) => counter = id,
+                                                            None => (),
+                                                        }
+                                                    }
+                                                    None => (),
+                                                }
+
+                                                let mut tmp_counter = start;
+                                                while !tmp.is_empty() {
+                                                    let msg = Message {
+                                                        op: Task::NewTask(tmp.pop_front().unwrap()),
+                                                        order: tmp_counter,
+                                                    };
+                                                    let err = self.next_node.send(msg, counter);
+                                                    if err.is_err() {
+                                                        panic!("Error: {}", err.unwrap_err());
+                                                    }
+                                                    tmp_counter += 1;
+                                                }
+                                                splitter.set(order + 1, tmp_counter);
+                                                cvar.notify_all();
+                                                break;
+                                            } else {
+                                                let err = cvar.wait(splitter);
+                                                if err.is_err() {
+                                                    panic!("Error: Poisoned mutex!");
+                                                } else {
+                                                    splitter = err.unwrap();
+                                                }
+                                            }
+                                        }
+                                    }
+                                    None => {
+                                        panic!("Error: You shouldnt be here! (ordered node without splitter)");
+                                    }
+                                }
+                            } else {
+                                // If the node is not ordered, then i can send the messages to the next node
+                                // without any order.
+                                // if there is feedback enabled, then i check for a free node
+                                // and i send the message to the free node
+                                match self.feedback {
+                                    Some(_) => match self.next_node.get_free_node() {
+                                        Some(id) => counter = id,
+                                        None => (),
+                                    },
+                                    None => (),
+                                }
+                                loop {
+                                    let msg = Message {
+                                        op: Task::NewTask(tmp.pop_front().unwrap()),
+                                        order: 0,
+                                    };
+                                    let err = self.next_node.send(msg, counter);
+                                    if err.is_err() {
+                                        panic!("Error: {}", err.unwrap_err());
+                                    }
+                                    if tmp.is_empty() {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        Task::Dropped => {
+                            let err = self.next_node.send(
+                                Message {
+                                    op: Task::Dropped,
+                                    order: order,
+                                },
+                                counter,
+                            );
+                            if err.is_err() {
+                                panic!("Error: {}", err.unwrap_err())
+                            }
+                        }
+                        Task::Terminate => {
+                            self.send_to_global_queue(Message::new(Task::Terminate, order));
+                            break;
+                        }
+                    }
+
+                    // If there is feedback enabled, then i send a message to the feedback queue
+                    // to notify that i finished my job.
+                    match &self.feedback {
+                        Some(feedback) => {
+                            feedback.push(self.id);
+                        }
+                        None => counter += 1,
+                    }
+                }
+                None => thread::yield_now(),
+            }
+        }
+    }
+}
+
 pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     channels: Vec<OutputChannel<Message<TIn>>>,
     next_node: Arc<TNext>,
     ordered: bool,
     producer: bool,
-    ordered_splitter: Arc<(Mutex<OrderedSplitter>, Condvar)>,
+    ordered_splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
-    scheduler: Arc<Injector<usize>>,
+    scheduler: Option<Arc<Injector<usize>>>,
+    global_queue: Arc<Injector<Message<TIn>>>,
     job_infos: Vec<JobInfo>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
 impl<
         TIn: Send + 'static,
-        TOut: Send + 'static,
-        TCollected,
+        TOut: Send + Sync + 'static,
+        TCollected: Sync + Send + 'static,
         TNext: Node<TOut, TCollected> + Send + Sync + 'static,
     > Node<TIn, TCollected> for InOutNode<TIn, TOut, TCollected, TNext>
 {
@@ -168,13 +616,7 @@ impl<
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else {
-                    for ch in &self.channels {
-                        let err = ch.send(Message::new(Task::Terminate, order));
-                        if err.is_err() {
-                            panic!("Error: Cannot send message!");
-                        }
-                    }
-
+                    self.global_queue.push(Message::new(op, order));
                     if self.ordered {
                         self.next_msg.store(order, Ordering::Release);
                     }
@@ -193,18 +635,21 @@ impl<
     }
 
     fn get_free_node(&self) -> Option<usize> {
-        loop {
-            match self.scheduler.steal() {
-                Steal::Success(id) => {
-                    return Some(id);
+        match &self.scheduler {
+            Some(sched) => loop {
+                match sched.steal() {
+                    Steal::Success(id) => {
+                        return Some(id);
+                    }
+                    Steal::Empty => {
+                        continue;
+                    }
+                    Steal::Retry => {
+                        continue;
+                    }
                 }
-                Steal::Empty => {
-                    continue;
-                }
-                Steal::Retry => {
-                    continue;
-                }
-            }
+            },
+            None => None,
         }
     }
 
@@ -215,8 +660,8 @@ impl<
 
 impl<
         TIn: Send + 'static,
-        TOut: Send + 'static,
-        TCollected,
+        TOut: Send + 'static + Sync,
+        TCollected: Sync + Send + 'static,
         TNext: Node<TOut, TCollected> + Sync + Send + 'static,
     > InOutNode<TIn, TOut, TCollected, TNext>
 {
@@ -238,13 +683,24 @@ impl<
         let next_node = Arc::new(next_node);
         let replicas = handler.number_of_replicas();
 
-        let scheduler = Arc::new(Injector::new());
-        let scheduling = orchestrator.get_configuration().get_scheduling();
+        let mut feedback_queue = None;
+        let feedback = orchestrator.get_configuration().get_scheduling();
+        if feedback {
+            feedback_queue = Some(Arc::new(Injector::new()));
+        }
+
         let blocking = orchestrator.get_configuration().get_blocking_channel();
 
-        let splitter = Arc::new((Mutex::new(OrderedSplitter::new()), Condvar::new()));
         let ordered = handler.is_ordered();
         let producer = handler.is_producer();
+
+        let mut splitter = None;
+        if ordered && producer {
+            splitter = Some(Arc::new((
+                Mutex::new(OrderedSplitter::new()),
+                Condvar::new(),
+            )));
+        }
 
         let mut handler_copies = Vec::with_capacity(replicas);
         for _i in 0..replicas - 1 {
@@ -252,23 +708,64 @@ impl<
         }
         handler_copies.push(handler);
 
+        let mut worker_nodes: Vec<WorkerNode<TIn, TOut, TCollected, TNext>> =
+            Vec::with_capacity(replicas);
+
+        let global_queue = Arc::new(Injector::new());
+
+        for i in 0..replicas {
+            let mut worker =
+                WorkerNode::new(i, handler_copies.remove(0), next_node.clone(), replicas);
+
+            // If the node is a producer, we need to set the splitter
+            if producer && ordered {
+                worker.set_splitter(splitter.clone().unwrap());
+            }
+            // If the node have the feedback enabled, we need to set the feedback queue
+            if feedback {
+                worker.set_feedback(feedback_queue.clone().unwrap());
+            }
+
+            // todo put if here
+            worker.create_local_queue();
+            for other in &mut worker_nodes {
+                let worker_stealer = worker.get_stealer();
+                let other_stealer = other.get_stealer();
+
+                match worker_stealer {
+                    Some(ws) => {
+                        other.register_stealer(ws);
+                    }
+                    None => (),
+                }
+
+                match other_stealer {
+                    Some(os) => {
+                        worker.register_stealer(os);
+                    }
+                    None => (),
+                }
+            }
+
+            // Create the channel
+            channels.push(worker.create_channel(blocking));
+
+            // Add global queue
+            worker.set_global_queue(global_queue.clone());
+
+            worker_nodes.push(worker);
+        }
+
         let barrier = Arc::new(Barrier::new(replicas));
 
         for i in 0..replicas {
-            let (channel_in, channel_out) = Channel::channel(blocking);
-            channels.push(channel_out);
-            let nn = Arc::clone(&next_node);
-            let splitter_copy = Arc::clone(&splitter);
-            let copy = handler_copies.pop().unwrap();
-            let local_barrier = Arc::clone(&barrier);
-            let local_scheduler = Arc::clone(&scheduler);
-
+            let mut worker = worker_nodes.remove(0);
+            let local_barrier = barrier.clone();
             let func = move || {
                 local_barrier.wait();
-                Self::rts(i, copy, channel_in, &nn, replicas, &splitter_copy, scheduling, &local_scheduler);
+                worker.rts();
             };
 
-            scheduler.push(i);
             funcs.push(func);
         }
 
@@ -280,161 +777,10 @@ impl<
             ordered_splitter: splitter,
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
-            scheduler,
+            scheduler: feedback_queue,
+            global_queue,
             job_infos: orchestrator.push_multiple(funcs),
             phantom: PhantomData,
-        }
-    }
-
-    fn rts(
-        id: usize,
-        mut node: Box<dyn InOut<TIn, TOut>>,
-        channel_in: InputChannel<Message<TIn>>,
-        next_node: &TNext,
-        n_replicas: usize,
-        ordered_splitter_handler: &(Mutex<OrderedSplitter>, Condvar),
-        scheduling: bool,
-        scheduler: &Injector<usize>,
-    ) {
-        // If next node have more replicas, i specify the first next node where i send my msg
-        let mut counter = 0;
-        if (next_node.get_num_of_replicas() > n_replicas) && n_replicas != 1 {
-            counter = id * (next_node.get_num_of_replicas() / n_replicas); 
-        } else if next_node.get_num_of_replicas() <= n_replicas {
-            // Standard case, not a2a
-            counter = id;
-        }
-        
-        trace!("Created a new Node! Id: {}", id);
-        loop {
-            let input = channel_in.receive();
-
-            match input {
-                Ok(Some(Message { op, order })) => {
-                    // If next node have more replicas, when counter > next_replicas i reset the counter
-                    counter = counter % next_node.get_num_of_replicas();
-                    let latest = counter; // Save the latest node
-
-                    match op {
-                    Task::NewTask(arg) => {
-                        let output = node.run(arg);
-                        
-                    // If scheduling is enabled, get the next free node
-                    if scheduling {
-                        match next_node.get_free_node() {
-                            Some(id) => counter = id,
-                            None => (),
-                        }
-                    }
-
-                        if !node.is_producer() {
-                            match output {
-                                Some(msg) => {
-                                    let err = next_node
-                                        .send(Message::new(Task::NewTask(msg), order), counter);
-                                    if err.is_err() {
-                                        panic!("Error: {}", err.unwrap_err())
-                                    }
-                                }
-                                None => {
-                                    let err =
-                                        next_node.send(Message::new(Task::Dropped, order), counter);
-                                    if err.is_err() {
-                                        panic!("Error: {}", err.unwrap_err())
-                                    }
-                                }
-                            }
-                        } else {
-                            let mut tmp = VecDeque::new();
-                            loop {
-                                let splitter_out = node.produce();
-                                match splitter_out {
-                                    Some(msg) => {
-                                        tmp.push_back(msg);
-                                    }
-                                    None => break,
-                                }
-                            }
-
-                            // If the node is ordered i need to wait the right order
-                            // before sending the messages to the next node
-                            // If the node is not ordered i send the messages to the next node immediately
-                            if node.is_ordered() {
-                                let (lock, cvar) = ordered_splitter_handler;
-                                let mut ordered_splitter = lock.lock().unwrap();
-                                // If the order is the right one i send the messages to the next node 
-                                // otherwise I wait for the right order
-                                loop {
-                                    let (latest, end) = ordered_splitter.get();
-                                    if latest == order {
-                                        let mut count_splitter = end;
-                                        while !tmp.is_empty() {
-                                            let err = next_node.send(
-                                                Message::new(
-                                                    Task::NewTask(tmp.pop_front().unwrap()),
-                                                    count_splitter,
-                                                ),
-                                                counter,
-                                            );
-                                            if err.is_err() {
-                                                panic!("Error: {}", err.unwrap_err())
-                                            }
-                                            count_splitter += 1;
-                                        }
-                                        ordered_splitter.set(order + 1, count_splitter);
-                                        cvar.notify_all();
-                                        break;
-                                    } else {
-                                        let err = cvar.wait(ordered_splitter);
-                                        if err.is_err() {
-                                            panic!("Error: Poisoned mutex!");
-                                        } else {
-                                            ordered_splitter = err.unwrap();
-                                        }
-                                    }
-                                }
-                            } else {
-                                while !tmp.is_empty() {
-                                    let err = next_node.send(
-                                        Message::new(
-                                            Task::NewTask(tmp.pop_front().unwrap()),
-                                            order,
-                                        ),
-                                        counter,
-                                    );
-                                    if err.is_err() {
-                                        panic!("Error: {}", err.unwrap_err())
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Task::Dropped => {
-                        let err = next_node.send(Message::new(Task::Dropped, order), counter);
-                        if err.is_err() {
-                            panic!("Error: {}", err.unwrap_err())
-                        }
-                    }
-                    Task::Terminate => {
-                        break;
-                    }
-                }
-                
-                if scheduling {
-                    counter = latest;
-                } else {
-                    counter += 1;
-                }
-
-                scheduler.push(id);
-
-                },
-                Ok(None) => (),
-                Err(e) => {
-                    warn!("Error: {}", e);
-                }
-            }
-
         }
     }
 
@@ -448,9 +794,13 @@ impl<
         if self.ordered && !self.producer {
             c = self.next_msg.load(Ordering::Acquire); // No need to be seq_cst
         } else if self.ordered && self.producer {
-            let (lock, _) = self.ordered_splitter.as_ref();
-            let ordered_splitter = lock.lock().unwrap();
-            (_, c) = ordered_splitter.get();
+            match &self.ordered_splitter {
+                Some(lock) => {
+                    let ordered_splitter = lock.0.lock().unwrap();
+                    (_, c) = ordered_splitter.get();
+                }
+                None => panic!("Error: Ordered splitter not initialized!"),
+            }
         }
         let err = self.next_node.send(Message::new(Task::Terminate, c), 0);
         if err.is_err() {

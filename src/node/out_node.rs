@@ -139,8 +139,6 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                 Err(_) => panic!("Error: Cannot lock mutex."),
             }
 
-            
-
             let res = node.run(); // Run the node and get the output
 
             counter = counter % nn.get_num_of_replicas(); // Get the next node
@@ -169,7 +167,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                     break;
                 }
             }
-            
+
             if scheduling {
                 counter = latest;
             } else {
