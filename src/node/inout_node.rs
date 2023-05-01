@@ -642,7 +642,7 @@ impl<
                         return Some(id);
                     }
                     Steal::Empty => {
-                        continue;
+                        return None;
                     }
                     Steal::Retry => {
                         continue;
