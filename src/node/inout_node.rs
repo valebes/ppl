@@ -143,30 +143,26 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         self.id
     }
 
-    // Steal batch of messages from the other workers.
-    fn steal_batch(&mut self) {
+    // Steal a messages from the other workers.
+    fn get_message_from_others(&mut self) -> Option<Message<TIn>> {
         match &mut self.stealers {
-            Some(stealers) => {
-                let mut stealers = stealers.write().unwrap();
-                for stealer in stealers.iter_mut() {
-                    loop {
-                        match stealer
-                            .steal_batch(&mut self.local_queue.as_ref().unwrap().lock().unwrap())
-                        {
-                            Steal::Success(_) => {
-                                break;
-                            }
-                            Steal::Empty => {
-                                break;
-                            }
-                            Steal::Retry => {
-                                continue;
-                            }
+            Some(stealers) => loop {
+                for stealer in stealers.read().unwrap().iter() {
+                    match stealer.steal() {
+                        Steal::Success(message) => {
+                            return Some(message);
+                        }
+                        Steal::Empty => {
+                            continue;
+                        }
+                        Steal::Retry => {
+                            continue;
                         }
                     }
                 }
-            }
-            None => {}
+                return None;
+            },
+            None => None,
         }
     }
 
@@ -235,21 +231,19 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     }
 
     // Get a new message.
-    // It first try to get a message from the local queue.
-    // If the local queue is empty, then the worker steal a message from the other workers.
-    // If the worker can't steal a message, then it try to receive a message from the channel.
-    // If there are more than one message in the channel, then the worker steal all the messages
-    // and put them in the local queue, after return the first message.
-    // If the channel is empty, then the worker return None.
+    // Pop a message from the local queue, if the local queue is not empty.
+    // Try to receive a message from the channel, if the channel is not empty.
+    // Steal a message from the other workers, if the local queue and the channel are empty.
+    // Then look for a message in the global queue.
+    // If there are no messages, then return None.
     fn get_message(&mut self) -> Option<Message<TIn>> {
-        self.steal_batch();
         match self.get_message_from_local_queue() {
             Some(message) => Some(message),
             None => match self.get_message_from_channel() {
                 Some(message) => Some(message),
-                None => match self.get_message_from_global_queue() {
+                None => match self.get_message_from_others() {
                     Some(message) => Some(message),
-                    None => None,
+                    None => self.get_message_from_global_queue(),
                 },
             },
         }
@@ -440,6 +434,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                         let mut splitter = splitter_ref.0.lock().unwrap();
                                         let cvar = &splitter_ref.1;
                                         loop {
+                                            println!("{} {}", order, splitter.get().0);
                                             let (expected, start) = splitter.get();
                                             if expected == order {
                                                 // if there is feedback enabled, then i check for a free node
@@ -466,10 +461,12 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                                     }
                                                     tmp_counter += 1;
                                                 }
+                                                println!("YES {} {}", order, tmp_counter);
                                                 splitter.set(order + 1, tmp_counter);
                                                 cvar.notify_all();
                                                 break;
                                             } else {
+                                                println!("Waiting {} {}", order, splitter.get().0);
                                                 let err = cvar.wait(splitter);
                                                 if err.is_err() {
                                                     panic!("Error: Poisoned mutex!");
@@ -728,24 +725,6 @@ impl<
 
             // todo put if here
             worker.create_local_queue();
-            for other in &mut worker_nodes {
-                let worker_stealer = worker.get_stealer();
-                let other_stealer = other.get_stealer();
-
-                match worker_stealer {
-                    Some(ws) => {
-                        other.register_stealer(ws);
-                    }
-                    None => (),
-                }
-
-                match other_stealer {
-                    Some(os) => {
-                        worker.register_stealer(os);
-                    }
-                    None => (),
-                }
-            }
 
             // Create the channel
             channels.push(worker.create_channel(blocking));
@@ -756,10 +735,29 @@ impl<
             worker_nodes.push(worker);
         }
 
+        if splitter.is_none() {
+        // Register stealers to each worker
+        let mut stealers = Vec::with_capacity(replicas);
+        for worker in &worker_nodes {
+            match worker.get_stealer() {
+                Some(stealer) => stealers.push(stealer),
+                None => (),
+            }
+        }
+
+        for worker in &mut worker_nodes {
+            for stealer in &stealers {
+                worker.register_stealer(stealer.clone());
+            }
+        }
+        }
+
+
         let barrier = Arc::new(Barrier::new(replicas));
 
         for i in 0..replicas {
             let mut worker = worker_nodes.remove(0);
+            
             let local_barrier = barrier.clone();
             let func = move || {
                 local_barrier.wait();
