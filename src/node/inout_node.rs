@@ -334,6 +334,9 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
         loop {
             let input = self.get_message();
+
+            let mut round_robin = false;
+
             match input {
                 Some(Message { op, order }) => {
                     counter = counter % self.next_node.get_num_of_replicas();
@@ -348,9 +351,9 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             match self.feedback {
                                 Some(_) => match self.next_node.get_free_node() {
                                     Some(id) => counter = id,
-                                    None => (),
+                                    None => round_robin = true,
                                 },
-                                None => (),
+                                None => round_robin = true,
                             }
 
                             match result {
@@ -389,6 +392,9 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                     // if there is feedback enabled, then i send the id of the node to the feedback queue
                     match &self.feedback {
                         Some(feedback) => {
+                            if round_robin {
+                                counter += 1;
+                            }
                             feedback.push(self.id);
                         }
                         None => counter += 1,
@@ -405,6 +411,9 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
         loop {
             let input = self.get_message();
+
+            let mut round_robin = false;
+
             match input {
                 Some(Message { op, order }) => {
                     counter = counter % self.next_node.get_num_of_replicas();
@@ -434,7 +443,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                         let mut splitter = splitter_ref.0.lock().unwrap();
                                         let cvar = &splitter_ref.1;
                                         loop {
-                                            println!("{} {}", order, splitter.get().0);
                                             let (expected, start) = splitter.get();
                                             if expected == order {
                                                 // if there is feedback enabled, then i check for a free node
@@ -443,10 +451,10 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                                     Some(_) => {
                                                         match self.next_node.get_free_node() {
                                                             Some(id) => counter = id,
-                                                            None => (),
+                                                            None => round_robin = true,
                                                         }
                                                     }
-                                                    None => (),
+                                                    None => round_robin = true,
                                                 }
 
                                                 let mut tmp_counter = start;
@@ -461,7 +469,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                                     }
                                                     tmp_counter += 1;
                                                 }
-                                                println!("YES {} {}", order, tmp_counter);
                                                 splitter.set(order + 1, tmp_counter);
                                                 cvar.notify_all();
                                                 break;
@@ -488,9 +495,9 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                 match self.feedback {
                                     Some(_) => match self.next_node.get_free_node() {
                                         Some(id) => counter = id,
-                                        None => (),
+                                        None => round_robin = true,
                                     },
-                                    None => (),
+                                    None => round_robin = true,
                                 }
                                 loop {
                                     let msg = Message {
@@ -529,6 +536,9 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                     // to notify that i finished my job.
                     match &self.feedback {
                         Some(feedback) => {
+                            if round_robin {
+                                counter += 1;
+                            }
                             feedback.push(self.id);
                         }
                         None => counter += 1,

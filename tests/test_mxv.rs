@@ -70,7 +70,7 @@ fn mult(m: Vec<i64>, v: &[i64]) -> i64 {
 fn test_mxv() {
     env_logger::init();
 
-    let n = 1000; //rows
+    let n = 10000; //rows
     let mut matrix = vec![vec![0; n]; n];
     let mut vec = vec![0; n];
     let mut correct_result = vec![0; n];
