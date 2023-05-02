@@ -758,7 +758,7 @@ impl<
             }
 
             // todo put if here
-            worker.create_local_queue();
+            //worker.create_local_queue();
 
             // Create the channel
             channels.push(worker.create_channel(blocking));
