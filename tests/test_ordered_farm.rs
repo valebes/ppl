@@ -101,7 +101,7 @@ fn test_ordered_farm() {
 
     let mut p = parallel![
         Source {
-            streamlen: 1000,
+            streamlen: 10000,
             counter: 0
         },
         WorkerA {},

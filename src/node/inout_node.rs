@@ -332,6 +332,9 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         let mut counter = self.init_counter();
         trace!("InOutNode {} started", self.id);
 
+        let mut stop = false;
+        let mut terminate_order = 0;
+
         loop {
             let input = self.get_message();
 
@@ -384,8 +387,8 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             }
                         }
                         Task::Terminate => {
-                            self.send_to_global_queue(Message::new(Task::Terminate, order));
-                            break;
+                            stop = true;
+                            terminate_order = order;
                         }
                     }
 
@@ -402,7 +405,15 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                         None => counter += 1,
                     }
                 }
-                None => thread::yield_now(),
+                None => {
+                    if stop {
+                        self.send_to_global_queue(Message::new(Task::Terminate, terminate_order));
+                        break;
+                    } else {
+                        thread::yield_now();
+                    }
+                    
+                },
             }
         }
     }
@@ -410,6 +421,9 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn rts_producer(&mut self) {
         let mut counter = self.init_counter();
         trace!("InOutNode {} started", self.id);
+
+        let mut stop = false;
+        let mut terminate_order = 0;
 
         loop {
             let input = self.get_message();
@@ -529,8 +543,8 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             }
                         }
                         Task::Terminate => {
-                            self.send_to_global_queue(Message::new(Task::Terminate, order));
-                            break;
+                            stop = true;
+                            terminate_order = order;
                         }
                     }
 
@@ -548,7 +562,15 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                         None => counter += 1,
                     }
                 }
-                None => thread::yield_now(),
+                None => {
+                    if stop {
+                        self.send_to_global_queue(Message::new(Task::Terminate, terminate_order));
+                        break;
+                    } else {
+                        thread::yield_now();
+                    }
+                    
+                },
             }
         }
     }
@@ -738,7 +760,7 @@ impl<
             }
 
             // todo put if here
-            worker.create_local_queue();
+            //worker.create_local_queue();
 
             // Create the channel
             channels.push(worker.create_channel(blocking));
