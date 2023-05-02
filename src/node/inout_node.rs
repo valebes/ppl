@@ -770,7 +770,7 @@ impl<
         }
 
         // If workstealing is enabled (and the node isn't an ordered producer), we need to register the stealers
-        if splitter.is_none() && false {
+        if splitter.is_none() {
             // Register stealers to each worker
             let mut stealers = Vec::new();
             for worker in &worker_nodes {

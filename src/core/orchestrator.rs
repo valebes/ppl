@@ -327,8 +327,11 @@ impl Partition {
     where
         F: FnOnce() + Send + 'static,
     {
+        let mut added_worker = false;
+
         if self.get_free_worker_count() == 0 {
             self.add_worker();
+            added_worker = true;
         }
 
         let job_info = JobInfo::new();
@@ -339,7 +342,14 @@ impl Partition {
             job_info_clone.store(true, Ordering::Release);
         }));
 
-        self.global.push(job);
+        if !added_worker {
+            self.global.push(job);
+        } else {
+            let mut workers = self.workers.write().unwrap();
+            let worker = workers.last_mut().unwrap();
+            worker.push(job);
+        }
+        
 
         job_info
     }
