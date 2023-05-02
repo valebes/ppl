@@ -281,7 +281,9 @@ impl Partition {
     }
 
     /// Add a worker to the partition.
-    fn add_worker(&self) {
+    fn add_worker<F>(&self, f: F) -> JobInfo
+    where F: FnOnce() + Send + 'static
+    {
         let mut workers = self.workers.write().unwrap();
         let worker = WorkerThread::new(
             self.core_id,
@@ -293,8 +295,17 @@ impl Partition {
             worker.register_stealer(other.get_stealer());
             other.register_stealer(worker.get_stealer());
         }
+        let job_info = JobInfo::new();
+        let job_info_clone = Arc::clone(&job_info.status);
 
+        let job = Job::NewJob(Box::new(move || {
+            f();
+            job_info_clone.store(true, Ordering::Release);
+        }));
+        worker.push(job);
         workers.push(worker);
+
+        job_info
     }
 
     /// Get if the worker vec is empty.
@@ -327,11 +338,9 @@ impl Partition {
     where
         F: FnOnce() + Send + 'static,
     {
-        let mut added_worker = false;
 
         if self.get_free_worker_count() == 0 {
-            self.add_worker();
-            added_worker = true;
+            return self.add_worker(f);
         }
 
         let job_info = JobInfo::new();
@@ -342,14 +351,8 @@ impl Partition {
             job_info_clone.store(true, Ordering::Release);
         }));
 
-        if !added_worker {
-            self.global.push(job);
-        } else {
-            let mut workers = self.workers.write().unwrap();
-            let worker = workers.last_mut().unwrap();
-            worker.push(job);
-        }
-        
+
+        self.global.push(job);     
 
         job_info
     }
