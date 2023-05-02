@@ -16,10 +16,10 @@ debug = false
 [dependencies]
 core_affinity = "0.8.0"
 crossbeam-channel = { version = "0.5.8", optional = true }
-crossbeam-deque = "0.8.2"
-dyn-clone = "1.0.10"
+crossbeam-deque = "0.8.3"
+dyn-clone = "1.0.11"
 log = "0.4.17"
-num_cpus = "1.0"
+num_cpus = "1.15.0"
 ff_buffer = { git = "https://github.com/valebes/ff_buffer.git", optional = true }
 kanal = { git = "https://github.com/fereidani/kanal.git", optional = true }
 flume = { version = "0.10.14", optional = true }
@@ -31,7 +31,7 @@ dashmap = "5.4.0"
 env_logger = "0.10.0"
 rand = "*"
 raster = {git = "https://github.com/valebes/raster.git"}
-rayon = "1.6.1"
+rayon = "1.7.0"
 rust-spp = {git = "https://github.com/GMAP/rust-ssp.git"}
 num_cpus = "1.15.0"
 serial_test = "*"
