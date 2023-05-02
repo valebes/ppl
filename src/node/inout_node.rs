@@ -748,7 +748,7 @@ impl<
             let mut worker =
                 WorkerNode::new(i, handler_copies.remove(0), next_node.clone(), replicas);
 
-            // If the node is a producer, we need to set the splitter
+            // If the node is ordered and a producer, we need to set the ordered splitter handler
             if producer && ordered {
                 worker.set_splitter(splitter.clone().unwrap());
             }
@@ -757,7 +757,7 @@ impl<
                 worker.set_feedback(feedback_queue.clone().unwrap());
             }
 
-            // todo put if here
+            // We create a local queue for each worker
             worker.create_local_queue();
 
             // Create the channel
@@ -769,7 +769,8 @@ impl<
             worker_nodes.push(worker);
         }
 
-        if splitter.is_none() {
+        // If workstealing is enabled (and the node isn't an ordered producer), we need to register the stealers
+        if splitter.is_none() && false {
             // Register stealers to each worker
             let mut stealers = Vec::new();
             for worker in &worker_nodes {

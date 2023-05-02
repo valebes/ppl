@@ -141,12 +141,11 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
     pub fn new(
         id: usize,
         handler: Box<dyn In<TIn, TCollected> + Send + Sync>,
-        blocking: bool,
         orchestrator: Arc<Orchestrator>,
     ) -> InNode<TIn, TCollected> {
         trace!("Created a new Sink! Id: {}", id);
 
-        let (channel_in, channel_out) = Channel::channel(blocking);
+        let (channel_in, channel_out) = Channel::channel(orchestrator.get_configuration().get_blocking_channel());
         let result = Arc::new(Mutex::new(None));
         let ordered = handler.is_ordered();
 
