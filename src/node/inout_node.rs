@@ -394,6 +394,8 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                         Some(feedback) => {
                             if round_robin {
                                 counter += 1;
+                            } else {
+                                counter = latest;
                             }
                             feedback.push(self.id);
                         }
@@ -538,6 +540,8 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                         Some(feedback) => {
                             if round_robin {
                                 counter += 1;
+                            } else {
+                                counter = latest;
                             }
                             feedback.push(self.id);
                         }
