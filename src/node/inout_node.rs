@@ -412,8 +412,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                     } else {
                         thread::yield_now();
                     }
-                    
-                },
+                }
             }
         }
     }
@@ -569,8 +568,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                     } else {
                         thread::yield_now();
                     }
-                    
-                },
+                }
             }
         }
     }
@@ -760,7 +758,7 @@ impl<
             }
 
             // todo put if here
-            //worker.create_local_queue();
+            worker.create_local_queue();
 
             // Create the channel
             channels.push(worker.create_channel(blocking));
@@ -772,28 +770,27 @@ impl<
         }
 
         if splitter.is_none() {
-        // Register stealers to each worker
-        let mut stealers = Vec::with_capacity(replicas);
-        for worker in &worker_nodes {
-            match worker.get_stealer() {
-                Some(stealer) => stealers.push(stealer),
-                None => (),
+            // Register stealers to each worker
+            let mut stealers = Vec::new();
+            for worker in &worker_nodes {
+                match worker.get_stealer() {
+                    Some(stealer) => stealers.push(stealer),
+                    None => (),
+                }
+            }
+
+            for worker in &mut worker_nodes {
+                for stealer in &stealers {
+                    worker.register_stealer(stealer.clone());
+                }
             }
         }
-
-        for worker in &mut worker_nodes {
-            for stealer in &stealers {
-                worker.register_stealer(stealer.clone());
-            }
-        }
-        }
-
 
         let barrier = Arc::new(Barrier::new(replicas));
 
         for i in 0..replicas {
             let mut worker = worker_nodes.remove(0);
-            
+
             let local_barrier = barrier.clone();
             let func = move || {
                 local_barrier.wait();
