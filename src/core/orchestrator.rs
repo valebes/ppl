@@ -359,9 +359,9 @@ impl Partition {
         F: FnOnce() + Send + 'static,
     {
 
-        //if self.get_free_worker_count() == 0 {
+        if self.get_free_worker_count() == 0 {
             return self.add_worker(f);
-        //}
+        }
 
         let job_info = JobInfo::new();
         let job_info_clone = Arc::clone(&job_info.status);
@@ -380,7 +380,7 @@ impl Partition {
 
 impl Drop for Partition {
     fn drop(&mut self) {
-        trace!(
+        error!(
             "Dropping partition on core {}, total worker: {}.",
             self.core_id,
             self.get_worker_count()
@@ -556,7 +556,7 @@ impl Orchestrator {
     where
         F: FnOnce() + Send + 'static,
     {
-        let mut job_info = Vec::new();
+        let mut job_info = Vec::with_capacity(f.len());
 
         let partitions = self.find_partition_sequence(f.len());
 
