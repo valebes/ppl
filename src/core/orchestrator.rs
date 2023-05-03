@@ -386,11 +386,16 @@ impl Drop for Partition {
             self.get_worker_count()
         );
         let mut worker = self.workers.write().unwrap();
+        // Empty the stealer of the workers.
         for worker in worker.iter_mut() {
             worker.empty_stealers();
         }
+        // Push a terminate job to all the workers.
         for worker in worker.iter_mut() {
             worker.push(Job::Terminate);
+        }
+        // Join all the workers.
+        for worker in worker.iter_mut() {
             worker.join();
         }
     }
