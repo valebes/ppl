@@ -359,9 +359,9 @@ impl Partition {
         F: FnOnce() + Send + 'static,
     {
 
-        if self.get_free_worker_count() == 0 {
+        //if self.get_free_worker_count() == 0 {
             return self.add_worker(f);
-        }
+        //}
 
         let job_info = JobInfo::new();
         let job_info_clone = Arc::clone(&job_info.status);
