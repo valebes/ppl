@@ -339,9 +339,9 @@ impl Partition {
         F: FnOnce() + Send + 'static,
     {
 
-        //if self.get_free_worker_count() == 0 {
+        if self.get_free_worker_count() == 0 {
             return self.add_worker(f);
-        //}
+        }
 
         let job_info = JobInfo::new();
         let job_info_clone = Arc::clone(&job_info.status);
@@ -454,6 +454,11 @@ impl Orchestrator {
     /// If there are more than one partition with the same number of workers, the first one is returned.
     /// If there are no workers in any partition, the first partition is returned.
     fn find_partition(&self) -> Option<&Partition> {
+        if self.partitions.is_empty() {
+            return None;
+        } else if self.partitions.len() == 1 {
+            return Some(self.partitions.first().unwrap());
+        }
         let mut min = self.partitions.first();
         let mut min_busy = min.unwrap().get_busy_worker_count();
         for partition in self.partitions.iter() {
