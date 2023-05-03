@@ -91,6 +91,12 @@ impl WorkerThread {
     fn register_stealer(&self, stealer: Stealer<Job>) {
         self.worker_info.register_stealer(stealer);
     }
+
+    // Empty the stealers list.
+    fn empty_stealers(&self) {
+        self.worker_info.empty_stealers();
+    }
+
 }
 
 /// Information about a worker thread.
@@ -128,6 +134,11 @@ impl WorkerInfo {
     /// Register a stealer to the thread.
     fn register_stealer(&self, stealer: Stealer<Job>) {
         self.stealers.write().unwrap().push(stealer);
+    }
+
+    // Empty the stealer list.
+    fn empty_stealers(&self) {
+        self.stealers.write().unwrap().clear();
     }
 
     /// This is the main loop of the thread.
@@ -170,7 +181,7 @@ impl WorkerInfo {
             } else {
                 if stop {
                     self.busy.store(true, Ordering::Release);
-                    self.global.push(Job::Terminate);
+                    //self.global.push(Job::Terminate);
                     break;
                 }
                 thread::yield_now();
@@ -365,9 +376,12 @@ impl Drop for Partition {
             self.core_id,
             self.get_worker_count()
         );
-        self.global.push(Job::Terminate);
         let mut worker = self.workers.write().unwrap();
         for worker in worker.iter_mut() {
+            worker.empty_stealers();
+        }
+        for worker in worker.iter_mut() {
+            worker.push(Job::Terminate);
             worker.join();
         }
     }
@@ -436,9 +450,9 @@ impl Orchestrator {
     fn new(configuration: Arc<Configuration>) -> Orchestrator {
         let mut partitions = Vec::new();
         let mut max_cores = 1;
-        //if configuration.get_pinning() {
+        if configuration.get_pinning() {
             max_cores = configuration.get_max_cores();
-        //}
+        }
 
         for i in 0..max_cores {
             partitions.push(Partition::new(i, Arc::clone(&configuration)));
