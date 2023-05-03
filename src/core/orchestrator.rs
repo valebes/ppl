@@ -292,6 +292,9 @@ impl Partition {
     }
 
     /// Add a worker to the partition.
+    /// The worker will be created and will execute the given closure.
+    /// After the closure is executed, the worker will fetch other jobs from
+    /// the global queue, local queue and other workers.
     fn add_worker<F>(&self, f: F) -> JobInfo
     where F: FnOnce() + Send + 'static
     {
@@ -302,18 +305,24 @@ impl Partition {
             self.global.clone(),
         );
 
-        for other in workers.iter() {
-            worker.register_stealer(other.get_stealer());
-            other.register_stealer(worker.get_stealer());
-        }
+        // Create a job info to track the job status.
         let job_info = JobInfo::new();
         let job_info_clone = Arc::clone(&job_info.status);
-
+        // Create the job and push it to the worker.
         let job = Job::NewJob(Box::new(move || {
             f();
             job_info_clone.store(true, Ordering::Release);
         }));
         worker.push(job);
+
+        // Register the stealer of the new worker to the other workers and
+        // register the stealer of the other workers to the new worker.
+        for other in workers.iter() {
+            worker.register_stealer(other.get_stealer());
+            other.register_stealer(worker.get_stealer());
+        }
+
+        // Push the new worker to the partition.
         workers.push(worker);
 
         job_info
