@@ -359,9 +359,9 @@ impl Partition {
         F: FnOnce() + Send + 'static,
     {
 
-        if self.get_free_worker_count() == 0 {
+        //if self.get_free_worker_count() == 0 {
             return self.add_worker(f);
-        }
+        //}
 
         let job_info = JobInfo::new();
         let job_info_clone = Arc::clone(&job_info.status);
@@ -385,8 +385,10 @@ impl Drop for Partition {
             self.core_id,
             self.get_worker_count()
         );
+
         let mut worker = self.workers.write().unwrap();
-        // Empty the stealer of the workers.
+
+        // Empty the stealers of the workers.
         for worker in worker.iter_mut() {
             worker.empty_stealers();
         }
