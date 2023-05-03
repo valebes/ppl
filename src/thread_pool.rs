@@ -90,7 +90,7 @@ impl ThreadPool {
                 // We wait that all threads start
                 //println!("HELLO from thread {}", i);
 
-                //local_barrier.wait();
+                local_barrier.wait();
                 loop {
                     let res = Self::find_task(&local_worker, &local_injector, &local_stealers);
                     match res {

@@ -359,9 +359,9 @@ impl Partition {
         F: FnOnce() + Send + 'static,
     {
 
-        //if self.get_free_worker_count() == 0 {
+        if self.get_free_worker_count() == 0 {
             return self.add_worker(f);
-        //}
+        }
 
         let job_info = JobInfo::new();
         let job_info_clone = Arc::clone(&job_info.status);
@@ -465,10 +465,7 @@ impl Orchestrator {
     // Create a new orchestrator.
     fn new(configuration: Arc<Configuration>) -> Orchestrator {
         let mut partitions = Vec::new();
-        let mut max_cores = 1;
-        if configuration.get_pinning() {
-            max_cores = configuration.get_max_cores();
-        }
+        let max_cores = configuration.get_max_cores(); // Change because this in reality determines the number of partitions.
 
         for i in 0..max_cores {
             partitions.push(Partition::new(i, Arc::clone(&configuration)));
@@ -508,7 +505,7 @@ impl Orchestrator {
     /// If there are more than one partition with the same number of workers, the first sequence found is returned.
     /// If there are no workers in any partition, the first sequence of 'count' partitions is returned.
     fn find_partition_sequence(&self, count: usize) -> Option<Vec<&Partition>> {
-        if count > self.partitions.len() {
+        if count > self.partitions.len() || !self.configuration.get_pinning() {
             return None;
         }
 

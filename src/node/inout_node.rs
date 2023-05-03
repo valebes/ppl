@@ -794,7 +794,7 @@ impl<
 
             let local_barrier = barrier.clone();
             let func = move || {
-                //local_barrier.wait();
+                local_barrier.wait();
                 worker.rts();
             };
 
