@@ -216,7 +216,8 @@ impl Thread {
 pub struct Partition {
     core_id: usize,
     workers: RwLock<Vec<WorkerThread>>,
-    available_workers: Arc<AtomicUsize>,
+    total_workers: Arc<AtomicUsize>, // total number of workers in the partition
+    available_workers: Arc<AtomicUsize>, // number of available workers in the partition
     global: Arc<Injector<Job>>,
     configuration: Arc<Configuration>,
 }
@@ -230,6 +231,7 @@ impl Partition {
         Partition {
             core_id,
             workers: RwLock::new(workers),
+            total_workers: Arc::new(AtomicUsize::new(0)),
             available_workers: Arc::new(AtomicUsize::new(0)),
             global,
             configuration,
@@ -264,12 +266,15 @@ impl Partition {
         // Push the new worker to the partition.
         workers.push(worker);
 
+        // Update the number of workers in the partition.
+        self.total_workers.fetch_add(1, Ordering::Release);
+
         job_info
     }
 
     /// Get the number of workers in the partition.
     fn get_worker_count(&self) -> usize {
-        self.workers.read().unwrap().len()
+        self.total_workers.load(Ordering::Acquire)
     }
 
     /// Get the number of busy workers (in this instant) in the partition.
