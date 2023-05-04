@@ -239,7 +239,7 @@ impl Partition {
     /// Add a worker to the partition.
     /// The worker will be created and will execute the given closure.
     /// After the closure is executed, the worker will fetch other jobs from
-    /// the global queue, local queue and other workers.
+    /// the global queue or the global queue.
     fn add_worker<F>(&self, f: F) -> JobInfo
     where F: FnOnce() + Send + 'static
     {
