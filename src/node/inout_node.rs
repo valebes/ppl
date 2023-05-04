@@ -105,7 +105,7 @@ struct WorkerNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     feedback: Option<Arc<Injector<usize>>>,
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     global_queue: Option<Arc<Injector<Message<TIn>>>>,
-    local_queue: Option<Mutex<Worker<Message<TIn>>>>,
+    local_queue: Worker<Message<TIn>>,
     stealers: Option<RwLock<Vec<Stealer<Message<TIn>>>>>,
     num_replicas: usize,
     phantom: PhantomData<(TOut, TCollected)>,
@@ -131,7 +131,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             feedback: None,
             splitter: None,
             global_queue: None,
-            local_queue: None,
+            local_queue: Worker::new_fifo(),
             stealers: None,
             num_replicas,
             phantom: PhantomData,
@@ -168,14 +168,12 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
     // Get a new message from the local queue or steal a message from the other workers.
     fn get_message_from_local_queue(&mut self) -> Option<Message<TIn>> {
-        match &mut self.local_queue {
-            Some(local_queue) => match local_queue.lock().unwrap().pop() {
+            match self.local_queue.pop() {
                 Some(message) => Some(message),
                 None => None,
-            },
-            None => None,
+            }
         }
-    }
+    
 
     // Get a new message from the global queue.
     fn get_message_from_global_queue(&mut self) -> Option<Message<TIn>> {
@@ -205,19 +203,13 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         match &mut self.channel_rx {
             Some(channel_rx) => match channel_rx.receive() {
                 Ok(Some(message)) => {
-                    match &mut self.local_queue {
-                        Some(local_queue) => {
-                            let local_queue = local_queue.lock().unwrap();
-                            channel_rx
-                                .receive_all()
-                                .unwrap()
-                                .into_iter()
-                                .for_each(|message| {
-                                    local_queue.push(message);
-                                });
-                        }
-                        None => (),
-                    }
+                    channel_rx
+                        .receive_all()
+                        .unwrap()
+                        .into_iter()
+                        .for_each(|message| {
+                            self.local_queue.push(message);
+                        });
                     return Some(message);
                 }
                 Ok(None) => return None,
@@ -249,21 +241,16 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         }
     }
 
-    fn get_stealer(&self) -> Option<Stealer<Message<TIn>>> {
-        match &self.local_queue {
-            Some(local_queue) => Some(local_queue.lock().unwrap().stealer()),
-            None => None,
-        }
+    fn get_stealer(&self) -> Stealer<Message<TIn>> {
+        self.local_queue.stealer()
     }
 
-    fn register_stealer(&mut self, stealer: Stealer<Message<TIn>>) {
+    fn register_stealers(&mut self, stealers: Vec<Stealer<Message<TIn>>>) {
         match &mut self.stealers {
-            Some(stealers) => {
-                stealers.write().unwrap().push(stealer);
+            Some(my_stealers) => {
+                my_stealers.write().unwrap().extend(stealers);
             }
             None => {
-                let mut stealers = Vec::new();
-                stealers.push(stealer);
                 self.stealers = Some(RwLock::new(stealers));
             }
         }
@@ -274,10 +261,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         self.global_queue = Some(global_queue);
     }
 
-    // Create a local queue for the worker.
-    fn create_local_queue(&mut self) {
-        self.local_queue = Some(Mutex::new(Worker::new_fifo()));
-    }
     // Create a new channel for the input.
     // Return the sender of the channel.
     fn create_channel(&mut self, blocking: bool) -> OutputChannel<Message<TIn>> {
@@ -409,8 +392,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                     if stop {
                         self.send_to_global_queue(Message::new(Task::Terminate, terminate_order));
                         break;
-                    } else {
-                        thread::yield_now();
                     }
                 }
             }
@@ -757,9 +738,6 @@ impl<
                 worker.set_feedback(feedback_queue.clone().unwrap());
             }
 
-            // We create a local queue for each worker
-            worker.create_local_queue();
-
             // Create the channel
             channels.push(worker.create_channel(blocking));
 
@@ -774,18 +752,11 @@ impl<
             // Register stealers to each worker
             let mut stealers = Vec::new();
             for worker in &worker_nodes {
-                match worker.get_stealer() {
-                    Some(stealer) => stealers.push(stealer),
-                    None => (),
-                }
+                stealers.push(worker.get_stealer());
             }
 
             for worker in &mut worker_nodes {
-                for i in 0..stealers.len() {
-                    if i != worker.get_id() {
-                        worker.register_stealer(stealers[i].clone());
-                    }
-                }
+                worker.register_stealers(stealers.clone());
             }
         }
 
