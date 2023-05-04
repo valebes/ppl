@@ -479,10 +479,8 @@ impl Orchestrator {
     // Create a new orchestrator.
     fn new(configuration: Arc<Configuration>) -> Orchestrator {
         let mut partitions = Vec::new();
-        let mut max_cores = 1;
-        if configuration.get_pinning() {
-            max_cores = configuration.get_max_cores();
-        }
+        let mut max_cores = configuration.get_max_cores();
+     
         for i in 0..max_cores {
             partitions.push(Partition::new(i, Arc::clone(&configuration)));
         }
