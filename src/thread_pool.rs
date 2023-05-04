@@ -48,16 +48,15 @@ impl Error for ThreadPoolError {
 struct ThreadPoolWorker {
     id: usize,
     worker: Worker<Job>,
-    stealers: RwLock<Vec<Stealer<Job>>>,
+    stealers: Vec<Stealer<Job>>,
     global: Arc<Injector<Job>>,
     total_tasks: Arc<AtomicUsize>,
 }
 impl ThreadPoolWorker {
-    fn new(id: usize, global: Arc<Injector<Job>>, total_tasks: Arc<AtomicUsize>) -> Self {
-        let stealers = RwLock::new(Vec::new());
+    fn new(id: usize, worker: Worker<Job>, stealers: Vec<Stealer<Job>>, global: Arc<Injector<Job>>, total_tasks: Arc<AtomicUsize>) -> Self {
         Self {
             id,
-            worker: Worker::new_fifo(),
+            worker,
             stealers,
             global,
             total_tasks,
@@ -79,33 +78,11 @@ impl ThreadPoolWorker {
         None
     }
 
-    fn find_task(&self) -> Option<Job> {
-        let mut stealers = self.stealers.read().unwrap();
-        let local = &self.worker;
-        let global = &self.global;
-
-        // Pop a task from the local queue, if not empty.
-        local.pop().or_else(|| {
-            // Otherwise, we need to look for a task elsewhere.
-            iter::repeat_with(|| {
-                // Try stealing a batch of tasks from the global queue.
-                global
-                    .steal_batch_and_pop(local)
-                    // Or try stealing a task from one of the other threads.
-                    .or_else(|| stealers.iter().map(|s| s.steal()).collect())
-            })
-            // Loop while no task was stolen and any steal operation needs to be retried.
-            .find(|s| !s.is_retry())
-            // Extract the stolen task, if there is one.
-            .and_then(|s| s.success())
-        })
-    }
-
     /// This is the main loop of the thread.
     fn run(&self) {
         let mut stop = false;
         loop {
-            let res = self.find_task();
+            let res = self.fetch_task();
             match res {
                 Some(task) => match task {
                     Job::NewJob(func) => {
@@ -135,8 +112,7 @@ impl ThreadPoolWorker {
 
     // Steal a job from another worker.
     fn steal(&self) -> Option<Job> {
-        let stealers = self.stealers.read().unwrap();
-        for stealer in stealers.iter() {
+        for stealer in self.stealers.iter() {
             loop {
                 match stealer.steal() {
                     Steal::Success(job) => return Some(job),
@@ -157,23 +133,6 @@ impl ThreadPoolWorker {
                 Steal::Retry => continue,
             };
         }
-    }
-
-    // Add a stealer to the list of stealers.
-    fn add_stealer(&self, stealer: Stealer<Job>) {
-        let mut stealers = self.stealers.write().unwrap();
-        stealers.push(stealer);
-    }
-
-    // Clean the list of stealers.
-    fn clean_stealers(&self) {
-        let mut stealers = self.stealers.write().unwrap();
-        stealers.clear();
-    }
-
-    // Get the stealer of the local queue.
-    fn stealer(&self) -> Stealer<Job> {
-        self.worker.stealer()
     }
 
     // Warn task done.
@@ -205,30 +164,30 @@ impl ThreadPool {
         let jobs_info;
         let mut workers = Vec::with_capacity(num_threads);
 
+        let mut queue: Vec<Worker<Job>> = Vec::with_capacity(num_threads);
+        let mut stealers = Vec::with_capacity(num_threads);
+
         let total_tasks = Arc::new(AtomicUsize::new(0));
         let barrier = Arc::new(Barrier::new(num_threads));
         let mut funcs = Vec::with_capacity(num_threads);
 
         let injector = Arc::new(Injector::new());
 
+
+
+        for _ in 0..num_threads {
+            queue.push(Worker::new_fifo());
+        }
+        for w in &queue {
+            stealers.push(w.stealer());
+        }
+
+
         for i in 0..num_threads {
             let global = Arc::clone(&injector);
             let total_tasks_cp = Arc::clone(&total_tasks);
-            let worker = ThreadPoolWorker::new(i, global, total_tasks_cp);
+            let worker = ThreadPoolWorker::new(i, queue.remove(0), stealers.clone(), global, total_tasks_cp);
             workers.push(worker);
-        }
-
-        let mut tmp = Vec::with_capacity(num_threads);
-        for i in 0..num_threads {
-            tmp.push(workers[i].stealer());
-        }
-
-        for worker in &workers {
-            for other in &workers {
-                if worker.id != other.id {
-                    other.add_stealer(tmp.get(other.id).unwrap().clone());
-                }
-            }
         }
 
         while workers.len() > 0 {
