@@ -90,7 +90,7 @@ impl ThreadPool {
                 // We wait that all threads start
                 //println!("HELLO from thread {}", i);
 
-                //local_barrier.wait();
+                local_barrier.wait();
                 loop {
                     let res = Self::find_task(&local_worker, &local_injector, &local_stealers);
                     match res {
@@ -356,7 +356,7 @@ mod tests {
     fn test_par_map() {
         env_logger::init();
         let mut vec = Vec::new();
-        let mut tp = ThreadPool::new_with_global_registry(8);
+        let mut tp = ThreadPool::new_with_global_registry(16);
 
         for i in 0..1000 {
             vec.push(i);

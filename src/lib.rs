@@ -4,7 +4,6 @@
 //#![warn(missing_docs)]
 #![feature(unsized_fn_params)]
 #![feature(box_into_inner)]
-#![feature(once_cell)]
 
 pub mod channel;
 //pub mod map;

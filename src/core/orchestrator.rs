@@ -2,7 +2,7 @@ use std::{
     cell::OnceCell,
     hint,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, Ordering, AtomicUsize},
         Arc, Mutex, RwLock,
     },
     thread::{self},
@@ -51,8 +51,8 @@ impl WorkerThread {
     /// Create a new worker thread.
     /// It will start executing jobs immediately.
     /// It will terminate when it receives a terminate message.
-    fn new(core_id: usize, config: Arc<Configuration>, global: Arc<Injector<Job>>) -> WorkerThread {
-        let worker = Arc::new(WorkerInfo::new(core_id, global));
+    fn new(core_id: usize, config: Arc<Configuration>, available_workers: Arc<AtomicUsize>, global: Arc<Injector<Job>>) -> WorkerThread {
+        let worker = Arc::new(WorkerInfo::new(core_id, available_workers, global));
         let worker_copy = Arc::clone(&worker);
         let thread = Thread::new(
             worker_copy.core_id,
@@ -104,17 +104,19 @@ impl WorkerThread {
 struct WorkerInfo {
     core_id: usize,
     busy: AtomicBool,
+    available_workers: Arc<AtomicUsize>,
     global: Arc<Injector<Job>>,
     worker: Mutex<Worker<Job>>,
     stealers: RwLock<Vec<Stealer<Job>>>,
 }
 impl WorkerInfo {
     /// Create a new worker info.
-    fn new(core_id: usize, global: Arc<Injector<Job>>) -> WorkerInfo {
+    fn new(core_id: usize, available_workers: Arc<AtomicUsize>, global: Arc<Injector<Job>>) -> WorkerInfo {
         let worker = Worker::new_fifo();
         WorkerInfo {
             core_id,
             busy: AtomicBool::new(true),
+            available_workers,
             global,
             worker: Mutex::new(worker),
             stealers: RwLock::new(Vec::new()),
@@ -141,6 +143,16 @@ impl WorkerInfo {
         self.stealers.write().unwrap().clear();
     }
 
+    // Warn that the thread is available.
+    fn warn_available(&self) {
+        self.available_workers.fetch_add(1, Ordering::Release);
+    }
+
+    // Warn that the thread is busy.
+    fn warn_busy(&self) {
+        self.available_workers.fetch_sub(1, Ordering::Release);
+    }
+
     /// This is the main loop of the thread.
     fn run(&self) {
         let mut stop = false;
@@ -148,9 +160,9 @@ impl WorkerInfo {
             if let Some(job) = self.pop() {
                 match job {
                     Job::NewJob(f) => {
-                        self.busy.store(true, Ordering::Release);
+                        self.warn_busy();
                         f();
-                        self.busy.store(false, Ordering::Release);
+                        self.warn_available();
                     }
                     Job::Terminate => {
                         stop = true;
@@ -159,9 +171,9 @@ impl WorkerInfo {
             } else if let Some(job) = self.steal() {
                 match job {
                     Job::NewJob(f) => {
-                        self.busy.store(true, Ordering::Release);
+                        self.warn_busy();
                         f();
-                        self.busy.store(false, Ordering::Release);
+                        self.warn_available();
                     }
                     Job::Terminate => {
                         stop = true;
@@ -170,9 +182,9 @@ impl WorkerInfo {
             } else if let Some(job) = self.steal_from_global() {
                 match job {
                     Job::NewJob(f) => {
-                        self.busy.store(true, Ordering::Release);
+                        self.warn_busy();
                         f();
-                        self.busy.store(false, Ordering::Release);
+                        self.warn_available();
                     }
                     Job::Terminate => {
                         stop = true;
@@ -180,7 +192,7 @@ impl WorkerInfo {
                 }
             } else {
                 if stop {
-                    self.busy.store(true, Ordering::Release);
+                    self.warn_busy();
                     //self.global.push(Job::Terminate);
                     break;
                 }
@@ -273,6 +285,7 @@ impl Thread {
 pub struct Partition {
     core_id: usize,
     workers: RwLock<Vec<WorkerThread>>,
+    available_workers: Arc<AtomicUsize>,
     global: Arc<Injector<Job>>,
     configuration: Arc<Configuration>,
 }
@@ -286,6 +299,7 @@ impl Partition {
         Partition {
             core_id,
             workers: RwLock::new(workers),
+            available_workers: Arc::new(AtomicUsize::new(0)),
             global,
             configuration,
         }
@@ -302,6 +316,7 @@ impl Partition {
         let worker = WorkerThread::new(
             self.core_id,
             self.configuration.clone(),
+            Arc::clone(&self.available_workers),
             self.global.clone(),
         );
 
@@ -465,8 +480,10 @@ impl Orchestrator {
     // Create a new orchestrator.
     fn new(configuration: Arc<Configuration>) -> Orchestrator {
         let mut partitions = Vec::new();
-        let max_cores = configuration.get_max_cores(); // Change because this in reality determines the number of partitions.
-
+        let mut max_cores = 1;
+        if configuration.get_pinning() {
+            max_cores = configuration.get_max_cores();
+        }
         for i in 0..max_cores {
             partitions.push(Partition::new(i, Arc::clone(&configuration)));
         }
