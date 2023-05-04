@@ -781,8 +781,10 @@ impl<
             }
 
             for worker in &mut worker_nodes {
-                for stealer in &stealers {
-                    worker.register_stealer(stealer.clone());
+                for i in 0..stealers.len() {
+                    if i != worker.get_id() {
+                        worker.register_stealer(stealers[i].clone());
+                    }
                 }
             }
         }

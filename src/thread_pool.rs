@@ -102,6 +102,7 @@ impl ThreadPoolWorker {
                 }
             }
         }
+
     }
 
     // Push a job to the local queue.
@@ -192,7 +193,7 @@ impl ThreadPool {
 
         let total_tasks = Arc::new(AtomicUsize::new(0));
         let barrier = Arc::new(Barrier::new(num_threads));
-        let mut funcs = Vec::new();
+        let mut funcs = Vec::with_capacity(num_threads);
 
         let injector = Arc::new(Injector::new());
 
@@ -203,17 +204,16 @@ impl ThreadPool {
             workers.push(Arc::new(worker));
         }
 
+        let mut tmp = Vec::with_capacity(num_threads);
+        for i in 0..num_threads {
+            tmp.push(workers[i].stealer());
+        }
+
         for worker in &workers {
-            let mut tmp = Vec::new();
-            let stealer = worker.stealer();
             for other in &workers {
                 if worker.id != other.id {
-                    other.add_stealer(stealer.clone());
-                    tmp.push(other.stealer());
+                    other.add_stealer(tmp.get(other.id).unwrap().clone());
                 }
-            }
-            for stealer in tmp {
-                worker.add_stealer(stealer);
             }
         }
 
