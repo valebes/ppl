@@ -140,6 +140,7 @@ impl WorkerInfo {
             } else {
                 if stop {
                     self.warn_busy();
+                    self.global.push(Job::Terminate);
                     break;
                 }
                 thread::yield_now();
@@ -324,10 +325,9 @@ impl Drop for Partition {
 
         let mut worker = self.workers.write().unwrap();
 
-        // Push a terminate job to all the workers.
-        for worker in worker.iter_mut() {
-            worker.push(Job::Terminate);
-        }
+        // Push a terminate job in the global queue.
+        self.global.push(Job::Terminate);
+
         // Join all the workers.
         for worker in worker.iter_mut() {
             worker.join();
@@ -440,7 +440,7 @@ impl Orchestrator {
     /// If there are more than one partition with the same number of workers, the first sequence found is returned.
     /// If there are no workers in any partition, the first sequence of 'count' partitions is returned.
     fn find_partition_sequence(&self, count: usize) -> Option<Vec<&Partition>> {
-        if count > self.partitions.len() || !self.configuration.get_pinning() {
+        if count > self.partitions.len() {
             return None;
         }
 
