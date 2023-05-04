@@ -106,7 +106,7 @@ struct WorkerNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     global_queue: Option<Arc<Injector<Message<TIn>>>>,
     local_queue: Worker<Message<TIn>>,
-    stealers: Option<RwLock<Vec<Stealer<Message<TIn>>>>>,
+    stealers: Option<Vec<Stealer<Message<TIn>>>>,
     num_replicas: usize,
     phantom: PhantomData<(TOut, TCollected)>,
 }
@@ -147,7 +147,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn get_message_from_others(&mut self) -> Option<Message<TIn>> {
         match &mut self.stealers {
             Some(stealers) => loop {
-                for stealer in stealers.read().unwrap().iter() {
+                for stealer in stealers.iter() {
                     match stealer.steal() {
                         Steal::Success(message) => {
                             return Some(message);
@@ -248,10 +248,10 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn register_stealers(&mut self, stealers: Vec<Stealer<Message<TIn>>>) {
         match &mut self.stealers {
             Some(my_stealers) => {
-                my_stealers.write().unwrap().extend(stealers);
+                my_stealers.extend(stealers);
             }
             None => {
-                self.stealers = Some(RwLock::new(stealers));
+                self.stealers = Some(stealers);
             }
         }
     }
