@@ -120,6 +120,7 @@ impl WorkerInfo {
     }
 
     /// This is the main loop of the thread.
+    /// Need refactoring.
     fn run(&self) {
         let mut stop = false;
         loop {
@@ -332,10 +333,8 @@ impl Drop for Partition {
         );
 
         // Terminate all the workers.
-        for _ in 0..self.get_worker_count() {
-            self.global.push(Job::Terminate);
-        }
-
+        self.global.push(Job::Terminate);
+        
         let mut worker = self.workers.write().unwrap();
 
         // Join all the workers.
