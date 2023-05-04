@@ -8,7 +8,7 @@ use std::{
     thread::{self},
 };
 
-use crossbeam_deque::{Injector, Steal, Stealer, Worker};
+use crossbeam_deque::{Injector, Steal, Worker};
 use log::{error, trace};
 
 use super::configuration::Configuration;
@@ -72,29 +72,9 @@ impl WorkerThread {
         self.thread.join();
     }
 
-    /// Check if the thread is busy.
-    fn is_busy(&self) -> bool {
-        self.worker_info.is_busy()
-    }
-
     /// Push a job to the thread.
     fn push(&self, job: Job) {
         self.worker_info.push(job);
-    }
-
-    /// Get the stealer of the thread.
-    fn get_stealer(&self) -> Stealer<Job> {
-        self.worker_info.get_stealer()
-    }
-
-    /// Register a stealer to the thread.
-    fn register_stealer(&self, stealer: Stealer<Job>) {
-        self.worker_info.register_stealer(stealer);
-    }
-
-    // Empty the stealers list.
-    fn empty_stealers(&self) {
-        self.worker_info.empty_stealers();
     }
 
 }
@@ -103,11 +83,9 @@ impl WorkerThread {
 /// This is used to keep track of the state of the thread.
 struct WorkerInfo {
     core_id: usize,
-    busy: AtomicBool,
     available_workers: Arc<AtomicUsize>,
     global: Arc<Injector<Job>>,
     worker: Mutex<Worker<Job>>,
-    stealers: RwLock<Vec<Stealer<Job>>>,
 }
 impl WorkerInfo {
     /// Create a new worker info.
@@ -115,32 +93,10 @@ impl WorkerInfo {
         let worker = Worker::new_fifo();
         WorkerInfo {
             core_id,
-            busy: AtomicBool::new(true),
             available_workers,
             global,
             worker: Mutex::new(worker),
-            stealers: RwLock::new(Vec::new()),
         }
-    }
-
-    /// Check if the thread is busy.
-    fn is_busy(&self) -> bool {
-        self.busy.load(Ordering::Acquire)
-    }
-
-    /// Get the stealer of the thread.
-    fn get_stealer(&self) -> Stealer<Job> {
-        self.worker.lock().unwrap().stealer()
-    }
-
-    /// Register a stealer to the thread.
-    fn register_stealer(&self, stealer: Stealer<Job>) {
-        self.stealers.write().unwrap().push(stealer);
-    }
-
-    // Empty the stealer list.
-    fn empty_stealers(&self) {
-        self.stealers.write().unwrap().clear();
     }
 
     // Warn that the thread is available.
@@ -170,17 +126,6 @@ impl WorkerInfo {
                         stop = true;
                     }
                 }
-            } else if let Some(job) = self.steal() {
-                match job {
-                    Job::NewJob(f) => {
-                        self.warn_busy();
-                        f();
-                        self.warn_available();
-                    }
-                    Job::Terminate => {
-                        stop = true;
-                    }
-                }
             } else if let Some(job) = self.steal_from_global() {
                 match job {
                     Job::NewJob(f) => {
@@ -195,7 +140,6 @@ impl WorkerInfo {
             } else {
                 if stop {
                     self.warn_busy();
-                    //self.global.push(Job::Terminate);
                     break;
                 }
                 thread::yield_now();
@@ -211,21 +155,6 @@ impl WorkerInfo {
     /// Push a job to the thread queue.
     fn push(&self, job: Job) {
         self.worker.lock().unwrap().push(job);
-    }
-
-    /// Steal a job from another thread.
-    fn steal(&self) -> Option<Job> {
-        let stealers = self.stealers.read().unwrap();
-        for stealer in stealers.iter() {
-            loop {
-                match stealer.steal() {
-                    Steal::Success(job) => return Some(job),
-                    Steal::Empty => break,
-                    Steal::Retry => continue,
-                }
-            }
-        }
-        None
     }
 
     /// Steal a job from the global queue.
@@ -332,22 +261,10 @@ impl Partition {
         }));
         worker.push(job);
 
-        // Register the stealer of the new worker to the other workers and
-        // register the stealer of the other workers to the new worker.
-        for other in workers.iter() {
-            //worker.register_stealer(other.get_stealer());
-            //other.register_stealer(worker.get_stealer());
-        }
-
         // Push the new worker to the partition.
         workers.push(worker);
 
         job_info
-    }
-
-    /// Get if the worker vec is empty.
-    fn is_empty(&self) -> bool {
-        self.workers.read().unwrap().is_empty()
     }
 
     /// Get the number of workers in the partition.
@@ -402,10 +319,6 @@ impl Drop for Partition {
 
         let mut worker = self.workers.write().unwrap();
 
-        // Empty the stealers of the workers.
-        for worker in worker.iter_mut() {
-            worker.empty_stealers();
-        }
         // Push a terminate job to all the workers.
         for worker in worker.iter_mut() {
             worker.push(Job::Terminate);
@@ -479,7 +392,7 @@ impl Orchestrator {
     // Create a new orchestrator.
     fn new(configuration: Arc<Configuration>) -> Orchestrator {
         let mut partitions = Vec::new();
-        let mut max_cores = configuration.get_max_cores();
+        let max_cores = configuration.get_max_cores(); // Todo: change this in case of no pinning
      
         for i in 0..max_cores {
             partitions.push(Partition::new(i, Arc::clone(&configuration)));

@@ -1,10 +1,10 @@
-use crossbeam_deque::{Injector, Stealer, Worker};
+use crossbeam_deque::{Injector, Stealer, Worker, Steal};
 use log::trace;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
-use std::sync::{Arc, Barrier};
+use std::sync::{Arc, Barrier, RwLock, Mutex};
 use std::{fmt, hint, iter, mem};
 
 use crate::channel::channel::Channel;
@@ -42,10 +42,135 @@ impl Error for ThreadPoolError {
     }
 }
 
+
+
+// Struct representing a worker in the thread pool.
+struct ThreadPoolWorker {
+    id: usize,
+    worker: Mutex<Worker<Job>>,
+    stealers: RwLock<Vec<Stealer<Job>>>,
+    global: Arc<Injector<Job>>,
+    total_tasks: Arc<AtomicUsize>,
+}
+impl ThreadPoolWorker {
+    fn new(id: usize, global: Arc<Injector<Job>>, total_tasks: Arc<AtomicUsize>) -> Self {
+        let worker = Mutex::new(Worker::new_fifo());
+        let stealers = RwLock::new(Vec::new());
+        Self {
+            id,
+            worker,
+            stealers,
+            global,
+            total_tasks,
+
+        }
+    }
+
+
+    // Fetch a task. If the local queue is empty, try to steal a batch of tasks from the global queue.
+    // If the global queue is empty, try to steal a task from one of the other threads.
+    fn fetch_task(&self) -> Option<Job> {
+        if let Some(job) = self.pop() {
+            return Some(job);
+        } else if let Some(job) = self.steal_from_global() {
+            return Some(job);
+        } else if let Some(job) = self.steal() {
+            return Some(job);
+        }
+        None
+    }
+
+    /// This is the main loop of the thread.
+    fn run(&self) {
+        let mut stop = false;
+        loop {
+            let res = self.fetch_task();
+            match res {
+                Some(task) => match task {
+                    Job::NewJob(func) => {
+                        (func)();
+                        self.task_done();
+                    }
+                    Job::Terminate => stop = true,
+                },
+                None => {
+                    if stop {
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+            }
+        }
+    }
+
+    // Push a job to the local queue.
+    fn push(&self, job: Job) {
+        let worker = self.worker.lock().unwrap();
+        worker.push(job);
+    }
+
+    // Pop a job from the local queue.
+    fn pop(&self) -> Option<Job> {
+        let worker = self.worker.lock().unwrap();
+        worker.pop()
+    }
+
+    // Steal a job from another worker.
+    fn steal(&self) -> Option<Job> {
+        let stealers = self.stealers.read().unwrap();
+        for stealer in stealers.iter() {
+            loop {
+                match stealer.steal() {
+                    Steal::Success(job) => return Some(job),
+                    Steal::Empty => break,
+                    Steal::Retry => continue,
+                }
+            }
+        }
+        None
+    }
+
+    // Steal a job from the global queue.
+    fn steal_from_global(&self) -> Option<Job> {
+        let worker_queue = self.worker.lock().unwrap();
+        loop {
+            match self.global.steal_batch_and_pop(&worker_queue) {
+                Steal::Success(job) => return Some(job),
+                Steal::Empty => return None,
+                Steal::Retry => continue,
+            };
+        }
+    }
+
+    // Add a stealer to the list of stealers.
+    fn add_stealer(&self, stealer: Stealer<Job>) {
+        let mut stealers = self.stealers.write().unwrap();
+        stealers.push(stealer);
+    }
+
+    // Clean the list of stealers.
+    fn clean_stealers(&self) {
+        let mut stealers = self.stealers.write().unwrap();
+        stealers.clear();
+    }
+
+    // Get the stealer of the local queue.
+    fn stealer(&self) -> Stealer<Job> {
+        let worker = self.worker.lock().unwrap();
+        worker.stealer()
+    }
+
+    // Warn task done.
+    fn task_done(&self) {
+        self.total_tasks.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+    }
+
+}
 ///Struct representing a thread pool.
 pub struct ThreadPool {
-    num_threads: usize,
-    workers_info: Vec<JobInfo>,
+    jobs_info: Vec<JobInfo>,
+    workers: Vec<Arc<ThreadPoolWorker>>,
     total_tasks: Arc<AtomicUsize>,
     injector: Arc<Injector<Job>>,
     orchestrator: Arc<Orchestrator>,
@@ -55,70 +180,60 @@ impl Clone for ThreadPool {
     /// Create a new threadpool from an existing one, using the same number of threads.
     fn clone(&self) -> Self {
         let orchestrator = self.orchestrator.clone();
-        ThreadPool::new(self.num_threads, orchestrator)
+        ThreadPool::new(self.workers.len(), orchestrator)
     }
 }
 
 impl ThreadPool {
     fn new(num_threads: usize, orchestrator: Arc<Orchestrator>) -> Self {
         trace!("Creating new threadpool");
-        let workers_info;
-        let mut workers: Vec<Worker<Job>> = Vec::with_capacity(num_threads);
-        let mut stealers = Vec::with_capacity(num_threads);
-        let injector = Arc::new(Injector::new());
-
-        for _ in 0..num_threads {
-            workers.push(Worker::new_fifo());
-        }
-        for w in &workers {
-            stealers.push(w.stealer());
-        }
+        let jobs_info;
+        let mut workers = Vec::with_capacity(num_threads);
 
         let total_tasks = Arc::new(AtomicUsize::new(0));
         let barrier = Arc::new(Barrier::new(num_threads));
         let mut funcs = Vec::new();
 
-        for _i in 0..num_threads {
-            let local_injector = Arc::clone(&injector);
-            let local_worker = workers.remove(0);
-            let local_stealers = stealers.clone();
-            let local_barrier = Arc::clone(&barrier);
+        let injector = Arc::new(Injector::new());
+
+        for i in 0..num_threads {
+            let global = Arc::clone(&injector);
             let total_tasks_cp = Arc::clone(&total_tasks);
-
-            funcs.push(move || {
-                let mut stop = false;
-                // We wait that all threads start
-                //println!("HELLO from thread {}", i);
-
-                local_barrier.wait();
-                loop {
-                    let res = Self::find_task(&local_worker, &local_injector, &local_stealers);
-                    match res {
-                        Some(task) => match task {
-                            Job::NewJob(func) => {
-                                (func)();
-                                total_tasks_cp.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
-                            }
-                            Job::Terminate => stop = true,
-                        },
-                        None => {
-                            if stop {
-                                local_injector.push(Job::Terminate);
-                                break;
-                            } else {
-                                continue;
-                            }
-                        }
-                    }
-                }
-            });
+            let worker = ThreadPoolWorker::new(i, global, total_tasks_cp);
+            workers.push(Arc::new(worker));
         }
 
-        workers_info = orchestrator.push_multiple(funcs);
+        for worker in &workers {
+            let mut tmp = Vec::new();
+            let stealer = worker.stealer();
+            for other in &workers {
+                if worker.id != other.id {
+                    other.add_stealer(stealer.clone());
+                    tmp.push(other.stealer());
+                }
+            }
+            for stealer in tmp {
+                worker.add_stealer(stealer);
+            }
+        }
+
+        for worker in &workers {
+            let barrier = Arc::clone(&barrier);
+            let worker = Arc::clone(&worker);
+            let func = move || {
+                println!("Thread {} started", worker.id);
+                barrier.wait();
+                worker.run();
+                println!("Thread {} terminated", worker.id);
+            };
+            funcs.push(Box::new(func));
+        }
+
+        jobs_info = orchestrator.push_multiple(funcs);
 
         Self {
-            num_threads,
-            workers_info,
+            workers,
+            jobs_info,
             total_tasks,
             injector,
             orchestrator,
@@ -128,28 +243,6 @@ impl ThreadPool {
     pub fn new_with_global_registry(num_threads: usize) -> Self {
         let orchestrator = get_global_orchestrator();
         Self::new(num_threads, orchestrator)
-    }
-
-    fn find_task<F>(
-        local: &Worker<F>,
-        global: &Injector<F>,
-        stealers: &Vec<Stealer<F>>,
-    ) -> Option<F> {
-        // Pop a task from the local queue, if not empty.
-        local.pop().or_else(|| {
-            // Otherwise, we need to look for a task elsewhere.
-            iter::repeat_with(|| {
-                // Try stealing a batch of tasks from the global queue.
-                global
-                    .steal_batch_and_pop(local)
-                    // Or try stealing a task from one of the other threads.
-                    .or_else(|| stealers.iter().map(|s| s.steal()).collect())
-            })
-            // Loop while no task was stolen and any steal operation needs to be retried.
-            .find(|s| !s.is_retry())
-            // Extract the stolen task, if there is one.
-            .and_then(|s| s.success())
-        })
     }
 
     /// Execute a function `task` on a thread in the thread pool.
@@ -262,9 +355,15 @@ impl ThreadPool {
 impl Drop for ThreadPool {
     fn drop(&mut self) {
         trace!("Closing threadpool");
-        self.injector.push(Job::Terminate);
+        for worker in &self.workers {
+            worker.clean_stealers();
+        }
 
-        for job in &self.workers_info {
+        for worker in &self.workers {
+            worker.push(Job::Terminate);
+        }
+
+        for job in &self.jobs_info {
             job.wait();
         }
     }
