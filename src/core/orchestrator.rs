@@ -335,8 +335,8 @@ impl Partition {
         // Register the stealer of the new worker to the other workers and
         // register the stealer of the other workers to the new worker.
         for other in workers.iter() {
-            worker.register_stealer(other.get_stealer());
-            other.register_stealer(worker.get_stealer());
+            //worker.register_stealer(other.get_stealer());
+            //other.register_stealer(worker.get_stealer());
         }
 
         // Push the new worker to the partition.
