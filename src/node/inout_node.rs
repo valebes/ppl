@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, Barrier, Condvar, Mutex, RwLock,
+        Arc, Barrier, Condvar, Mutex,
     },
     thread,
 };
@@ -320,26 +320,13 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         loop {
             let input = self.get_message();
 
-            let mut round_robin = false;
-
             match input {
                 Some(Message { op, order }) => {
                     counter = counter % self.next_node.get_num_of_replicas();
-                    let latest = counter;
 
                     match op {
                         Task::NewTask(task) => {
                             let result = self.node.run(task);
-
-                            // if there is feedback enabled, then i check for a free node
-                            // and i send the message to the free node
-                            match self.feedback {
-                                Some(_) => match self.next_node.get_free_node() {
-                                    Some(id) => counter = id,
-                                    None => round_robin = true,
-                                },
-                                None => round_robin = true,
-                            }
 
                             match result {
                                 Some(msg) => {
@@ -373,19 +360,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             terminate_order = order;
                         }
                     }
-
-                    // if there is feedback enabled, then i send the id of the node to the feedback queue
-                    match &self.feedback {
-                        Some(feedback) => {
-                            if round_robin {
-                                counter += 1;
-                            } else {
-                                counter = latest;
-                            }
-                            feedback.push(self.id);
-                        }
-                        None => counter += 1,
-                    }
+                    counter += 1;
                 }
                 None => {
                     if stop {
@@ -407,12 +382,9 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         loop {
             let input = self.get_message();
 
-            let mut round_robin = false;
-
             match input {
                 Some(Message { op, order }) => {
                     counter = counter % self.next_node.get_num_of_replicas();
-                    let latest = counter;
 
                     match op {
                         Task::NewTask(task) => {
@@ -439,19 +411,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                         let cvar = &splitter_ref.1;
                                         loop {
                                             let (expected, start) = splitter.get();
-                                            if expected == order {
-                                                // if there is feedback enabled, then i check for a free node
-                                                // and i send the message to the free node
-                                                match self.feedback {
-                                                    Some(_) => {
-                                                        match self.next_node.get_free_node() {
-                                                            Some(id) => counter = id,
-                                                            None => round_robin = true,
-                                                        }
-                                                    }
-                                                    None => round_robin = true,
-                                                }
-
+                                            if expected == order {                               
                                                 let mut tmp_counter = start;
                                                 while !tmp.is_empty() {
                                                     let msg = Message {
@@ -485,15 +445,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             } else {
                                 // If the node is not ordered, then i can send the messages to the next node
                                 // without any order.
-                                // if there is feedback enabled, then i check for a free node
-                                // and i send the message to the free node
-                                match self.feedback {
-                                    Some(_) => match self.next_node.get_free_node() {
-                                        Some(id) => counter = id,
-                                        None => round_robin = true,
-                                    },
-                                    None => round_robin = true,
-                                }
                                 loop {
                                     let msg = Message {
                                         op: Task::NewTask(tmp.pop_front().unwrap()),
@@ -526,20 +477,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             terminate_order = order;
                         }
                     }
-
-                    // If there is feedback enabled, then i send a message to the feedback queue
-                    // to notify that i finished my job.
-                    match &self.feedback {
-                        Some(feedback) => {
-                            if round_robin {
-                                counter += 1;
-                            } else {
-                                counter = latest;
-                            }
-                            feedback.push(self.id);
-                        }
-                        None => counter += 1,
-                    }
+                    counter += 1;
                 }
                 None => {
                     if stop {
@@ -645,25 +583,6 @@ impl<
         }
     }
 
-    fn get_free_node(&self) -> Option<usize> {
-        match &self.scheduler {
-            Some(sched) => loop {
-                match sched.steal() {
-                    Steal::Success(id) => {
-                        return Some(id);
-                    }
-                    Steal::Empty => {
-                        return None;
-                    }
-                    Steal::Retry => {
-                        continue;
-                    }
-                }
-            },
-            None => None,
-        }
-    }
-
     fn get_num_of_replicas(&self) -> usize {
         self.job_infos.len()
     }
@@ -761,7 +680,7 @@ impl<
 
         let barrier = Arc::new(Barrier::new(replicas));
 
-        for i in 0..replicas {
+        for _i in 0..replicas {
             let mut worker = worker_nodes.remove(0);
 
             let local_barrier = barrier.clone();

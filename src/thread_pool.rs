@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
-use std::sync::{Arc, Barrier, RwLock};
-use std::{fmt, hint, iter, mem};
+use std::sync::{Arc, Barrier};
+use std::{fmt, hint, mem};
 
 use crate::channel::channel::Channel;
 use crate::core::orchestrator::{get_global_orchestrator, JobInfo, Orchestrator};
