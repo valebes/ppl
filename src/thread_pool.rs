@@ -79,11 +79,33 @@ impl ThreadPoolWorker {
         None
     }
 
+    fn find_task(&self) -> Option<Job> {
+        let mut stealers = self.stealers.read().unwrap();
+        let local = &self.worker;
+        let global = &self.global;
+
+        // Pop a task from the local queue, if not empty.
+        local.pop().or_else(|| {
+            // Otherwise, we need to look for a task elsewhere.
+            iter::repeat_with(|| {
+                // Try stealing a batch of tasks from the global queue.
+                global
+                    .steal_batch_and_pop(local)
+                    // Or try stealing a task from one of the other threads.
+                    .or_else(|| stealers.iter().map(|s| s.steal()).collect())
+            })
+            // Loop while no task was stolen and any steal operation needs to be retried.
+            .find(|s| !s.is_retry())
+            // Extract the stolen task, if there is one.
+            .and_then(|s| s.success())
+        })
+    }
+
     /// This is the main loop of the thread.
     fn run(&self) {
         let mut stop = false;
         loop {
-            let res = self.fetch_task();
+            let res = self.find_task();
             match res {
                 Some(task) => match task {
                     Job::NewJob(func) => {
