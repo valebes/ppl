@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
-use std::sync::{Arc, Barrier, RwLock, Mutex};
+use std::sync::{Arc, Barrier, RwLock};
 use std::{fmt, hint, iter, mem};
 
 use crate::channel::channel::Channel;
@@ -47,18 +47,17 @@ impl Error for ThreadPoolError {
 // Struct representing a worker in the thread pool.
 struct ThreadPoolWorker {
     id: usize,
-    worker: Mutex<Worker<Job>>,
+    worker: Worker<Job>,
     stealers: RwLock<Vec<Stealer<Job>>>,
     global: Arc<Injector<Job>>,
     total_tasks: Arc<AtomicUsize>,
 }
 impl ThreadPoolWorker {
     fn new(id: usize, global: Arc<Injector<Job>>, total_tasks: Arc<AtomicUsize>) -> Self {
-        let worker = Mutex::new(Worker::new_fifo());
         let stealers = RwLock::new(Vec::new());
         Self {
             id,
-            worker,
+            worker: Worker::new_fifo(),
             stealers,
             global,
             total_tasks,
@@ -95,6 +94,7 @@ impl ThreadPoolWorker {
                 },
                 None => {
                     if stop {
+                        self.global.push(Job::Terminate);
                         break;
                     } else {
                         continue;
@@ -105,16 +105,10 @@ impl ThreadPoolWorker {
 
     }
 
-    // Push a job to the local queue.
-    fn push(&self, job: Job) {
-        let worker = self.worker.lock().unwrap();
-        worker.push(job);
-    }
 
     // Pop a job from the local queue.
     fn pop(&self) -> Option<Job> {
-        let worker = self.worker.lock().unwrap();
-        worker.pop()
+        self.worker.pop()
     }
 
     // Steal a job from another worker.
@@ -134,9 +128,8 @@ impl ThreadPoolWorker {
 
     // Steal a job from the global queue.
     fn steal_from_global(&self) -> Option<Job> {
-        let worker_queue = self.worker.lock().unwrap();
         loop {
-            match self.global.steal_batch_and_pop(&worker_queue) {
+            match self.global.steal_batch_and_pop(&self.worker) {
                 Steal::Success(job) => return Some(job),
                 Steal::Empty => return None,
                 Steal::Retry => continue,
@@ -158,8 +151,7 @@ impl ThreadPoolWorker {
 
     // Get the stealer of the local queue.
     fn stealer(&self) -> Stealer<Job> {
-        let worker = self.worker.lock().unwrap();
-        worker.stealer()
+        self.worker.stealer()
     }
 
     // Warn task done.
@@ -171,7 +163,7 @@ impl ThreadPoolWorker {
 ///Struct representing a thread pool.
 pub struct ThreadPool {
     jobs_info: Vec<JobInfo>,
-    workers: Vec<Arc<ThreadPoolWorker>>,
+    num_workers: usize,
     total_tasks: Arc<AtomicUsize>,
     injector: Arc<Injector<Job>>,
     orchestrator: Arc<Orchestrator>,
@@ -181,7 +173,7 @@ impl Clone for ThreadPool {
     /// Create a new threadpool from an existing one, using the same number of threads.
     fn clone(&self) -> Self {
         let orchestrator = self.orchestrator.clone();
-        ThreadPool::new(self.workers.len(), orchestrator)
+        ThreadPool::new(self.num_workers, orchestrator)
     }
 }
 
@@ -201,7 +193,7 @@ impl ThreadPool {
             let global = Arc::clone(&injector);
             let total_tasks_cp = Arc::clone(&total_tasks);
             let worker = ThreadPoolWorker::new(i, global, total_tasks_cp);
-            workers.push(Arc::new(worker));
+            workers.push(worker);
         }
 
         let mut tmp = Vec::with_capacity(num_threads);
@@ -217,9 +209,9 @@ impl ThreadPool {
             }
         }
 
-        for worker in &workers {
+        while workers.len() > 0 {
             let barrier = Arc::clone(&barrier);
-            let worker = Arc::clone(&worker);
+            let worker = workers.remove(0);
             let func = move || {
                 barrier.wait();
                 worker.run();
@@ -230,7 +222,7 @@ impl ThreadPool {
         jobs_info = orchestrator.push_multiple(funcs);
 
         Self {
-            workers,
+            num_workers: num_threads,
             jobs_info,
             total_tasks,
             injector,
@@ -352,14 +344,7 @@ impl ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        trace!("Closing threadpool");
-        for worker in &self.workers {
-            worker.clean_stealers();
-        }
-
-        for worker in &self.workers {
-            worker.push(Job::Terminate);
-        }
+        self.injector.push(Job::Terminate);
 
         for job in &self.jobs_info {
             job.wait();
