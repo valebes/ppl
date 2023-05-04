@@ -102,7 +102,6 @@ struct WorkerNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     channel_rx: Option<InputChannel<Message<TIn>>>,
     node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
     next_node: Arc<TNext>,
-    feedback: Option<Arc<Injector<usize>>>,
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     global_queue: Option<Arc<Injector<Message<TIn>>>>,
     local_queue: Worker<Message<TIn>>,
@@ -128,7 +127,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             channel_rx: None,
             node,
             next_node,
-            feedback: None,
             splitter: None,
             global_queue: None,
             local_queue: Worker::new_fifo(),
@@ -271,11 +269,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // Set a splitter for the node.
     fn set_splitter(&mut self, splitter: Arc<(Mutex<OrderedSplitter>, Condvar)>) {
         self.splitter = Some(splitter);
-    }
-
-    // Set a feedback queue for the node.
-    fn set_feedback(&mut self, feedback: Arc<Injector<usize>>) {
-        self.feedback = Some(feedback);
     }
 
     // Send to global queue a message.
@@ -500,7 +493,6 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     ordered_splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
-    scheduler: Option<Arc<Injector<usize>>>,
     global_queue: Arc<Injector<Message<TIn>>>,
     job_infos: Vec<JobInfo>,
     phantom: PhantomData<(TOut, TCollected)>,
@@ -613,12 +605,6 @@ impl<
         let next_node = Arc::new(next_node);
         let replicas = handler.number_of_replicas();
 
-        let mut feedback_queue = None;
-        let feedback = orchestrator.get_configuration().get_scheduling();
-        if feedback {
-            feedback_queue = Some(Arc::new(Injector::new()));
-        }
-
         let blocking = orchestrator.get_configuration().get_blocking_channel();
 
         let ordered = handler.is_ordered();
@@ -650,10 +636,6 @@ impl<
             // If the node is ordered and a producer, we need to set the ordered splitter handler
             if producer && ordered {
                 worker.set_splitter(splitter.clone().unwrap());
-            }
-            // If the node have the feedback enabled, we need to set the feedback queue
-            if feedback {
-                worker.set_feedback(feedback_queue.clone().unwrap());
             }
 
             // Create the channel
@@ -700,7 +682,6 @@ impl<
             ordered_splitter: splitter,
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
-            scheduler: feedback_queue,
             global_queue,
             job_infos: orchestrator.push_multiple(funcs),
             phantom: PhantomData,
