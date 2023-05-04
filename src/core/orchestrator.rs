@@ -150,7 +150,9 @@ impl WorkerInfo {
 
     // Warn that the thread is busy.
     fn warn_busy(&self) {
-        self.available_workers.fetch_sub(1, Ordering::Release);
+        if self.available_workers.load(Ordering::Acquire) > 0 {
+            self.available_workers.fetch_sub(1, Ordering::Release);
+        }
     }
 
     /// This is the main loop of the thread.
@@ -355,14 +357,12 @@ impl Partition {
 
     /// Get the number of busy workers (in this instant) in the partition.
     fn get_busy_worker_count(&self) -> usize {
-        let workers = self.workers.read().unwrap();
-        workers.iter().filter(|w| w.is_busy()).count()
+        self.get_worker_count() - self.get_free_worker_count()
     }
 
     /// Get the number of free workers (in this instant) in the partition.
     fn get_free_worker_count(&self) -> usize {
-        let workers = self.workers.read().unwrap();
-        workers.iter().filter(|w| !w.is_busy()).count()
+        self.available_workers.load(Ordering::Acquire)
     }
 
     /// Create a new job from a function and push it to the partition.
@@ -373,7 +373,6 @@ impl Partition {
     where
         F: FnOnce() + Send + 'static,
     {
-
         if self.get_free_worker_count() == 0 {
             return self.add_worker(f);
         }
