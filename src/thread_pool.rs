@@ -221,10 +221,8 @@ impl ThreadPool {
             let barrier = Arc::clone(&barrier);
             let worker = Arc::clone(&worker);
             let func = move || {
-                println!("Thread {} started", worker.id);
                 barrier.wait();
                 worker.run();
-                println!("Thread {} terminated", worker.id);
             };
             funcs.push(Box::new(func));
         }
