@@ -1,4 +1,4 @@
-use crossbeam_deque::{Injector, Stealer, Worker, Steal};
+use crossbeam_deque::{Injector, Steal, Stealer, Worker};
 use log::trace;
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -42,8 +42,6 @@ impl Error for ThreadPoolError {
     }
 }
 
-
-
 // Struct representing a worker in the thread pool.
 struct ThreadPoolWorker {
     id: usize,
@@ -53,17 +51,21 @@ struct ThreadPoolWorker {
     total_tasks: Arc<AtomicUsize>,
 }
 impl ThreadPoolWorker {
-    fn new(id: usize, worker: Worker<Job>, stealers: Vec<Stealer<Job>>, global: Arc<Injector<Job>>, total_tasks: Arc<AtomicUsize>) -> Self {
+    fn new(
+        id: usize,
+        worker: Worker<Job>,
+        stealers: Vec<Stealer<Job>>,
+        global: Arc<Injector<Job>>,
+        total_tasks: Arc<AtomicUsize>,
+    ) -> Self {
         Self {
             id,
             worker,
             stealers,
             global,
             total_tasks,
-
         }
     }
-
 
     // Fetch a task. If the local queue is empty, try to steal a batch of tasks from the global queue.
     // If the global queue is empty, try to steal a task from one of the other threads.
@@ -101,9 +103,7 @@ impl ThreadPoolWorker {
                 }
             }
         }
-
     }
-
 
     // Pop a job from the local queue.
     fn pop(&self) -> Option<Job> {
@@ -137,9 +137,9 @@ impl ThreadPoolWorker {
 
     // Warn task done.
     fn task_done(&self) {
-        self.total_tasks.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+        self.total_tasks
+            .fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
     }
-
 }
 ///Struct representing a thread pool.
 pub struct ThreadPool {
@@ -173,8 +173,6 @@ impl ThreadPool {
 
         let injector = Arc::new(Injector::new());
 
-
-
         for _ in 0..num_threads {
             queue.push(Worker::new_fifo());
         }
@@ -182,11 +180,11 @@ impl ThreadPool {
             stealers.push(w.stealer());
         }
 
-
         for i in 0..num_threads {
             let global = Arc::clone(&injector);
             let total_tasks_cp = Arc::clone(&total_tasks);
-            let worker = ThreadPoolWorker::new(i, queue.remove(0), stealers.clone(), global, total_tasks_cp);
+            let worker =
+                ThreadPoolWorker::new(i, queue.remove(0), stealers.clone(), global, total_tasks_cp);
             workers.push(worker);
         }
 

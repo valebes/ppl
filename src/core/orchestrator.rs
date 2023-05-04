@@ -2,7 +2,7 @@ use std::{
     cell::OnceCell,
     hint,
     sync::{
-        atomic::{AtomicBool, Ordering, AtomicUsize},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex, RwLock,
     },
     thread::{self},
@@ -51,7 +51,12 @@ impl WorkerThread {
     /// Create a new worker thread.
     /// It will start executing jobs immediately.
     /// It will terminate when it receives a terminate message.
-    fn new(core_id: usize, config: Arc<Configuration>, available_workers: Arc<AtomicUsize>, global: Arc<Injector<Job>>) -> WorkerThread {
+    fn new(
+        core_id: usize,
+        config: Arc<Configuration>,
+        available_workers: Arc<AtomicUsize>,
+        global: Arc<Injector<Job>>,
+    ) -> WorkerThread {
         let worker = Arc::new(WorkerInfo::new(core_id, available_workers, global));
         let worker_copy = Arc::clone(&worker);
         let thread = Thread::new(
@@ -76,7 +81,6 @@ impl WorkerThread {
     fn push(&self, job: Job) {
         self.worker_info.push(job);
     }
-
 }
 
 /// Information about a worker thread.
@@ -89,7 +93,11 @@ struct WorkerInfo {
 }
 impl WorkerInfo {
     /// Create a new worker info.
-    fn new(core_id: usize, available_workers: Arc<AtomicUsize>, global: Arc<Injector<Job>>) -> WorkerInfo {
+    fn new(
+        core_id: usize,
+        available_workers: Arc<AtomicUsize>,
+        global: Arc<Injector<Job>>,
+    ) -> WorkerInfo {
         let worker = Worker::new_fifo();
         WorkerInfo {
             core_id,
@@ -244,7 +252,8 @@ impl Partition {
     /// After the closure is executed, the worker will fetch other jobs from
     /// the global queue or the global queue.
     fn add_worker<F>(&self, f: F) -> JobInfo
-    where F: FnOnce() + Send + 'static
+    where
+        F: FnOnce() + Send + 'static,
     {
         let mut workers = self.workers.write().unwrap();
         let worker = WorkerThread::new(
@@ -308,8 +317,7 @@ impl Partition {
             job_info_clone.store(true, Ordering::Release);
         }));
 
-
-        self.global.push(job);     
+        self.global.push(job);
 
         job_info
     }
@@ -401,7 +409,7 @@ impl Orchestrator {
         if configuration.get_pinning() {
             max_cores = configuration.get_max_cores();
         }
-     
+
         for i in 0..max_cores {
             partitions.push(Partition::new(i, Arc::clone(&configuration)));
         }

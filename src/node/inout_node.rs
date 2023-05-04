@@ -168,12 +168,11 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
     // Get a new message from the local queue or steal a message from the other workers.
     fn get_message_from_local_queue(&mut self) -> Option<Message<TIn>> {
-            match self.local_queue.pop() {
-                Some(message) => Some(message),
-                None => None,
-            }
+        match self.local_queue.pop() {
+            Some(message) => Some(message),
+            None => None,
         }
-    
+    }
 
     // Get a new message from the global queue.
     fn get_message_from_global_queue(&mut self) -> Option<Message<TIn>> {
