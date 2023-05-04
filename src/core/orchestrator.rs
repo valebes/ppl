@@ -325,16 +325,18 @@ impl Partition {
 
 impl Drop for Partition {
     fn drop(&mut self) {
-        error!(
+        trace!(
             "Dropping partition on core {}, total worker: {}.",
             self.core_id,
             self.get_worker_count()
         );
 
-        let mut worker = self.workers.write().unwrap();
+        // Terminate all the workers.
+        for _ in 0..self.get_worker_count() {
+            self.global.push(Job::Terminate);
+        }
 
-        // Push a terminate job in the global queue.
-        self.global.push(Job::Terminate);
+        let mut worker = self.workers.write().unwrap();
 
         // Join all the workers.
         for worker in worker.iter_mut() {
