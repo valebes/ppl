@@ -38,17 +38,15 @@ impl JobInfo {
     }
 }
 
-/// A thread worker.
-/// This is the thread that will execute the jobs.
-/// It will steal jobs from other workers if it has nothing to do.
-/// It will also execute the jobs in the global queue.
-/// It will terminate when it receives a terminate message.
-struct WorkerThread {
-    worker_info: Arc<WorkerInfo>,
+/// An executor.
+/// It is a thread that execute jobs.
+/// It will fetch jobs from it's own queue or from the global queue.
+struct Executor {
+    worker_info: Arc<ExecutorInfo>,
     thread: Thread,
 }
-impl WorkerThread {
-    /// Create a new worker thread.
+impl Executor {
+    /// Create a executor.
     /// It will start executing jobs immediately.
     /// It will terminate when it receives a terminate message.
     fn new(
@@ -56,8 +54,8 @@ impl WorkerThread {
         config: Arc<Configuration>,
         available_workers: Arc<AtomicUsize>,
         global: Arc<Injector<Job>>,
-    ) -> WorkerThread {
-        let worker = Arc::new(WorkerInfo::new(core_id, available_workers, global));
+    ) -> Executor {
+        let worker = Arc::new(ExecutorInfo::new(core_id, available_workers, global));
         let worker_copy = Arc::clone(&worker);
         let thread = Thread::new(
             worker_copy.core_id,
@@ -66,40 +64,40 @@ impl WorkerThread {
             },
             config,
         );
-        WorkerThread {
+        Executor {
             worker_info: worker,
             thread,
         }
     }
 
-    /// Join the thread.
+    /// Join the thread running the executor.
     fn join(&mut self) {
         self.thread.join();
     }
 
-    /// Push a job to the thread.
+    /// Push a job to the executor queue.
     fn push(&self, job: Job) {
         self.worker_info.push(job);
     }
 }
 
-/// Information about a worker thread.
-/// This is used to keep track of the state of the thread.
-struct WorkerInfo {
+/// Information about the executor.
+/// It contains the queue of jobs and the number of available executors in it's partition.
+struct ExecutorInfo {
     core_id: usize,
     available_workers: Arc<AtomicUsize>,
     global: Arc<Injector<Job>>,
     worker: Mutex<Worker<Job>>,
 }
-impl WorkerInfo {
-    /// Create a new worker info.
+impl ExecutorInfo {
+    /// Create a new executor info.
     fn new(
         core_id: usize,
         available_workers: Arc<AtomicUsize>,
         global: Arc<Injector<Job>>,
-    ) -> WorkerInfo {
+    ) -> ExecutorInfo {
         let worker = Worker::new_fifo();
-        WorkerInfo {
+        ExecutorInfo {
             core_id,
             available_workers,
             global,
@@ -107,19 +105,19 @@ impl WorkerInfo {
         }
     }
 
-    // Warn that the thread is available.
+    // Warn that the executor is available.
     fn warn_available(&self) {
         self.available_workers.fetch_add(1, Ordering::Release);
     }
 
-    // Warn that the thread is busy.
+    // Warn that the executor is busy.
     fn warn_busy(&self) {
         if self.available_workers.load(Ordering::Acquire) > 0 {
             self.available_workers.fetch_sub(1, Ordering::Release);
         }
     }
 
-    /// This is the main loop of the thread.
+    /// This is the main loop of the executor.
     /// Need refactoring.
     fn run(&self) {
         let mut stop = false;
@@ -157,12 +155,12 @@ impl WorkerInfo {
         }
     }
 
-    /// Pop a job from the thread.
+    /// Pop a job from the executor queue.
     fn pop(&self) -> Option<Job> {
         self.worker.lock().unwrap().pop()
     }
 
-    /// Push a job to the thread queue.
+    /// Push a job to the executor queue.
     fn push(&self, job: Job) {
         self.worker.lock().unwrap().push(job);
     }
@@ -179,7 +177,7 @@ impl WorkerInfo {
     }
 }
 
-/// A thread in the threadpool.
+/// A thread.
 struct Thread {
     thread: Option<thread::JoinHandle<()>>,
 }
@@ -225,7 +223,7 @@ impl Thread {
 
 pub struct Partition {
     core_id: usize,
-    workers: RwLock<Vec<WorkerThread>>,
+    workers: RwLock<Vec<Executor>>,
     total_workers: Arc<AtomicUsize>, // total number of workers in the partition
     available_workers: Arc<AtomicUsize>, // number of available workers in the partition
     global: Arc<Injector<Job>>,
@@ -248,16 +246,16 @@ impl Partition {
         }
     }
 
-    /// Add a worker to the partition.
-    /// The worker will be created and will execute the given closure.
-    /// After the closure is executed, the worker will fetch other jobs from
-    /// the global queue or the global queue.
+    /// Add a worker (executor) to the partition.
+    /// The executor will be created and will execute the given closure.
+    /// After the closure is executed, the executor will fetch other jobs from
+    /// the global queue or its own queue.
     fn add_worker<F>(&self, f: F) -> JobInfo
     where
         F: FnOnce() + Send + 'static,
     {
         let mut workers = self.workers.write().unwrap();
-        let worker = WorkerThread::new(
+        let worker = Executor::new(
             self.core_id,
             self.configuration.clone(),
             Arc::clone(&self.available_workers),
@@ -267,40 +265,40 @@ impl Partition {
         // Create a job info to track the job status.
         let job_info = JobInfo::new();
         let job_info_clone = Arc::clone(&job_info.status);
-        // Create the job and push it to the worker.
+        // Create the job and push it to the executor.
         let job = Job::NewJob(Box::new(move || {
             f();
             job_info_clone.store(true, Ordering::Release);
         }));
         worker.push(job);
 
-        // Push the new worker to the partition.
+        // Push the new executor to the partition.
         workers.push(worker);
 
-        // Update the number of workers in the partition.
+        // Update the number of executor in the partition.
         self.total_workers.fetch_add(1, Ordering::Release);
 
         job_info
     }
 
-    /// Get the number of workers in the partition.
+    /// Get the number of executor in the partition.
     fn get_worker_count(&self) -> usize {
         self.total_workers.load(Ordering::Acquire)
     }
 
-    /// Get the number of busy workers (in this instant) in the partition.
+    /// Get the number of busy executors (in this instant) in the partition.
     fn get_busy_worker_count(&self) -> usize {
         self.get_worker_count() - self.get_free_worker_count()
     }
 
-    /// Get the number of free workers (in this instant) in the partition.
+    /// Get the number of free executors (in this instant) in the partition.
     fn get_free_worker_count(&self) -> usize {
         self.available_workers.load(Ordering::Acquire)
     }
 
     /// Create a new job from a function and push it to the partition.
     /// This method return a JobInfo that can be used to wait for the Job to finish.
-    /// If there aren't worker in the partition or all the existing worker are busy, a new worker is created.
+    /// If there aren't executors in the partition or all the existing executors are busy, a new executor is created.
     /// Otherwise, the function is put in the global queue of the partition.
     fn push<F>(&self, f: F) -> JobInfo
     where
@@ -421,9 +419,9 @@ impl Orchestrator {
         }
     }
 
-    /// Find the partition with the less busy workers.
-    /// If there are more than one partition with the same number of workers, the first one is returned.
-    /// If there are no workers in any partition, the first partition is returned.
+    /// Find the partition with the less busy executors.
+    /// If there are more than one partition with the same number of executors, the first one is returned.
+    /// If there are no executors in any partition, the first partition is returned.
     fn find_partition(&self) -> Option<&Partition> {
         if self.partitions.is_empty() {
             return None;
@@ -445,9 +443,9 @@ impl Orchestrator {
         min
     }
 
-    /// Find a contiguos interval of 'count' partitions that minimize the number of busy workers contained in each partition of the interval.
-    /// If there are more than one partition with the same number of workers, the first sequence found is returned.
-    /// If there are no workers in any partition, the first sequence of 'count' partitions is returned.
+    /// Find a contiguos interval of 'count' partitions that minimize the number of busy executors contained in each partition of the interval.
+    /// If there are more than one partition with the same number of executors, the first sequence found is returned.
+    /// If there are no executors in any partition, the first sequence of 'count' partitions is returned.
     fn find_partition_sequence(&self, count: usize) -> Option<Vec<&Partition>> {
         if count > self.partitions.len() {
             return None;
@@ -478,7 +476,7 @@ impl Orchestrator {
 
     /// Push a function into the orchestrator.
     /// This method return a JobInfo that can be used to wait for the Job to finish.
-    /// If there aren't worker in the partitions of the orchestrator or all the existing worker are busy, a new worker is created.
+    /// If there aren't executors in the partitions of the orchestrator or all the existing executors are busy, a new executor is created.
     pub(crate) fn push<F>(&self, f: F) -> JobInfo
     where
         F: FnOnce() + Send + 'static,
@@ -494,7 +492,7 @@ impl Orchestrator {
     /// This method return a vector of JobInfo that can be used to wait for the Jobs to finish.
     /// If the number of functions is lower than the number of partitions, this method will try to push all the functions in partitions that are contiguous in the vector.
     /// If the number of functions is greater than the number of partitions, this method will distribute evenly the functions in the sequence of partitions found.
-    /// If there aren't worker in the partitions of the orchestrator or all the existing worker are busy, new workers are created.
+    /// If there aren't executors in the partitions of the orchestrator or all the existing executors are busy, new executor are created.
     pub(crate) fn push_multiple<F>(&self, mut f: Vec<F>) -> Vec<JobInfo>
     where
         F: FnOnce() + Send + 'static,

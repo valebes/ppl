@@ -46,25 +46,33 @@ impl Error for ThreadPoolError {
 struct ThreadPoolWorker {
     id: usize,
     worker: Worker<Job>,
-    stealers: Vec<Stealer<Job>>,
+    stealers: Option<Vec<Stealer<Job>>>,
     global: Arc<Injector<Job>>,
     total_tasks: Arc<AtomicUsize>,
 }
 impl ThreadPoolWorker {
     fn new(
         id: usize,
-        worker: Worker<Job>,
-        stealers: Vec<Stealer<Job>>,
         global: Arc<Injector<Job>>,
         total_tasks: Arc<AtomicUsize>,
     ) -> Self {
         Self {
             id,
-            worker,
-            stealers,
+            worker: Worker::new_fifo(),
+            stealers: None,
             global,
             total_tasks,
         }
+    }
+
+    // Get stealer.
+    fn get_stealer(&self) -> Stealer<Job> {
+        self.worker.stealer()
+    }
+
+    // Set the stealers vector of the worker.
+    fn set_stealers(&mut self, stealers: Vec<Stealer<Job>>) {
+        self.stealers = Some(stealers);
     }
 
     // Fetch a task. If the local queue is empty, try to steal a batch of tasks from the global queue.
@@ -82,6 +90,7 @@ impl ThreadPoolWorker {
 
     /// This is the main loop of the thread.
     fn run(&self) {
+        trace!("Worker {} started", self.id);
         let mut stop = false;
         loop {
             let res = self.fetch_task();
@@ -112,15 +121,18 @@ impl ThreadPoolWorker {
 
     // Steal a job from another worker.
     fn steal(&self) -> Option<Job> {
-        for stealer in self.stealers.iter() {
-            loop {
-                match stealer.steal() {
-                    Steal::Success(job) => return Some(job),
-                    Steal::Empty => break,
-                    Steal::Retry => continue,
+        if let Some(stealers) = &self.stealers {
+            for stealer in stealers {
+                loop {
+                    match stealer.steal() {
+                        Steal::Success(job) => return Some(job),
+                        Steal::Empty => break,
+                        Steal::Retry => continue,
+                    }
                 }
             }
         }
+        
         None
     }
 
@@ -164,7 +176,6 @@ impl ThreadPool {
         let jobs_info;
         let mut workers = Vec::with_capacity(num_threads);
 
-        let mut queue: Vec<Worker<Job>> = Vec::with_capacity(num_threads);
         let mut stealers = Vec::with_capacity(num_threads);
 
         let total_tasks = Arc::new(AtomicUsize::new(0));
@@ -173,21 +184,29 @@ impl ThreadPool {
 
         let injector = Arc::new(Injector::new());
 
-        for _ in 0..num_threads {
-            queue.push(Worker::new_fifo());
-        }
-        for w in &queue {
-            stealers.push(w.stealer());
-        }
 
+        // Create workers.
         for i in 0..num_threads {
             let global = Arc::clone(&injector);
             let total_tasks_cp = Arc::clone(&total_tasks);
             let worker =
-                ThreadPoolWorker::new(i, queue.remove(0), stealers.clone(), global, total_tasks_cp);
+                ThreadPoolWorker::new(i, global, total_tasks_cp);
             workers.push(worker);
         }
 
+        // Get stealers.
+        for worker in &workers {
+            let stealer = worker.get_stealer();
+            stealers.push(stealer);
+        }
+
+        // For each worker, set the stealers vector.
+        for worker in &mut workers {
+            let stealers_cp = stealers.clone();
+            worker.set_stealers(stealers_cp);
+        }
+
+        // Push workers to the orchestrator.
         while workers.len() > 0 {
             let barrier = Arc::clone(&barrier);
             let worker = workers.remove(0);
@@ -279,7 +298,7 @@ impl ThreadPool {
         <Iter as IntoIterator>::Item: Send,
         R: Send + 'static,
     {
-        let (rx, tx) = Channel::channel(true);
+        let (rx, tx) = Channel::channel(false);
         let arc_tx = Arc::new(tx);
         let mut unordered_map = BTreeMap::<usize, R>::new();
         self.scoped(|s| {
@@ -295,14 +314,17 @@ impl ThreadPool {
         });
         self.wait();
         while !rx.is_empty() {
-            let msg = rx.receive();
-            match msg {
-                Ok(Some((order, result))) => {
-                    unordered_map.insert(order, result);
+            let tmp = rx.receive_all();
+            match tmp {
+                Ok(vec) => {
+                    for (order, result) in vec {
+                        unordered_map.insert(order, result);
+                    }
                 }
-                Ok(None) => continue,
-                Err(e) => panic!("Error: {}", e),
-            };
+                Err(err) => {
+                    panic!("Error: {}", err);
+                }
+            }
         }
         unordered_map.into_values()
     }

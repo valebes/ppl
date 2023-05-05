@@ -97,7 +97,7 @@ impl OrderedSplitter {
     }
 }
 
-struct WorkerNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
+struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     id: usize,
     channel_rx: Option<InputChannel<Message<TIn>>>,
     node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
@@ -110,7 +110,7 @@ struct WorkerNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     phantom: PhantomData<(TOut, TCollected)>,
 }
 impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
-    WorkerNode<TIn, TOut, TCollected, TNext>
+    NodeWorker<TIn, TOut, TCollected, TNext>
 {
     // Create a new workernode with default values.
     // Is created a new channel for the input and the output.
@@ -121,8 +121,8 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: Arc<TNext>,
         num_replicas: usize,
-    ) -> WorkerNode<TIn, TOut, TCollected, TNext> {
-        WorkerNode {
+    ) -> NodeWorker<TIn, TOut, TCollected, TNext> {
+        NodeWorker {
             id,
             channel_rx: None,
             node,
@@ -134,11 +134,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             num_replicas,
             phantom: PhantomData,
         }
-    }
-
-    // Get id
-    fn get_id(&self) -> usize {
-        self.id
     }
 
     // Steal a messages from the other workers.
@@ -303,6 +298,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         }
     }
 
+    // Run the node in the default way.
     fn rts_default(&mut self) {
         let mut counter = self.init_counter();
         trace!("InOutNode {} started", self.id);
@@ -365,6 +361,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         }
     }
 
+    // RTS method for producer nodes.
     fn rts_producer(&mut self) {
         let mut counter = self.init_counter();
         trace!("InOutNode {} started", self.id);
@@ -600,6 +597,7 @@ impl<
         next_node: TNext,
         orchestrator: Arc<Orchestrator>,
     ) -> InOutNode<TIn, TOut, TCollected, TNext> {
+        trace!("Created a new InOutNode! Id: {}", id);
         let mut funcs = Vec::new();
         let mut channels = Vec::new();
         let next_node = Arc::new(next_node);
@@ -624,14 +622,14 @@ impl<
         }
         handler_copies.push(handler);
 
-        let mut worker_nodes: Vec<WorkerNode<TIn, TOut, TCollected, TNext>> =
+        let mut worker_nodes: Vec<NodeWorker<TIn, TOut, TCollected, TNext>> =
             Vec::with_capacity(replicas);
 
         let global_queue = Arc::new(Injector::new());
 
         for i in 0..replicas {
             let mut worker =
-                WorkerNode::new(i, handler_copies.remove(0), next_node.clone(), replicas);
+                NodeWorker::new(i, handler_copies.remove(0), next_node.clone(), replicas);
 
             // If the node is ordered and a producer, we need to set the ordered splitter handler
             if producer && ordered {
@@ -648,7 +646,7 @@ impl<
         }
 
         // If workstealing is enabled (and the node isn't an ordered producer), we need to register the stealers
-        if splitter.is_none() {
+        if splitter.is_none() && orchestrator.get_configuration().get_scheduling() {
             // Register stealers to each worker
             let mut stealers = Vec::new();
             for worker in &worker_nodes {
