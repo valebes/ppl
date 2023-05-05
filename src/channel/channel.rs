@@ -23,6 +23,7 @@ pub trait Sender<T> {
 
 pub struct InputChannel<T> {
     rx: Box<dyn Receiver<T> + Sync + Send>,
+    blocking: bool,
 }
 impl<T: Send> InputChannel<T> {
     pub fn receive(&self) -> Result<Option<T>, ChannelError> {
@@ -31,10 +32,15 @@ impl<T: Send> InputChannel<T> {
 
     pub fn receive_all(&self) -> Result<Vec<T>, ChannelError> {
         let mut res = Vec::new();
-        while let Some(msg) = self.receive()? {
+        // if is in blocking mode and the queue is empty, then we return immediately to avoid blocking
+        while !self.is_empty() && let Some(msg) = self.receive()? {
             res.push(msg);
         }
         Ok(res)
+    }
+
+    pub fn is_blocking(&self) -> bool {
+        self.blocking
     }
 
     pub fn is_empty(&self) -> bool {
@@ -56,6 +62,6 @@ pub struct Channel;
 impl Channel {
     pub fn channel<T: Send + 'static>(blocking: bool) -> (InputChannel<T>, OutputChannel<T>) {
         let (rx, tx) = backend::Channel::channel(blocking);
-        (InputChannel { rx }, OutputChannel { tx })
+        (InputChannel { rx, blocking }, OutputChannel { tx })
     }
 }

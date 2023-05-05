@@ -193,20 +193,27 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // If the channel is empty, then the worker return None.
     fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
         match &mut self.channel_rx {
-            Some(channel_rx) => match channel_rx.receive() {
-                Ok(Some(message)) => {
-                    channel_rx
-                        .receive_all()
-                        .unwrap()
-                        .into_iter()
-                        .for_each(|message| {
-                            self.local_queue.push(message);
-                        });
-                    return Some(message);
+            Some(channel_rx) => {
+                // if the channel is empty, then return None
+                // Used to avoid to block the worker when the channel is in blocking mode.
+                if channel_rx.is_empty() {
+                    return None;
                 }
-                Ok(None) => return None,
-                Err(e) => {
-                    warn!("Error: {}", e);
+                match channel_rx.receive() {
+                    Ok(Some(message)) => {
+                        channel_rx
+                            .receive_all()
+                            .unwrap()
+                            .into_iter()
+                            .for_each(|message| {
+                                self.local_queue.push(message);
+                            });
+                        return Some(message);
+                    }
+                    Ok(None) => return None,
+                    Err(e) => {
+                        warn!("Error: {}", e);
+                    }
                 }
             },
             None => return None,
@@ -261,7 +268,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         channel_tx
     }
 
-    // Set a splitter for the node.
+    // Set the ordered splitter handler for the worker.
     fn set_splitter(&mut self, splitter: Arc<(Mutex<OrderedSplitter>, Condvar)>) {
         self.splitter = Some(splitter);
     }

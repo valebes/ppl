@@ -5,6 +5,7 @@
 #![feature(unsized_fn_params)]
 #![feature(box_into_inner)]
 #![feature(once_cell)]
+#![feature(let_chains)]
 
 pub mod channel;
 //pub mod map;
