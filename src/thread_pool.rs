@@ -298,7 +298,7 @@ impl ThreadPool {
         <Iter as IntoIterator>::Item: Send,
         R: Send + 'static,
     {
-        let (rx, tx) = Channel::channel(false);
+        let (rx, tx) = Channel::channel(true);
         let arc_tx = Arc::new(tx);
         let mut unordered_map = BTreeMap::<usize, R>::new();
         self.scoped(|s| {
