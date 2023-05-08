@@ -2,7 +2,7 @@ use std::{
     collections::VecDeque,
     marker::PhantomData,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering, AtomicBool},
         Arc, Barrier, Condvar, Mutex,
     },
     thread,
@@ -107,7 +107,7 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     local_queue: Worker<Message<TIn>>,
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
     num_replicas: usize,
-    stop: bool,
+    stop: Arc<AtomicBool>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
@@ -121,6 +121,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         id: usize,
         node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: Arc<TNext>,
+        stop: Arc<AtomicBool>,
         num_replicas: usize,
     ) -> NodeWorker<TIn, TOut, TCollected, TNext> {
         NodeWorker {
@@ -132,13 +133,18 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             local_queue: Worker::new_fifo(),
             stealers: None,
             num_replicas,
-            stop: false,
+            stop,
             phantom: PhantomData,
         }
     }
 
     // Steal a messages from the other workers.
     fn get_message_from_others(&mut self) -> Option<Message<TIn>> {
+        // If this stage is terminating, then avoid to steal messages.
+        if self.stop.load(Ordering::Acquire) {
+            return None;
+        }
+
         match &mut self.stealers {
             Some(stealers) => loop {
                 for stealer in stealers.iter() {
@@ -177,7 +183,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             Some(channel_rx) => {
                 // if the channel is empty and blocking is false, then return None
                 // This is used to avoid to block the worker when the channel is in blocking mode.
-                if channel_rx.is_blocking() && channel_rx.is_empty() && self.stop
+                if channel_rx.is_blocking() && channel_rx.is_empty() && self.stop.load(Ordering::Acquire)
                 {
                     return None;
                 }
@@ -315,7 +321,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                         }
                         Task::Terminate => {
                             stop = true;
-                            self.stop = true;
                         }
                     }
                     counter += 1;
@@ -431,7 +436,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                         }
                         Task::Terminate => {
                             stop = true;
-                            self.stop = true;
                         }
                     }
                     counter += 1;
@@ -457,6 +461,7 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
     job_infos: Vec<JobInfo>,
+    stop: Arc<AtomicBool>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
@@ -519,6 +524,7 @@ impl<
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else {
+                    self.stop.store(true, Ordering::Release);
                     self.terminate_all(order);
                     if self.ordered {
                         self.next_msg.store(order, Ordering::Release);
@@ -568,6 +574,7 @@ impl<
         let next_node = Arc::new(next_node);
         let replicas = handler.number_of_replicas();
 
+        let mut stop = Arc::new(AtomicBool::new(false));
         let blocking = orchestrator.get_configuration().get_blocking_channel();
 
         let ordered = handler.is_ordered();
@@ -593,7 +600,7 @@ impl<
         // Create the workers
         for i in 0..replicas {
             let mut worker =
-                NodeWorker::new(i, handler_copies.remove(0), next_node.clone(), replicas);
+                NodeWorker::new(i, handler_copies.remove(0), next_node.clone(), stop.clone(), replicas);
 
             // If the node is ordered and a producer, we need to set the ordered splitter handler
             if producer && ordered {
@@ -642,6 +649,7 @@ impl<
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
             job_infos: orchestrator.push_multiple(funcs),
+            stop,
             phantom: PhantomData,
         }
     }

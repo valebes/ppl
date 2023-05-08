@@ -48,7 +48,7 @@ impl InOut<u64, u64> for WorkerA {
         Some(input)
     }
     fn number_of_replicas(&self) -> usize {
-        20
+        2
     }
 }
 
@@ -94,7 +94,7 @@ fn test_long_farm() {
     env_logger::init();
 
     let mut p = parallel!(
-        Source { streamlen: 500 },
+        Source { streamlen: 500000 },
         WorkerA {},
         WorkerB {},
         WorkerC {},
@@ -103,5 +103,5 @@ fn test_long_farm() {
 
     p.start();
     let res = p.wait_and_collect();
-    assert_eq!(res.unwrap(), 500);
+    assert_eq!(res.unwrap(), 500000);
 }
