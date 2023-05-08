@@ -332,7 +332,7 @@ impl Drop for Partition {
 
         // Terminate all the workers.
         self.global.push(Job::Terminate);
-        
+
         let mut worker = self.workers.write().unwrap();
 
         // Join all the workers.

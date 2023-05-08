@@ -51,11 +51,7 @@ struct ThreadPoolWorker {
     total_tasks: Arc<AtomicUsize>,
 }
 impl ThreadPoolWorker {
-    fn new(
-        id: usize,
-        global: Arc<Injector<Job>>,
-        total_tasks: Arc<AtomicUsize>,
-    ) -> Self {
+    fn new(id: usize, global: Arc<Injector<Job>>, total_tasks: Arc<AtomicUsize>) -> Self {
         Self {
             id,
             worker: Worker::new_fifo(),
@@ -132,7 +128,7 @@ impl ThreadPoolWorker {
                 }
             }
         }
-        
+
         None
     }
 
@@ -184,13 +180,11 @@ impl ThreadPool {
 
         let injector = Arc::new(Injector::new());
 
-
         // Create workers.
         for i in 0..num_threads {
             let global = Arc::clone(&injector);
             let total_tasks_cp = Arc::clone(&total_tasks);
-            let worker =
-                ThreadPoolWorker::new(i, global, total_tasks_cp);
+            let worker = ThreadPoolWorker::new(i, global, total_tasks_cp);
             workers.push(worker);
         }
 

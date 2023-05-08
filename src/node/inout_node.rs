@@ -15,8 +15,9 @@ use std::collections::BTreeMap;
 
 use crate::{
     channel::{
+        self,
         channel::{Channel, InputChannel, OutputChannel},
-        err::ChannelError, self,
+        err::ChannelError,
     },
     core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
@@ -171,12 +172,14 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // If there are more than one message in the channel, then the worker steal all the messages
     // and put them in the local queue, after return the first message.
     // If the channel is empty, then the worker return None.
-    fn get_message_from_channel(&mut self, blocking: bool) -> Option<Message<TIn>> {
+    fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
         match &mut self.channel_rx {
             Some(channel_rx) => {
-                // if the channel is empty, then return None
-                // Used to avoid to block the worker when the channel is in blocking mode.
-                if (channel_rx.is_empty() && self.stop && blocking) || (channel_rx.is_empty() && !blocking) {
+                // if the channel is empty and blocking is false, then return None
+                // This is used to avoid to block the worker when the channel is in blocking mode.
+                if (channel_rx.is_empty() && self.stop && channel_rx.is_blocking())
+                    || (channel_rx.is_empty() && !channel_rx.is_blocking())
+                {
                     return None;
                 }
                 match channel_rx.receive() {
@@ -195,7 +198,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                         warn!("Error: {}", e);
                     }
                 }
-            },
+            }
             None => return None,
         }
         None
@@ -205,18 +208,14 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // Pop a message from the local queue, if the local queue is not empty.
     // Try to receive a message from the channel, if the channel is not empty.
     // Steal a message from the other workers, if the local queue and the channel are empty.
-    // Then look for a message in the global queue.
-    // If there are no messages, then return None.
+    //
     fn get_message(&mut self) -> Option<Message<TIn>> {
         match self.get_message_from_local_queue() {
             Some(message) => Some(message),
-            None => match self.get_message_from_channel(false) {
+            None => match self.get_message_from_others() {
                 Some(message) => Some(message),
-                None => match self.get_message_from_others() {
-                    Some(message) => Some(message),
-                    None => self.get_message_from_channel(true),
-                    },
-                },
+                None => self.get_message_from_channel(),
+            },
         }
     }
 
@@ -370,7 +369,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                         let cvar = &splitter_ref.1;
                                         loop {
                                             let (expected, start) = splitter.get();
-                                            if expected == order {                               
+                                            if expected == order {
                                                 let mut tmp_counter = start;
                                                 while !tmp.is_empty() {
                                                     let msg = Message {
@@ -719,7 +718,7 @@ impl<
         }
     }
 
-    // Broadcast terminate message to all workers. 
+    // Broadcast terminate message to all workers.
     fn terminate_all(&self, order: usize) {
         for channel in &self.channels {
             let err = channel.send(Message::new(Task::Terminate, order));
