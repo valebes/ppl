@@ -177,8 +177,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             Some(channel_rx) => {
                 // if the channel is empty and blocking is false, then return None
                 // This is used to avoid to block the worker when the channel is in blocking mode.
-                if (channel_rx.is_empty() && self.stop && channel_rx.is_blocking())
-                    || (channel_rx.is_empty() && !channel_rx.is_blocking())
+                if channel_rx.is_blocking() && channel_rx.is_empty() && self.stop
                 {
                     return None;
                 }
