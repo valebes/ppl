@@ -8,14 +8,13 @@ use std::{
     thread,
 };
 
-use crossbeam_deque::{Injector, Steal, Stealer, Worker};
+use crossbeam_deque::{Steal, Stealer, Worker};
 use dyn_clone::DynClone;
 use log::{trace, warn};
 use std::collections::BTreeMap;
 
 use crate::{
     channel::{
-        self,
         channel::{Channel, InputChannel, OutputChannel},
         err::ChannelError,
     },
@@ -107,7 +106,7 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     local_queue: Worker<Message<TIn>>,
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
     num_replicas: usize,
-    stop: Arc<AtomicBool>,
+    stop: Arc<AtomicBool>, // This flag is used to warn the worker that the stage is terminating.
     phantom: PhantomData<(TOut, TCollected)>,
 }
 impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
@@ -181,8 +180,8 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
         match &mut self.channel_rx {
             Some(channel_rx) => {
-                // if the channel is empty and blocking is false, then return None
-                // This is used to avoid to block the worker when the channel is in blocking mode.
+                // if the channel is empty and it is in blocking mode, then return None
+                // This is used to avoid to block the worker when the channel is in blocking mode and the stage is terminating.
                 if channel_rx.is_blocking() && channel_rx.is_empty() && self.stop.load(Ordering::Acquire)
                 {
                     return None;
@@ -390,7 +389,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                                 cvar.notify_all();
                                                 break;
                                             } else {
-                                                println!("Waiting {} {}", order, splitter.get().0);
                                                 let err = cvar.wait(splitter);
                                                 if err.is_err() {
                                                     panic!("Error: Poisoned mutex!");
