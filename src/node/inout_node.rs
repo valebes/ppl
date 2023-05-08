@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use crate::{
     channel::{
         channel::{Channel, InputChannel, OutputChannel},
-        err::ChannelError,
+        err::ChannelError, self,
     },
     core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
@@ -103,10 +103,10 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
     next_node: Arc<TNext>,
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
-    global_queue: Option<Arc<Injector<Message<TIn>>>>,
     local_queue: Worker<Message<TIn>>,
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
     num_replicas: usize,
+    stop: bool,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
@@ -128,10 +128,10 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             node,
             next_node,
             splitter: None,
-            global_queue: None,
             local_queue: Worker::new_fifo(),
             stealers: None,
             num_replicas,
+            stop: false,
             phantom: PhantomData,
         }
     }
@@ -167,36 +167,16 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         }
     }
 
-    // Get a new message from the global queue.
-    fn get_message_from_global_queue(&mut self) -> Option<Message<TIn>> {
-        match &mut self.global_queue {
-            Some(global_queue) => loop {
-                match global_queue.steal() {
-                    Steal::Success(message) => {
-                        return Some(message);
-                    }
-                    Steal::Empty => {
-                        return None;
-                    }
-                    Steal::Retry => {
-                        continue;
-                    }
-                }
-            },
-            None => None,
-        }
-    }
-
     // Get a new message from the channel.
     // If there are more than one message in the channel, then the worker steal all the messages
     // and put them in the local queue, after return the first message.
     // If the channel is empty, then the worker return None.
-    fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
+    fn get_message_from_channel(&mut self, blocking: bool) -> Option<Message<TIn>> {
         match &mut self.channel_rx {
             Some(channel_rx) => {
                 // if the channel is empty, then return None
                 // Used to avoid to block the worker when the channel is in blocking mode.
-                if channel_rx.is_empty() {
+                if (channel_rx.is_empty() && self.stop && blocking) || (channel_rx.is_empty() && !blocking) {
                     return None;
                 }
                 match channel_rx.receive() {
@@ -230,13 +210,13 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn get_message(&mut self) -> Option<Message<TIn>> {
         match self.get_message_from_local_queue() {
             Some(message) => Some(message),
-            None => match self.get_message_from_channel() {
+            None => match self.get_message_from_channel(false) {
                 Some(message) => Some(message),
                 None => match self.get_message_from_others() {
                     Some(message) => Some(message),
-                    None => self.get_message_from_global_queue(),
+                    None => self.get_message_from_channel(true),
+                    },
                 },
-            },
         }
     }
 
@@ -255,11 +235,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         }
     }
 
-    // Add global queue to the worker.
-    fn set_global_queue(&mut self, global_queue: Arc<Injector<Message<TIn>>>) {
-        self.global_queue = Some(global_queue);
-    }
-
     // Create a new channel for the input.
     // Return the sender of the channel.
     fn create_channel(&mut self, blocking: bool) -> OutputChannel<Message<TIn>> {
@@ -271,16 +246,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // Set the ordered splitter handler for the worker.
     fn set_splitter(&mut self, splitter: Arc<(Mutex<OrderedSplitter>, Condvar)>) {
         self.splitter = Some(splitter);
-    }
-
-    // Send to global queue a message.
-    fn send_to_global_queue(&mut self, message: Message<TIn>) {
-        match &mut self.global_queue {
-            Some(global_queue) => {
-                global_queue.push(message);
-            }
-            None => (),
-        }
     }
 
     fn init_counter(&self) -> usize {
@@ -311,7 +276,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         trace!("InOutNode {} started", self.id);
 
         let mut stop = false;
-        let mut terminate_order = 0;
 
         loop {
             let input = self.get_message();
@@ -353,14 +317,13 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                         }
                         Task::Terminate => {
                             stop = true;
-                            terminate_order = order;
+                            self.stop = true;
                         }
                     }
                     counter += 1;
                 }
                 None => {
                     if stop {
-                        self.send_to_global_queue(Message::new(Task::Terminate, terminate_order));
                         break;
                     }
                 }
@@ -374,7 +337,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         trace!("InOutNode {} started", self.id);
 
         let mut stop = false;
-        let mut terminate_order = 0;
 
         loop {
             let input = self.get_message();
@@ -471,14 +433,13 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                         }
                         Task::Terminate => {
                             stop = true;
-                            terminate_order = order;
+                            self.stop = true;
                         }
                     }
                     counter += 1;
                 }
                 None => {
                     if stop {
-                        self.send_to_global_queue(Message::new(Task::Terminate, terminate_order));
                         break;
                     } else {
                         thread::yield_now();
@@ -497,7 +458,6 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     ordered_splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
-    global_queue: Arc<Injector<Message<TIn>>>,
     job_infos: Vec<JobInfo>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
@@ -561,7 +521,7 @@ impl<
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else {
-                    self.global_queue.push(Message::new(op, order));
+                    self.terminate_all(order);
                     if self.ordered {
                         self.next_msg.store(order, Ordering::Release);
                     }
@@ -632,8 +592,7 @@ impl<
         let mut worker_nodes: Vec<NodeWorker<TIn, TOut, TCollected, TNext>> =
             Vec::with_capacity(replicas);
 
-        let global_queue = Arc::new(Injector::new());
-
+        // Create the workers
         for i in 0..replicas {
             let mut worker =
                 NodeWorker::new(i, handler_copies.remove(0), next_node.clone(), replicas);
@@ -645,9 +604,6 @@ impl<
 
             // Create the channel
             channels.push(worker.create_channel(blocking));
-
-            // Add global queue
-            worker.set_global_queue(global_queue.clone());
 
             worker_nodes.push(worker);
         }
@@ -687,7 +643,6 @@ impl<
             ordered_splitter: splitter,
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
-            global_queue,
             job_infos: orchestrator.push_multiple(funcs),
             phantom: PhantomData,
         }
@@ -761,6 +716,16 @@ impl<
                 }
             }
             Err(_) => panic!("Error: Cannot lock the storage!"),
+        }
+    }
+
+    // Broadcast terminate message to all workers. 
+    fn terminate_all(&self, order: usize) {
+        for channel in &self.channels {
+            let err = channel.send(Message::new(Task::Terminate, order));
+            if err.is_err() {
+                panic!("Error: Cannot send message!");
+            }
         }
     }
 }
