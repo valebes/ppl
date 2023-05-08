@@ -216,9 +216,9 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn get_message(&mut self) -> Option<Message<TIn>> {
         match self.get_message_from_local_queue() {
             Some(message) => Some(message),
-            None => match self.get_message_from_others() {
+            None => match self.get_message_from_channel() {
                 Some(message) => Some(message),
-                None => self.get_message_from_channel(),
+                None => self.get_message_from_others(),
             },
         }
     }
@@ -572,7 +572,7 @@ impl<
         let next_node = Arc::new(next_node);
         let replicas = handler.number_of_replicas();
 
-        let mut stop = Arc::new(AtomicBool::new(false));
+        let stop = Arc::new(AtomicBool::new(false));
         let blocking = orchestrator.get_configuration().get_blocking_channel();
 
         let ordered = handler.is_ordered();
