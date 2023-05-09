@@ -195,9 +195,11 @@ impl ThreadPool {
         }
 
         // For each worker, set the stealers vector.
-        for worker in &mut workers {
-            let stealers_cp = stealers.clone();
-            worker.set_stealers(stealers_cp);
+        // I remove the stealer of the worker itself from the vector.
+        for i in 0..num_threads {
+            let mut stealers_cp = stealers.clone();
+            stealers_cp.remove(i);
+            workers[i].set_stealers(stealers_cp);
         }
 
         // Push workers to the orchestrator.

@@ -2,21 +2,21 @@ use std::{
     collections::VecDeque,
     marker::PhantomData,
     sync::{
-        atomic::{AtomicUsize, Ordering, AtomicBool},
-        Arc, Barrier, Condvar, Mutex, RwLock,
+        atomic::{AtomicUsize, Ordering},
+        Arc, Barrier, Condvar, Mutex,
     },
     thread,
 };
 
 use crossbeam_deque::{Steal, Stealer, Worker};
 use dyn_clone::DynClone;
-use log::{trace, warn, error};
+use log::{trace, warn};
 use std::collections::BTreeMap;
 
 use crate::{
     channel::{
         channel::{Channel, InputChannel, OutputChannel},
-        err::{ChannelError}, self,
+        err::{ChannelError},
     },
     core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
@@ -113,7 +113,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 {
     // Create a new workernode with default values.
     // Is created a new channel for the input and the output.
-    // Feedback is set to None.
     // Splitter is set to None.
     fn new(
         id: usize,
@@ -139,15 +138,17 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         match &mut self.stealers {
             Some(stealers) => loop {
                 for stealer in stealers.iter() {
-                    match stealer.steal() {
-                        Steal::Success(message) => {
-                            return Some(message);
-                        }
-                        Steal::Empty => {
-                            continue;
-                        }
-                        Steal::Retry => {
-                            continue;
+                    loop {
+                        match stealer.steal() {
+                            Steal::Success(message) => {
+                                return Some(message);
+                            }
+                            Steal::Empty => {
+                                break;
+                            }
+                            Steal::Retry => {
+                                continue;
+                            }
                         }
                     }
                 }
@@ -597,9 +598,11 @@ impl<
             for worker in &worker_nodes {
                 stealers.push(worker.get_stealer());
             }
-
-            for worker in &mut worker_nodes {
-                worker.register_stealers(stealers.clone());
+            // Remove the stealer of the current worker
+            for i in 0..replicas {
+                let mut stealer_cp = stealers.clone();
+                stealer_cp.remove(i);
+                worker_nodes[i].register_stealers(stealer_cp);
             }
         }
 
