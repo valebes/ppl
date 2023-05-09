@@ -2,7 +2,7 @@ use std::{
     collections::VecDeque,
     marker::PhantomData,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering, AtomicBool},
         Arc, Barrier, Condvar, Mutex,
     },
     thread,
@@ -105,6 +105,7 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     local_queue: Worker<Message<TIn>>,
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
+    terminating: Arc<AtomicBool>,
     num_replicas: usize,
     
     phantom: PhantomData<(TOut, TCollected)>,
@@ -120,6 +121,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: Arc<TNext>,
         num_replicas: usize,
+        terminating: Arc<AtomicBool>
     ) -> NodeWorker<TIn, TOut, TCollected, TNext> {
         NodeWorker {
             id,
@@ -129,6 +131,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             splitter: None,
             local_queue: Worker::new_fifo(),
             stealers: None,
+            terminating,
             num_replicas,
             phantom: PhantomData,
         }
@@ -139,12 +142,10 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         match &mut self.stealers {
             Some(stealers) => loop {
                 for stealer in stealers.iter() {
-                    // If the stealer have only one element, then skip it.
-                    // Useful to avoid to steal from a worker that have, as last message, a termination message.
-                    if stealer.len() == 1 {
-                        continue;
-                    }
                     loop {
+                        if self.terminating.load(Ordering::Acquire) {
+                            return None;
+                        }
                         match stealer.steal() {
                             Steal::Success(message) => {
                                 return Some(message);
@@ -441,6 +442,7 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
     job_infos: Vec<JobInfo>,
+    terminating: Arc<AtomicBool>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
@@ -503,6 +505,8 @@ impl<
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else {
+                    self.terminating.store(true, Ordering::Release);
+
                     for channel in &self.channels {
                         let res = channel.send(Message::new(Task::Terminate, order));
                         if res.is_err() {
@@ -562,7 +566,7 @@ impl<
 
         let ordered = handler.is_ordered();
         let producer = handler.is_producer();
-
+        let terminating = Arc::new(AtomicBool::new(false));
 
         let mut splitter = None;
         if ordered && producer {
@@ -584,7 +588,7 @@ impl<
         // Create the workers
         for i in 0..replicas {
             let mut worker =
-                NodeWorker::new(i, handler_copies.remove(0), next_node.clone(), replicas);
+                NodeWorker::new(i, handler_copies.remove(0), next_node.clone(), replicas, terminating.clone());
 
             // If the node is ordered and a producer, we need to set the ordered splitter handler
             if producer && ordered {
@@ -635,6 +639,7 @@ impl<
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
             job_infos: orchestrator.push_multiple(funcs),
+            terminating,
             phantom: PhantomData,
         }
     }
