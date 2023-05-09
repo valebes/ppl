@@ -9,6 +9,7 @@ use std::{
 };
 
 use crossbeam_deque::{Steal, Stealer, Worker};
+use crossbeam_utils::sync::ShardedLock;
 use dyn_clone::DynClone;
 use log::{trace, warn};
 use std::collections::BTreeMap;
@@ -105,7 +106,7 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     local_queue: Worker<Message<TIn>>,
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
-    terminating: Arc<AtomicBool>,
+    terminating: Arc<ShardedLock<bool>>,
     num_replicas: usize,
     
     phantom: PhantomData<(TOut, TCollected)>,
@@ -121,7 +122,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: Arc<TNext>,
         num_replicas: usize,
-        terminating: Arc<AtomicBool>
+        terminating: Arc<ShardedLock<bool>>
     ) -> NodeWorker<TIn, TOut, TCollected, TNext> {
         NodeWorker {
             id,
@@ -139,13 +140,20 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
     // Steal a messages from the other workers.
     fn get_message_from_others(&mut self) -> Option<Message<TIn>> {
+        match self.terminating.try_read() {
+            Ok(terminating) => {
+                if *terminating {
+                    return None;
+                }
+            }
+            Err(_) => {
+                return None;
+            }
+        }
         match &mut self.stealers {
             Some(stealers) => loop {
                 for stealer in stealers.iter() {
                     loop {
-                        if self.terminating.load(Ordering::Acquire) {
-                            return None;
-                        }
                         match stealer.steal() {
                             Steal::Success(message) => {
                                 return Some(message);
@@ -442,7 +450,7 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
     job_infos: Vec<JobInfo>,
-    terminating: Arc<AtomicBool>,
+    terminating: Arc<ShardedLock<bool>>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
@@ -505,7 +513,7 @@ impl<
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else {
-                    self.terminating.store(true, Ordering::Release);
+                    *self.terminating.write().unwrap() = true;
 
                     for channel in &self.channels {
                         let res = channel.send(Message::new(Task::Terminate, order));
@@ -566,7 +574,7 @@ impl<
 
         let ordered = handler.is_ordered();
         let producer = handler.is_producer();
-        let terminating = Arc::new(AtomicBool::new(false));
+        let terminating = Arc::new(ShardedLock::new(false));
 
         let mut splitter = None;
         if ordered && producer {

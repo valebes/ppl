@@ -840,6 +840,7 @@ dependencies = [
  "criterion",
  "crossbeam-channel",
  "crossbeam-deque",
+ "crossbeam-utils",
  "dashmap",
  "dyn-clone",
  "env_logger",
