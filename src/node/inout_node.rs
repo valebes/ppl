@@ -9,9 +9,9 @@ use std::{
 };
 
 use crossbeam_deque::{Steal, Stealer, Worker};
-use crossbeam_utils::sync::ShardedLock;
 use dyn_clone::DynClone;
 use log::{trace, warn};
+use parking_lot::RwLock;
 use std::collections::BTreeMap;
 
 use crate::{
@@ -106,7 +106,7 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     local_queue: Worker<Message<TIn>>,
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
-    terminating: Arc<ShardedLock<bool>>,
+    terminating: Arc<RwLock<bool>>,
     num_replicas: usize,
     
     phantom: PhantomData<(TOut, TCollected)>,
@@ -122,7 +122,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: Arc<TNext>,
         num_replicas: usize,
-        terminating: Arc<ShardedLock<bool>>
+        terminating: Arc<RwLock<bool>>
     ) -> NodeWorker<TIn, TOut, TCollected, TNext> {
         NodeWorker {
             id,
@@ -142,12 +142,12 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn get_message_from_others(&mut self) -> Option<Message<TIn>> {
         let mtx = self.terminating.try_read();
         match mtx {
-            Ok(terminating) => {
+            Some(terminating) => {
                 if *terminating {
                     return None;
                 }
             }
-            Err(_) => {
+            None => {
                 return None;
             }
         }
@@ -451,7 +451,7 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
     job_infos: Vec<JobInfo>,
-    terminating: Arc<ShardedLock<bool>>,
+    terminating: Arc<RwLock<bool>>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
@@ -514,7 +514,7 @@ impl<
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else {
-                    *self.terminating.write().unwrap() = true;
+                    *self.terminating.write() = true;
 
                     for channel in &self.channels {
                         let res = channel.send(Message::new(Task::Terminate, order));
@@ -575,7 +575,7 @@ impl<
 
         let ordered = handler.is_ordered();
         let producer = handler.is_producer();
-        let terminating = Arc::new(ShardedLock::new(false));
+        let terminating = Arc::new(RwLock::new(false));
 
         let mut splitter = None;
         if ordered && producer {
