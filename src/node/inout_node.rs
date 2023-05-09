@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
     sync::{
         atomic::{AtomicUsize, Ordering, AtomicBool},
-        Arc, Barrier, Condvar, Mutex, RwLock,
+        Arc, Barrier, Condvar, Mutex,
     },
     thread,
 };
@@ -11,6 +11,7 @@ use std::{
 use crossbeam_deque::{Steal, Stealer, Worker};
 use dyn_clone::DynClone;
 use log::{trace, warn};
+use parking_lot::RwLock;
 use std::collections::BTreeMap;
 
 use crate::{
@@ -139,7 +140,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
     // Steal a messages from the other workers.
     fn get_message_from_others(&mut self) -> Option<Message<TIn>> {
-        let stop = self.stop.read().unwrap();
+        let stop = self.stop.read();
         if *stop {
             return None;
         }
@@ -506,7 +507,7 @@ impl<
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else {
-                    *self.stop.write().unwrap() = true;
+                    *self.stop.write() = true;
                     for channel in &self.channels {
                         let res = channel.send(Message::new(Task::Terminate, order));
                         if res.is_err() {
