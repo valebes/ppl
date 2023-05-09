@@ -104,9 +104,9 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
     next_node: Arc<TNext>,
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
-    local_queue: Worker<Message<TIn>>,
+    local_queue: Worker<Message<TIn>>, // steable queue
+    system_queue: Vec<Message<TIn>>, // non steable queue
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
-    terminating: Arc<RwLock<bool>>,
     num_replicas: usize,
     
     phantom: PhantomData<(TOut, TCollected)>,
@@ -132,7 +132,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             splitter: None,
             local_queue: Worker::new_fifo(),
             stealers: None,
-            terminating,
+            system_queue: Vec::new(),
             num_replicas,
             phantom: PhantomData,
         }
@@ -140,17 +140,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
     // Steal a messages from the other workers.
     fn get_message_from_others(&mut self) -> Option<Message<TIn>> {
-        let mtx = self.terminating.try_read();
-        match mtx {
-            Some(terminating) => {
-                if *terminating {
-                    return None;
-                }
-            }
-            None => {
-                return None;
-            }
-        }
         match &mut self.stealers {
             Some(stealers) => loop {
                 for stealer in stealers.iter() {
@@ -191,13 +180,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             Some(channel_rx) => {
                 match channel_rx.receive() {
                     Ok(Some(message)) => {
-                        channel_rx
-                            .receive_all()
-                            .unwrap()
-                            .into_iter()
-                            .for_each(|message| {
-                                self.local_queue.push(message);
-                            });
+                        self.steal_all_from_channel();
                         return Some(message);
                     }
                     Ok(None) => return None,
@@ -211,19 +194,52 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         None
     }
 
+    // Steal all the message from the channel.
+    // All the messages, apart from terminating message, are put in the local queue.
+    // If there are a terminating message, then that is put in the system queue.
+    fn steal_all_from_channel(&mut self) {
+        match &mut self.channel_rx {
+            Some(channel_rx) => {
+                match channel_rx.receive_all() {
+                    Ok(messages) => {
+                        messages.into_iter().for_each(|message| {
+                            if message.is_terminate(){
+                                self.system_queue.push(message);
+                            } else {
+                                self.local_queue.push(message);
+                            }
+                        });
+                    }
+                    Err(e) => {
+                        warn!("Error: {}", e);
+                    }
+                }
+            }
+            None => {}
+        }
+    }
+
+    // Get a message from system queue.
+    // If the system queue is empty, then return None.
+    fn get_message_from_system_queue(&mut self) -> Option<Message<TIn>> {
+        match self.system_queue.pop() {
+            Some(message) => Some(message),
+            None => None,
+        }
+    }
+
     // Get a new message.
     // Pop a message from the local queue, if the local queue is not empty.
     // Try to receive a message from the channel, if the channel is not empty.
     // Steal a message from the other workers, if the local queue and the channel are empty.
-    //
     fn get_message(&mut self) -> Option<Message<TIn>> {
         match self.get_message_from_local_queue() {
             Some(message) => Some(message),
-            None => match self.get_message_from_channel() {
+            None => match self.get_message_from_system_queue() {
                 Some(message) => Some(message),
-                None => match self.get_message_from_others() {
+                None => match self.get_message_from_channel() {
                     Some(message) => Some(message),
-                    None => None,
+                    None => self.get_message_from_others(),
                 },
             },
         }
@@ -451,7 +467,6 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
     job_infos: Vec<JobInfo>,
-    terminating: Arc<RwLock<bool>>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
@@ -514,8 +529,6 @@ impl<
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else {
-                    *self.terminating.write() = true;
-
                     for channel in &self.channels {
                         let res = channel.send(Message::new(Task::Terminate, order));
                         if res.is_err() {
@@ -648,7 +661,6 @@ impl<
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
             job_infos: orchestrator.push_multiple(funcs),
-            terminating,
             phantom: PhantomData,
         }
     }
