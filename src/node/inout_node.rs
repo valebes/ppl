@@ -140,7 +140,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
     // Steal a messages from the other workers.
     fn get_message_from_others(&mut self) -> Option<Message<TIn>> {
-        match self.terminating.try_read() {
+        match self.terminating.read() {
             Ok(terminating) => {
                 if *terminating {
                     return None;
