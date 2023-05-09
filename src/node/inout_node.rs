@@ -3,20 +3,20 @@ use std::{
     marker::PhantomData,
     sync::{
         atomic::{AtomicUsize, Ordering, AtomicBool},
-        Arc, Barrier, Condvar, Mutex,
+        Arc, Barrier, Condvar, Mutex, RwLock,
     },
     thread,
 };
 
 use crossbeam_deque::{Steal, Stealer, Worker};
 use dyn_clone::DynClone;
-use log::{trace, warn};
+use log::{trace, warn, error};
 use std::collections::BTreeMap;
 
 use crate::{
     channel::{
         channel::{Channel, InputChannel, OutputChannel},
-        err::ChannelError,
+        err::{ChannelError}, self,
     },
     core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
@@ -106,7 +106,6 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     local_queue: Worker<Message<TIn>>,
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
     num_replicas: usize,
-    stop: Arc<AtomicBool>, // This flag is used to warn the worker that the stage is terminating.
     phantom: PhantomData<(TOut, TCollected)>,
 }
 impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
@@ -120,7 +119,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         id: usize,
         node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: Arc<TNext>,
-        stop: Arc<AtomicBool>,
         num_replicas: usize,
     ) -> NodeWorker<TIn, TOut, TCollected, TNext> {
         NodeWorker {
@@ -132,18 +130,12 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             local_queue: Worker::new_fifo(),
             stealers: None,
             num_replicas,
-            stop,
             phantom: PhantomData,
         }
     }
 
     // Steal a messages from the other workers.
     fn get_message_from_others(&mut self) -> Option<Message<TIn>> {
-        // If this stage is terminating, then avoid to steal messages.
-        if self.stop.load(Ordering::Acquire) {
-            return None;
-        }
-
         match &mut self.stealers {
             Some(stealers) => loop {
                 for stealer in stealers.iter() {
@@ -180,12 +172,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
         match &mut self.channel_rx {
             Some(channel_rx) => {
-                // if the channel is empty and it is in blocking mode, then return None
-                // This is used to avoid to block the worker when the channel is in blocking mode and the stage is terminating.
-                if channel_rx.is_blocking() && channel_rx.is_empty() && self.stop.load(Ordering::Acquire)
-                {
-                    return None;
-                }
                 match channel_rx.receive() {
                     Ok(Some(message)) => {
                         channel_rx
@@ -218,7 +204,10 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             Some(message) => Some(message),
             None => match self.get_message_from_channel() {
                 Some(message) => Some(message),
-                None => self.get_message_from_others(),
+                None => match self.get_message_from_others() {
+                    Some(message) => Some(message),
+                    None => None,
+                },
             },
         }
     }
@@ -278,8 +267,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         let mut counter = self.init_counter();
         trace!("InOutNode {} started", self.id);
 
-        let mut stop = false;
-
         loop {
             let input = self.get_message();
 
@@ -319,16 +306,12 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             }
                         }
                         Task::Terminate => {
-                            stop = true;
+                            break;
                         }
                     }
                     counter += 1;
                 }
-                None => {
-                    if stop {
-                        break;
-                    }
-                }
+                None => thread::yield_now(),
             }
         }
     }
@@ -337,8 +320,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn rts_producer(&mut self) {
         let mut counter = self.init_counter();
         trace!("InOutNode {} started", self.id);
-
-        let mut stop = false;
 
         loop {
             let input = self.get_message();
@@ -433,18 +414,12 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             }
                         }
                         Task::Terminate => {
-                            stop = true;
+                            break;
                         }
                     }
                     counter += 1;
                 }
-                None => {
-                    if stop {
-                        break;
-                    } else {
-                        thread::yield_now();
-                    }
-                }
+                None => thread::yield_now(),
             }
         }
     }
@@ -459,7 +434,6 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     next_msg: AtomicUsize,
     job_infos: Vec<JobInfo>,
-    stop: Arc<AtomicBool>,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
@@ -522,8 +496,14 @@ impl<
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else {
-                    self.stop.store(true, Ordering::Release);
-                    self.terminate_all(order);
+                    for channel in &self.channels {
+                        let res = channel.send(Message::new(Task::Terminate, order));
+                        if res.is_err() {
+                            panic!("Error: Cannot send message!");
+                        }
+                    }
+
+
                     if self.ordered {
                         self.next_msg.store(order, Ordering::Release);
                     }
@@ -572,7 +552,6 @@ impl<
         let next_node = Arc::new(next_node);
         let replicas = handler.number_of_replicas();
 
-        let stop = Arc::new(AtomicBool::new(false));
         let blocking = orchestrator.get_configuration().get_blocking_channel();
 
         let ordered = handler.is_ordered();
@@ -598,7 +577,7 @@ impl<
         // Create the workers
         for i in 0..replicas {
             let mut worker =
-                NodeWorker::new(i, handler_copies.remove(0), next_node.clone(), stop.clone(), replicas);
+                NodeWorker::new(i, handler_copies.remove(0), next_node.clone(), replicas);
 
             // If the node is ordered and a producer, we need to set the ordered splitter handler
             if producer && ordered {
@@ -639,7 +618,7 @@ impl<
         }
 
         InOutNode {
-            channels,
+            channels: channels,
             next_node,
             ordered,
             producer,
@@ -647,7 +626,6 @@ impl<
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
             job_infos: orchestrator.push_multiple(funcs),
-            stop,
             phantom: PhantomData,
         }
     }
@@ -720,16 +698,6 @@ impl<
                 }
             }
             Err(_) => panic!("Error: Cannot lock the storage!"),
-        }
-    }
-
-    // Broadcast terminate message to all workers.
-    fn terminate_all(&self, order: usize) {
-        for channel in &self.channels {
-            let err = channel.send(Message::new(Task::Terminate, order));
-            if err.is_err() {
-                panic!("Error: Cannot send message!");
-            }
         }
     }
 }
