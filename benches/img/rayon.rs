@@ -39,7 +39,6 @@ pub fn rayon(images: Vec<Image>, threads: usize) {
         .build()
         .unwrap();
     pool.install(|| {
-
         let _collection: Vec<Image> = images
             .into_iter()
             .par_bridge()

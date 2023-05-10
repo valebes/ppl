@@ -2,7 +2,7 @@ use std::{
     collections::VecDeque,
     marker::PhantomData,
     sync::{
-        atomic::{AtomicUsize, Ordering, AtomicBool},
+        atomic::{AtomicUsize, Ordering},
         Arc, Barrier, Condvar, Mutex,
     },
     thread,
@@ -11,13 +11,12 @@ use std::{
 use crossbeam_deque::{Steal, Stealer, Worker};
 use dyn_clone::DynClone;
 use log::{trace, warn};
-use parking_lot::RwLock;
 use std::collections::BTreeMap;
 
 use crate::{
     channel::{
         channel::{Channel, InputChannel, OutputChannel},
-        err::{ChannelError},
+        err::ChannelError,
     },
     core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
@@ -105,10 +104,10 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     next_node: Arc<TNext>,
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     local_queue: Worker<Message<TIn>>, // steable queue
-    system_queue: Vec<Message<TIn>>, // non steable queue
+    system_queue: Vec<Message<TIn>>,   // non steable queue
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
     num_replicas: usize,
-    
+
     phantom: PhantomData<(TOut, TCollected)>,
 }
 impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
@@ -122,7 +121,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: Arc<TNext>,
         num_replicas: usize,
-        terminating: Arc<RwLock<bool>>
     ) -> NodeWorker<TIn, TOut, TCollected, TNext> {
         NodeWorker {
             id,
@@ -177,18 +175,16 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // If the channel is empty, then the worker return None.
     fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
         match &mut self.channel_rx {
-            Some(channel_rx) => {
-                match channel_rx.receive() {
-                    Ok(Some(message)) => {
-                        self.steal_all_from_channel();
-                        return Some(message);
-                    }
-                    Ok(None) => return None,
-                    Err(e) => {
-                        warn!("Error: {}", e);
-                    }
+            Some(channel_rx) => match channel_rx.receive() {
+                Ok(Some(message)) => {
+                    self.steal_all_from_channel();
+                    return Some(message);
                 }
-            }
+                Ok(None) => return None,
+                Err(e) => {
+                    warn!("Error: {}", e);
+                }
+            },
             None => return None,
         }
         None
@@ -199,22 +195,20 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // If there are a terminating message, then that is put in the system queue.
     fn steal_all_from_channel(&mut self) {
         match &mut self.channel_rx {
-            Some(channel_rx) => {
-                match channel_rx.receive_all() {
-                    Ok(messages) => {
-                        messages.into_iter().for_each(|message| {
-                            if message.is_terminate(){
-                                self.system_queue.push(message);
-                            } else {
-                                self.local_queue.push(message);
-                            }
-                        });
-                    }
-                    Err(e) => {
-                        warn!("Error: {}", e);
-                    }
+            Some(channel_rx) => match channel_rx.receive_all() {
+                Ok(messages) => {
+                    messages.into_iter().for_each(|message| {
+                        if message.is_terminate() {
+                            self.system_queue.push(message);
+                        } else {
+                            self.local_queue.push(message);
+                        }
+                    });
                 }
-            }
+                Err(e) => {
+                    warn!("Error: {}", e);
+                }
+            },
             None => {}
         }
     }
@@ -588,7 +582,6 @@ impl<
 
         let ordered = handler.is_ordered();
         let producer = handler.is_producer();
-        let terminating = Arc::new(RwLock::new(false));
 
         let mut splitter = None;
         if ordered && producer {
@@ -610,7 +603,7 @@ impl<
         // Create the workers
         for i in 0..replicas {
             let mut worker =
-                NodeWorker::new(i, handler_copies.remove(0), next_node.clone(), replicas, terminating.clone());
+                NodeWorker::new(i, handler_copies.remove(0), next_node.clone(), replicas);
 
             // If the node is ordered and a producer, we need to set the ordered splitter handler
             if producer && ordered {

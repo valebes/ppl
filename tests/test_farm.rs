@@ -42,7 +42,6 @@ impl Out<u64> for Source {
     }
 }
 
-
 #[derive(Clone)]
 struct WorkerA {}
 impl InOut<u64, u64> for WorkerA {
