@@ -23,7 +23,6 @@ num_cpus = "1.15.0"
 ff_buffer = { git = "https://github.com/valebes/ff_buffer.git", optional = true }
 kanal = { git = "https://github.com/fereidani/kanal.git", optional = true }
 flume = { version = "0.10.14", optional = true }
-parking_lot = {version = "0.12.1", features = ["hardware-lock-elision", "nightly"]}
 
 [dev-dependencies]
 criterion = {version = "0.4", features = ["html_reports"]}
