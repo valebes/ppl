@@ -133,7 +133,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // Steal a messages from the other workers.
     fn get_message_from_others(&mut self) -> Option<Message<TIn>> {
         match &mut self.stealers {
-            Some(stealers) => loop {
+            Some(stealers) => {
                 for stealer in stealers.iter() {
                     loop {
                         match stealer.steal() {
@@ -149,7 +149,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                         }
                     }
                 }
-                return None;
+                None
             },
             None => None,
         }
@@ -157,10 +157,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
     // Get a new message from the local queue or steal a message from the other workers.
     fn get_message_from_local_queue(&mut self) -> Option<Message<TIn>> {
-        match self.local_queue.pop() {
-            Some(message) => Some(message),
-            None => None,
-        }
+        self.local_queue.pop()
     }
 
     // Get a new message from the channel.
@@ -214,10 +211,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // Get a message from system queue.
     // If the system queue is empty, then return None.
     fn get_message_from_system_queue(&mut self) -> Option<Message<TIn>> {
-        match self.system_queue.pop() {
-            Some(message) => Some(message),
-            None => None,
-        }
+        self.system_queue.pop()
     }
 
     // Get a new message.
@@ -297,7 +291,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
             match input {
                 Some(Message { op, order }) => {
-                    counter = counter % self.next_node.get_num_of_replicas();
+                    counter %= self.next_node.get_num_of_replicas();
 
                     match op {
                         Task::NewTask(task) => {
@@ -351,7 +345,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
             match input {
                 Some(Message { op, order }) => {
-                    counter = counter % self.next_node.get_num_of_replicas();
+                    counter %= self.next_node.get_num_of_replicas();
 
                     match op {
                         Task::NewTask(task) => {
@@ -430,7 +424,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             let err = self.next_node.send(
                                 Message {
                                     op: Task::Dropped,
-                                    order: order,
+                                    order,
                                 },
                                 counter,
                             );
@@ -623,11 +617,11 @@ impl<
                 stealers.push(worker.get_stealer());
             }
             // Remove the stealer of the current worker
-            for i in 0..replicas {
+            (0..replicas).for_each(|i| {
                 let mut stealer_cp = stealers.clone();
                 stealer_cp.remove(i);
                 worker_nodes[i].register_stealers(stealer_cp);
-            }
+            });
         }
 
         // Create the barrier
@@ -647,7 +641,7 @@ impl<
         }
 
         InOutNode {
-            channels: channels,
+            channels,
             next_node,
             ordered,
             producer,

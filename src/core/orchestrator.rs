@@ -535,7 +535,7 @@ impl Orchestrator {
 
 impl Drop for Orchestrator {
     fn drop(&mut self) {
-        while self.partitions.len() > 0 {
+        while !self.partitions.is_empty() {
             drop(self.partitions.remove(0));
         }
     }

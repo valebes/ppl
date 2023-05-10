@@ -133,7 +133,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
 
             let res = node.run(); // Run the node and get the output
 
-            counter = counter % nn.get_num_of_replicas(); // Get the next node
+            counter %= nn.get_num_of_replicas(); // Get the next node
 
             match res {
                 Some(output) => {

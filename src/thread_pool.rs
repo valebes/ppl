@@ -196,14 +196,14 @@ impl ThreadPool {
 
         // For each worker, set the stealers vector.
         // I remove the stealer of the worker itself from the vector.
-        for i in 0..num_threads {
+        (0..num_threads).for_each(|i| {
             let mut stealers_cp = stealers.clone();
             stealers_cp.remove(i);
             workers[i].set_stealers(stealers_cp);
-        }
+        });
 
         // Push workers to the orchestrator.
-        while workers.len() > 0 {
+        while !workers.is_empty() {
             let barrier = Arc::clone(&barrier);
             let worker = workers.remove(0);
             let func = move || {

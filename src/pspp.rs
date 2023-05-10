@@ -29,7 +29,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     pub fn wait_and_collect(&mut self) -> Option<TCollected> {
         match &mut self.first_block {
             Some(_block) => {
-                let block = std::mem::replace(&mut self.first_block, None);
+                let block = self.first_block.take();
                 if block.is_some() {
                     Node::<TOut, TCollected>::collect(block.unwrap())
                 } else {
@@ -47,7 +47,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     fn drop(&mut self) {
         match &mut self.first_block {
             Some(_block) => {
-                let block = std::mem::replace(&mut self.first_block, None);
+                let block = self.first_block.take();
                 if block.is_some() {
                     block.unwrap().terminate();
                 }

@@ -12,11 +12,8 @@ impl<T: Send> Message<T> {
     pub fn new(op: Task<T>, order: usize) -> Message<T> {
         Message { op, order }
     }
-    
+
     pub fn is_terminate(&self) -> bool {
-        match self.op {
-            Task::Terminate => true,
-            _ => false,
-        }
+        matches!(self.op, Task::Terminate)
     }
 }

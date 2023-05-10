@@ -35,7 +35,7 @@ impl Out<u64> for Source {
         let mut ret = None;
         if self.streamlen > 0 {
             ret = Some((self.streamlen as u64 % 20) + 1);
-            self.streamlen = self.streamlen - 1;
+            self.streamlen -= 1;
         }
         ret
     }
