@@ -72,7 +72,6 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
         match &op {
             Task::NewTask(_e) => {
                 if self.ordered && order != self.counter.load(Ordering::Acquire) {
-                    //change to acquire ordering
                     self.save_to_storage(Message::new(op, rec_id), order);
                     self.send_pending();
                 } else {
@@ -131,9 +130,6 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
     /// The `handler` is the  struct that implement the trait `In` and defines
     /// the behavior of the node we're creating.
     /// `next_node` contains the stage that follows the node.
-    /// If `blocking` is true the node will perform blocking operation on receive.
-    /// If `pinning` is `true` the node will be pinned to the thread in position `id`.
-    ///
     pub fn new(
         id: usize,
         handler: Box<dyn In<TIn, TCollected> + Send + Sync>,

@@ -78,7 +78,6 @@ macro_rules! propagate {
     };
 }
 
-//todo: add macro for parallel using local registry
 /// Creates a new parallel pipeline.
 /// The macro takes as input a list of stages.
 /// The stages are executed in parallel.

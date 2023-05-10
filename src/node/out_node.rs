@@ -76,8 +76,6 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     /// The `handler` is the  struct that implement the trait `Out` and defines
     /// the behavior of the node we're creating.
     /// `next_node` contains the stage that follows the node.
-    /// If `pinning` is `true` the node will be pinned to the thread in position `id`.
-    ///
     pub fn new(
         id: usize,
         handler: Box<dyn Out<TOut> + Send + Sync>,

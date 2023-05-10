@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use crate::{
     channel::{
         channel::{Channel, InputChannel, OutputChannel},
-        err::ChannelError,
+        err::{ChannelError},
     },
     core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
@@ -62,14 +62,6 @@ pub trait InOut<TIn, TOut>: DynClone {
     fn is_ordered(&self) -> bool {
         false
     }
-    fn broadcasting(&self) -> bool {
-        // to be implemented
-        false
-    }
-    fn a2a(&self) -> bool {
-        // to be implemented
-        false
-    }
     /// This method return a boolean that represent if the node is a producer or not.
     /// Overload this method allow to choose if the node produce multiple output or not.
     fn is_producer(&self) -> bool {
@@ -97,6 +89,8 @@ impl OrderedSplitter {
     }
 }
 
+/// Struct that represent a node that receive an input and produce an output.
+/// This struct is used by the rts to execute the node.
 struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     id: usize,
     channel_rx: Option<InputChannel<Message<TIn>>>,
@@ -104,10 +98,10 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     next_node: Arc<TNext>,
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     local_queue: Worker<Message<TIn>>, // steable queue
-    system_queue: Vec<Message<TIn>>,   // non steable queue
+    system_queue: Vec<Message<TIn>>, // non steable queue
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
     num_replicas: usize,
-
+    
     phantom: PhantomData<(TOut, TCollected)>,
 }
 impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
@@ -175,16 +169,18 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // If the channel is empty, then the worker return None.
     fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
         match &mut self.channel_rx {
-            Some(channel_rx) => match channel_rx.receive() {
-                Ok(Some(message)) => {
-                    self.steal_all_from_channel();
-                    return Some(message);
+            Some(channel_rx) => {
+                match channel_rx.receive() {
+                    Ok(Some(message)) => {
+                        self.steal_all_from_channel();
+                        return Some(message);
+                    }
+                    Ok(None) => return None,
+                    Err(e) => {
+                        warn!("Error: {}", e);
+                    }
                 }
-                Ok(None) => return None,
-                Err(e) => {
-                    warn!("Error: {}", e);
-                }
-            },
+            }
             None => return None,
         }
         None
@@ -195,20 +191,22 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // If there are a terminating message, then that is put in the system queue.
     fn steal_all_from_channel(&mut self) {
         match &mut self.channel_rx {
-            Some(channel_rx) => match channel_rx.receive_all() {
-                Ok(messages) => {
-                    messages.into_iter().for_each(|message| {
-                        if message.is_terminate() {
-                            self.system_queue.push(message);
-                        } else {
-                            self.local_queue.push(message);
-                        }
-                    });
+            Some(channel_rx) => {
+                match channel_rx.receive_all() {
+                    Ok(messages) => {
+                        messages.into_iter().for_each(|message| {
+                            if message.is_terminate(){
+                                self.system_queue.push(message);
+                            } else {
+                                self.local_queue.push(message);
+                            }
+                        });
+                    }
+                    Err(e) => {
+                        warn!("Error: {}", e);
+                    }
                 }
-                Err(e) => {
-                    warn!("Error: {}", e);
-                }
-            },
+            }
             None => {}
         }
     }
@@ -452,6 +450,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     }
 }
 
+/// Struct representing a stage, with an input and an output, of a pipeline.
 pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     channels: Vec<OutputChannel<Message<TIn>>>,
     next_node: Arc<TNext>,
@@ -631,6 +630,7 @@ impl<
             }
         }
 
+        // Create the barrier
         let barrier = Arc::new(Barrier::new(replicas));
 
         for _i in 0..replicas {
@@ -638,6 +638,7 @@ impl<
 
             let local_barrier = barrier.clone();
             let func = move || {
+                // The worker will wait for the barrier before starting
                 local_barrier.wait();
                 worker.rts();
             };
@@ -653,20 +654,22 @@ impl<
             ordered_splitter: splitter,
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
-            job_infos: orchestrator.push_multiple(funcs),
+            job_infos: orchestrator.push_multiple(funcs), // Push the workers into the orchestrator
             phantom: PhantomData,
         }
     }
 
+    /// Wait for all the workers to finish
     fn wait(&mut self) {
         for job in &self.job_infos {
             job.wait();
         }
 
-        // Change this that is really shitty
+        // TODO: Change this, it can be done better
+        // If the node is ordered and a producer, we need to wait for the ordered splitter to arrive at the correct order
         let mut c = 0;
         if self.ordered && !self.producer {
-            c = self.next_msg.load(Ordering::Acquire); // No need to be seq_cst
+            c = self.next_msg.load(Ordering::Acquire);
         } else if self.ordered && self.producer {
             match &self.ordered_splitter {
                 Some(lock) => {
@@ -682,6 +685,8 @@ impl<
         }
     }
 
+    /// If we cant send a message immediately, we need to save it to the storage.
+    /// Take in example a pipeline that is ordered.
     fn save_to_storage(&self, msg: Message<TIn>, order: usize) {
         let mtx = self.storage.lock();
 
@@ -693,6 +698,7 @@ impl<
         }
     }
 
+    /// Send pending messages in the storage to the next node.
     fn send_pending(&self) {
         let mtx = self.storage.lock();
 
