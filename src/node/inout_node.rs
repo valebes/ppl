@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use crate::{
     channel::{
         channel::{Channel, InputChannel, OutputChannel},
-        err::{ChannelError},
+        err::ChannelError,
     },
     core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
@@ -98,10 +98,10 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     next_node: Arc<TNext>,
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
     local_queue: Worker<Message<TIn>>, // steable queue
-    system_queue: Vec<Message<TIn>>, // non steable queue
+    system_queue: Vec<Message<TIn>>,   // non steable queue
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
     num_replicas: usize,
-    
+
     phantom: PhantomData<(TOut, TCollected)>,
 }
 impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
@@ -150,7 +150,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                     }
                 }
                 None
-            },
+            }
             None => None,
         }
     }
@@ -166,18 +166,16 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // If the channel is empty, then the worker return None.
     fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
         match &mut self.channel_rx {
-            Some(channel_rx) => {
-                match channel_rx.receive() {
-                    Ok(Some(message)) => {
-                        self.steal_all_from_channel();
-                        return Some(message);
-                    }
-                    Ok(None) => return None,
-                    Err(e) => {
-                        warn!("Error: {}", e);
-                    }
+            Some(channel_rx) => match channel_rx.receive() {
+                Ok(Some(message)) => {
+                    self.steal_all_from_channel();
+                    return Some(message);
                 }
-            }
+                Ok(None) => return None,
+                Err(e) => {
+                    warn!("Error: {}", e);
+                }
+            },
             None => return None,
         }
         None
@@ -188,22 +186,20 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // If there are a terminating message, then that is put in the system queue.
     fn steal_all_from_channel(&mut self) {
         match &mut self.channel_rx {
-            Some(channel_rx) => {
-                match channel_rx.receive_all() {
-                    Ok(messages) => {
-                        messages.into_iter().for_each(|message| {
-                            if message.is_terminate(){
-                                self.system_queue.push(message);
-                            } else {
-                                self.local_queue.push(message);
-                            }
-                        });
-                    }
-                    Err(e) => {
-                        warn!("Error: {}", e);
-                    }
+            Some(channel_rx) => match channel_rx.receive_all() {
+                Ok(messages) => {
+                    messages.into_iter().for_each(|message| {
+                        if message.is_terminate() {
+                            self.system_queue.push(message);
+                        } else {
+                            self.local_queue.push(message);
+                        }
+                    });
                 }
-            }
+                Err(e) => {
+                    warn!("Error: {}", e);
+                }
+            },
             None => {}
         }
     }
@@ -216,6 +212,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 
     // Get a new message.
     // Pop a message from the local queue, if the local queue is not empty.
+    // Look in the system queue, if there are a message.
     // Try to receive a message from the channel, if the channel is not empty.
     // Steal a message from the other workers, if the local queue and the channel are empty.
     fn get_message(&mut self) -> Option<Message<TIn>> {
@@ -224,8 +221,9 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             None => match self.get_message_from_system_queue() {
                 Some(message) => Some(message),
                 None => match self.get_message_from_channel() {
+                    // If we are in blocking mode, we stop here until we receive a message.
                     Some(message) => Some(message),
-                    None => self.get_message_from_others(),
+                    None => self.get_message_from_others(), // Otherwise, If we are in non blocking mode and there arent msg in the channel, we steal a message from the other workers.
                 },
             },
         }
@@ -286,6 +284,8 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         let mut counter = self.init_counter();
         trace!("InOutNode {} started", self.id);
 
+        let mut stop = false;
+
         loop {
             let input = self.get_message();
 
@@ -325,12 +325,19 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             }
                         }
                         Task::Terminate => {
-                            break;
+                            stop = true;
                         }
                     }
                     counter += 1;
                 }
-                None => thread::yield_now(),
+                None => {
+                    // There are no more messages to process.
+                    if stop {
+                        break;
+                    } else {
+                        thread::yield_now();
+                    }
+                }
             }
         }
     }
@@ -339,6 +346,8 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn rts_producer(&mut self) {
         let mut counter = self.init_counter();
         trace!("InOutNode {} started", self.id);
+
+        let mut stop = false;
 
         loop {
             let input = self.get_message();
@@ -433,12 +442,19 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             }
                         }
                         Task::Terminate => {
-                            break;
+                            stop = true;
                         }
                     }
                     counter += 1;
                 }
-                None => thread::yield_now(),
+                None => {
+                    // There are no more messages to process.
+                    if stop {
+                        break;
+                    } else {
+                        thread::yield_now();
+                    }
+                }
             }
         }
     }
