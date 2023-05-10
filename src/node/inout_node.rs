@@ -100,6 +100,7 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
     local_queue: Worker<Message<TIn>>, // steable queue
     system_queue: Vec<Message<TIn>>,   // non steable queue
     stealers: Option<Vec<Stealer<Message<TIn>>>>,
+    stop: bool,
     num_replicas: usize,
 
     phantom: PhantomData<(TOut, TCollected)>,
@@ -126,6 +127,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
             stealers: None,
             system_queue: Vec::new(),
             num_replicas,
+            stop: false,
             phantom: PhantomData,
         }
     }
@@ -165,6 +167,11 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // and put them in the local queue, after return the first message.
     // If the channel is empty, then the worker return None.
     fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
+        // If we have received a terminating message, then we don't want to receive any other message.
+        // In blocking mode this help to avoid to block the thread on a channel that won't receive any other message.
+        if self.stop {
+            return None;
+        }
         match &mut self.channel_rx {
             Some(channel_rx) => match channel_rx.receive() {
                 Ok(Some(message)) => {
@@ -284,8 +291,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
         let mut counter = self.init_counter();
         trace!("InOutNode {} started", self.id);
 
-        let mut stop = false;
-
         loop {
             let input = self.get_message();
 
@@ -325,14 +330,14 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             }
                         }
                         Task::Terminate => {
-                            stop = true;
+                            self.stop = true;
                         }
                     }
                     counter += 1;
                 }
                 None => {
                     // There are no more messages to process.
-                    if stop {
+                    if self.stop {
                         break;
                     } else {
                         thread::yield_now();
@@ -346,8 +351,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn rts_producer(&mut self) {
         let mut counter = self.init_counter();
         trace!("InOutNode {} started", self.id);
-
-        let mut stop = false;
 
         loop {
             let input = self.get_message();
@@ -442,14 +445,14 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             }
                         }
                         Task::Terminate => {
-                            stop = true;
+                            self.stop = true;
                         }
                     }
                     counter += 1;
                 }
                 None => {
                     // There are no more messages to process.
-                    if stop {
+                    if self.stop {
                         break;
                     } else {
                         thread::yield_now();

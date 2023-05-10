@@ -16,6 +16,7 @@ fn main() {
     let threads = args[2].parse::<usize>().unwrap();
     let dataset = &args[3];
 
+    // TODO: add more backends? In that case this can be a benchmark instead than an example
     match backend.as_str() {
         //"sequential" => sequential::sequential(dir_name),
         //"rust-ssp" => rust_ssp::rust_ssp(dir_name, threads),
