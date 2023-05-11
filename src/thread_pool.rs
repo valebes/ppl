@@ -301,7 +301,7 @@ impl ThreadPool {
         <Iter as IntoIterator>::Item: Send,
         R: Send + 'static,
     {
-        let (rx, tx) = Channel::channel(false);
+        let (rx, tx) = Channel::channel(true);
         let arc_tx = Arc::new(tx);
         let mut unordered_map = BTreeMap::<usize, R>::new();
 
@@ -317,12 +317,18 @@ impl ThreadPool {
             });
         });
 
+        drop(arc_tx);
+        
+        // We use non-blocking channel and a thread::yield_now() instead to use
+        // directly blocking channel. This is because depending on the implementation
+        // of the channel in use, the channel in blocking mode may block the thread pool
+        // even if the sender side is dropped.
         while !rx.is_empty() || !self.is_empty() {
             match rx.receive() {
                 Ok(Some((i, r))) => {
                     unordered_map.insert(i, r);
                 },
-                Ok(None) => std::thread::yield_now(),
+                Ok(None) => continue,
                 Err(_) => {}
             }
         }
