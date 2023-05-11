@@ -319,16 +319,12 @@ impl ThreadPool {
         // There is room for interleave the execution of the jobs with the reception of the results.
         //self.wait();
         while !rx.is_empty() || !self.is_empty() {
-            let tmp = rx.receive_all();
-            match tmp {
-                Ok(vec) => {
-                    for (order, result) in vec {
-                        unordered_map.insert(order, result);
-                    }
-                }
-                Err(err) => {
-                    panic!("Error: {}", err);
-                }
+            match rx.receive() {
+                Ok(Some((i, r))) => {
+                    unordered_map.insert(i, r);
+                },
+                Ok(None) => continue,
+                Err(_) => {}
             }
         }
         unordered_map.into_values()
