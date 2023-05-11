@@ -3,6 +3,7 @@ use log::trace;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::marker::PhantomData;
+use std::os::unix::thread;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier};
 use std::{fmt, hint, mem};
@@ -323,7 +324,7 @@ impl ThreadPool {
                 Ok(Some((i, r))) => {
                     unordered_map.insert(i, r);
                 },
-                Ok(None) => continue,
+                Ok(None) => std::thread::yield_now(),
                 Err(_) => {}
             }
         }
