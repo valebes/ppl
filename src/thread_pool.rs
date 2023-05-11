@@ -239,14 +239,20 @@ impl ThreadPool {
             .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     }
 
+
+    /// Check if there are jobs in the thread pool.
+    pub fn is_empty(&self) -> bool {
+        self.total_tasks.load(std::sync::atomic::Ordering::Acquire) == 0
+            && self.injector.is_empty()
+    }
+
     /// Block until all current jobs in the thread pool are finished.
     pub fn wait(&self) {
-        while (self.total_tasks.load(std::sync::atomic::Ordering::Acquire) != 0)
-            || !self.injector.is_empty()
-        {
+        while !self.is_empty() {
             hint::spin_loop();
         }
     }
+
     /// Applies in parallel the function `f` on a iterable object `iter`.
     ///
     /// # Examples
@@ -308,8 +314,11 @@ impl ThreadPool {
                 });
             });
         });
-        self.wait();
-        while !rx.is_empty() {
+        // TODO: find a better way to wait for the jobs to finish
+        // Probably, when using SMT, wait and only after that receive the results isnt the best approach.
+        // There is room for interleave the execution of the jobs with the reception of the results.
+        //self.wait();
+        while !rx.is_empty() || !self.is_empty() {
             let tmp = rx.receive_all();
             match tmp {
                 Ok(vec) => {
