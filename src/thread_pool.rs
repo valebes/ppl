@@ -301,7 +301,7 @@ impl ThreadPool {
         <Iter as IntoIterator>::Item: Send,
         R: Send + 'static,
     {
-        let (rx, tx) = Channel::channel(true);
+        let (rx, tx) = Channel::channel(false);
         let arc_tx = Arc::new(tx);
         let mut unordered_map = BTreeMap::<usize, R>::new();
 
@@ -316,20 +316,13 @@ impl ThreadPool {
                 });
             });
         });
-        
-        // TODO: find a better way to wait for the jobs to finish
-        // Probably, when using SMT, wait and only after that receive the results isnt the best approach.
-        // There is room for interleave the execution of the jobs with the reception of the results.
-        //self.wait();
-        
-        drop(arc_tx);
 
         while !rx.is_empty() || !self.is_empty() {
             match rx.receive() {
                 Ok(Some((i, r))) => {
                     unordered_map.insert(i, r);
                 },
-                Ok(None) => continue,
+                Ok(None) => std::thread::yield_now(),
                 Err(_) => {}
             }
         }
