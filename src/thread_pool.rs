@@ -318,11 +318,7 @@ impl ThreadPool {
         });
 
         drop(arc_tx);
-        
-        // We use non-blocking channel and a thread::yield_now() instead to use
-        // directly blocking channel. This is because depending on the implementation
-        // of the channel in use, the channel in blocking mode may block the thread pool
-        // even if the sender side is dropped.
+
         while !rx.is_empty() || !self.is_empty() {
             match rx.receive() {
                 Ok(Some((i, r))) => {

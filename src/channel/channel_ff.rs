@@ -27,7 +27,10 @@ pub struct FFBlockingInputChannel<T> {
 }
 impl<T: Send> Receiver<T> for FFBlockingInputChannel<T> {
     fn receive(&self) -> Result<Option<T>, ChannelError> {
-        Ok(Some(Box::into_inner(self.rx.pop())))
+        match self.rx.pop() {
+            Some(boxed) => Ok(Some(Box::into_inner(boxed))),
+            None => Ok(None),
+        }
     }
 
     fn is_empty(&self) -> bool {
