@@ -301,7 +301,9 @@ impl ThreadPool {
         <Iter as IntoIterator>::Item: Send,
         R: Send + 'static,
     {
-        let (rx, tx) = Channel::channel(true);
+        let blocking = self.orchestrator.get_configuration().get_blocking_channel();
+
+        let (rx, tx) = Channel::channel(blocking);
         let arc_tx = Arc::new(tx);
         let mut unordered_map = BTreeMap::<usize, R>::new();
 
