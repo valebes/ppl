@@ -8,7 +8,7 @@ use std::{
 
 use dashmap::DashMap;
 use pspp::{
-    node::{
+    pipeline::{
         in_node::{In, InNode},
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},

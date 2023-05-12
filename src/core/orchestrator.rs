@@ -342,6 +342,7 @@ impl Drop for Partition {
     }
 }
 
+/* 
 #[derive(Debug)]
 pub struct OrchestratorError {
     details: String,
@@ -363,6 +364,7 @@ impl std::error::Error for OrchestratorError {
         &self.details
     }
 }
+*/
 
 pub struct Orchestrator {
     partitions: Vec<Partition>,
@@ -371,12 +373,15 @@ pub struct Orchestrator {
 
 static mut ORCHESTRATOR: OnceCell<Arc<Orchestrator>> = OnceCell::new();
 
+/* 
 pub(crate) fn new_global_orchestrator(
     configuration: Arc<Configuration>,
 ) -> Result<Arc<Orchestrator>, OrchestratorError> {
     let orchestrator = Orchestrator::new(configuration);
     set_global_orchestrator(orchestrator)
 }
+}
+*/
 
 pub(crate) fn new_default_orchestrator() -> Arc<Orchestrator> {
     Arc::new(Orchestrator::new(Arc::new(Configuration::new_default())))
@@ -390,6 +395,7 @@ pub fn get_global_orchestrator() -> Arc<Orchestrator> {
     }
 }
 
+/* 
 fn set_global_orchestrator(
     orchestrator: Orchestrator,
 ) -> Result<Arc<Orchestrator>, OrchestratorError> {
@@ -400,6 +406,7 @@ fn set_global_orchestrator(
         Ok(get_global_orchestrator())
     }
 }
+*/
 
 impl Orchestrator {
     // Create a new orchestrator.
@@ -546,69 +553,53 @@ impl Drop for Orchestrator {
 mod tests {
     use super::*;
     use serial_test::serial;
-    use std::{sync::Arc, thread::sleep, time::Duration};
+    use std::{sync::Arc};
 
     #[test]
     #[serial]
     fn test_orchestrator() {
         let configuration = Arc::new(Configuration::new_default());
-        let orchestrator = Orchestrator::new(configuration);
-        ::scopeguard::defer!({
-            unsafe {
-                drop(ORCHESTRATOR.take());
-            }
-        });
+        let orchestrator = Orchestrator::new(Arc::clone(&configuration));
+        let counter = Arc::new(AtomicUsize::new(0));
 
-        let job_info = orchestrator.push(|| {
-            println!("Hello from job!");
-        });
-        job_info.wait();
-    }
+        let mut jobs_info = Vec::with_capacity(1000);
 
-    #[test]
-    #[serial]
-    /// Test that there is possible to set only one global orchestrator.
-    /// This test is run in serial because it is testing a global state.
-    fn test_global_orchestrator() {
-        let configuration = Arc::new(Configuration::new_default());
-        let orchestrator = Orchestrator::new(configuration);
-        let configuration = Arc::new(Configuration::new_default());
-        let orchestrator_clone = Orchestrator::new(configuration);
-        ::scopeguard::defer!({
-            unsafe {
-                drop(ORCHESTRATOR.take());
-            }
-        });
-
-        let result = set_global_orchestrator(orchestrator);
-        assert!(result.is_ok());
-        let result = set_global_orchestrator(orchestrator_clone);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    #[serial]
-    /// Test that all the jobs are executed and completed.
-    /// This test is run in serial because it is testing a global state.
-    fn test_global_orchestrator_jobs() {
-        let configuration = Arc::new(Configuration::new_default());
-        let orchestrator = Orchestrator::new(configuration);
-        ::scopeguard::defer!({
-            unsafe {
-                drop(ORCHESTRATOR.take());
-            }
-        });
-
-        let mut job_infos = Vec::new();
-        for _ in 0..100 {
-            let job_info = orchestrator.push(|| {
-                sleep(Duration::from_millis(100));
-                println!("Hello from job!");
+        (0..1000).for_each(|_| {
+            let counter_clone = counter.clone();
+            let job_info = orchestrator.push(move || {
+                counter_clone.fetch_add(1, Ordering::AcqRel);
             });
-            job_infos.push(job_info);
-        }
-        for job_info in job_infos.iter() {
+            jobs_info.push(job_info);
+        });
+
+        for job_info in jobs_info {
             job_info.wait();
         }
+
+        assert_eq!(counter.load(Ordering::Acquire), 1000);
     }
+
+    #[test]
+    #[serial]
+    fn test_global_orchestrator() {
+        let orchestrator = get_global_orchestrator();
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let mut jobs_info = Vec::with_capacity(1000);
+
+        (0..1000).for_each(|_| {
+            let counter_clone = counter.clone();
+            let job_info = orchestrator.push(move || {
+                counter_clone.fetch_add(1, Ordering::AcqRel);
+            });
+            jobs_info.push(job_info);
+        });
+
+        for job_info in jobs_info {
+            job_info.wait();
+        }
+
+        assert_eq!(counter.load(Ordering::Acquire), 1000);
+    }
+
 }

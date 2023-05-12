@@ -8,9 +8,9 @@
 #![feature(let_chains)]
 
 pub mod mpsc;
-//pub mod map;
+pub mod map;
 pub mod core;
-pub mod node;
+pub mod pipeline;
 pub mod pspp;
 mod task;
 pub mod thread_pool;

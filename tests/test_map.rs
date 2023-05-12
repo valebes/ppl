@@ -1,7 +1,7 @@
-/*
+use pspp::core::orchestrator::get_global_orchestrator;
+use pspp::map::Map;
 use pspp::{
-    map::Map,
-    node::{
+    pipeline::{
         in_node::{In, InNode},
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
@@ -48,7 +48,7 @@ fn test_map() {
             streamlen: 50,
             counter: 0
         },
-        Map::new(2, |el: i32| -> String {
+        Map::build(2, |el: i32| -> String {
             "Hello from: ".to_string() + &el.to_string()
         }),
         Sink { res: Vec::new() }
@@ -59,14 +59,11 @@ fn test_map() {
 
     let mut check = true;
     for sub_res in res {
-        let mut i = 0;
-        for str in sub_res {
+        for (i, str) in sub_res.into_iter().enumerate() {
             if str != ("Hello from: ".to_string() + &i.to_string()) {
                 check = false;
             }
-            i += 1;
         }
     }
     assert!(check)
 }
-*/

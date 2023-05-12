@@ -3,7 +3,7 @@
 */
 use pspp::core::orchestrator::get_global_orchestrator;
 use pspp::{
-    node::{
+    pipeline::{
         in_node::{In, InNode},
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},

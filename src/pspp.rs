@@ -1,4 +1,4 @@
-pub use crate::node::{node::Node, out_node::*};
+pub use crate::pipeline::{node::Node, out_node::*};
 
 pub struct Parallel<
     TOut: Send + 'static,

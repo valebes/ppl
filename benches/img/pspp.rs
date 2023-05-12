@@ -4,7 +4,7 @@ use raster::filter;
 use raster::Image;
 
 use pspp::{
-    node::{
+    pipeline::{
         in_node::{In, InNode},
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},

@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{node::inout_node::InOut, thread_pool::ThreadPool};
+use crate::{thread_pool::ThreadPool, pipeline::inout_node::InOut};
 
 #[derive(Clone)]
 pub struct Map<TIn: Send, TOut: Send, F: FnOnce(TIn) -> TOut + Send + Copy> {
@@ -12,12 +12,12 @@ pub struct Map<TIn: Send, TOut: Send, F: FnOnce(TIn) -> TOut + Send + Copy> {
 impl<TIn: Send + Clone, TOut: Send + Clone + 'static, F: FnOnce(TIn) -> TOut + Send + Copy>
     Map<TIn, TOut, F>
 {
-    pub fn new<TInIter: IntoIterator<Item = TIn>, TOutIter: FromIterator<TOut>>(
+    pub fn build<TInIter: IntoIterator<Item = TIn>, TOutIter: FromIterator<TOut>>(
         n_worker: usize,
         f: F,
     ) -> impl InOut<TInIter, TOutIter> {
         Self {
-            threadpool: ThreadPool::new(n_worker, false),
+            threadpool: ThreadPool::new_with_global_registry(n_worker),
             f,
             phantom: PhantomData,
         }
