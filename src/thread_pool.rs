@@ -1,14 +1,12 @@
 use crossbeam_deque::{Injector, Steal, Stealer, Worker};
 use log::trace;
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::marker::PhantomData;
-use std::os::unix::thread;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier};
-use std::{fmt, hint, mem};
+use std::{hint, mem};
 
-use crate::channel::channel::Channel;
+use crate::mpsc::channel::Channel;
 use crate::core::orchestrator::{get_global_orchestrator, JobInfo, Orchestrator};
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
@@ -18,32 +16,7 @@ enum Job {
     Terminate,
 }
 
-#[derive(Debug)]
-pub struct ThreadPoolError {
-    details: String,
-}
-
-impl ThreadPoolError {
-    fn new(msg: &str) -> ThreadPoolError {
-        ThreadPoolError {
-            details: msg.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for ThreadPoolError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-
-impl Error for ThreadPoolError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
-
-// Struct representing a worker in the thread pool.
+/// Struct representing a worker in the thread pool.
 struct ThreadPoolWorker {
     id: usize,
     worker: Worker<Job>,
@@ -62,7 +35,7 @@ impl ThreadPoolWorker {
         }
     }
 
-    // Get stealer.
+    /// Get stealer.
     fn get_stealer(&self) -> Stealer<Job> {
         self.worker.stealer()
     }
@@ -72,8 +45,8 @@ impl ThreadPoolWorker {
         self.stealers = Some(stealers);
     }
 
-    // Fetch a task. If the local queue is empty, try to steal a batch of tasks from the global queue.
-    // If the global queue is empty, try to steal a task from one of the other threads.
+    /// Fetch a task. If the local queue is empty, try to steal a batch of tasks from the global queue.
+    /// If the global queue is empty, try to steal a task from one of the other threads.
     fn fetch_task(&self) -> Option<Job> {
         if let Some(job) = self.pop() {
             return Some(job);
@@ -240,11 +213,9 @@ impl ThreadPool {
             .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     }
 
-
     /// Check if there are jobs in the thread pool.
     pub fn is_empty(&self) -> bool {
-        self.total_tasks.load(std::sync::atomic::Ordering::Acquire) == 0
-            && self.injector.is_empty()
+        self.total_tasks.load(std::sync::atomic::Ordering::Acquire) == 0 && self.injector.is_empty()
     }
 
     /// Block until all current jobs in the thread pool are finished.
@@ -325,7 +296,7 @@ impl ThreadPool {
             match rx.receive() {
                 Ok(Some((i, r))) => {
                     unordered_map.insert(i, r);
-                },
+                }
                 Ok(None) => continue,
                 Err(_) => {}
             }

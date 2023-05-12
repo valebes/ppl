@@ -1,4 +1,4 @@
-use crate::{channel::err::ChannelError, task::Message};
+use crate::{mpsc::err::ChannelError, task::Message};
 
 pub trait Node<TIn: Send, TCollected> {
     fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), ChannelError>;

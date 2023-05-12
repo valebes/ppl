@@ -3,7 +3,7 @@ use std::sync::{Arc, Condvar, Mutex};
 
 use log::trace;
 
-use crate::channel::err::ChannelError;
+use crate::mpsc::err::ChannelError;
 use crate::core::orchestrator::{JobInfo, Orchestrator};
 use crate::task::{Message, Task};
 
@@ -137,7 +137,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
 
             match res {
                 Some(output) => {
-                    let err = nn.send(Message::new(Task::NewTask(output), order), counter);
+                    let err = nn.send(Message::new(Task::New(output), order), counter);
                     if err.is_err() {
                         panic!("Error: {}", err.unwrap_err())
                     }

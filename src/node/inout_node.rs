@@ -14,7 +14,7 @@ use log::{trace, warn};
 use std::collections::BTreeMap;
 
 use crate::{
-    channel::{
+    mpsc::{
         channel::{Channel, InputChannel, OutputChannel},
         err::ChannelError,
     },
@@ -169,6 +169,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
         // If we have received a terminating message, then we don't want to receive any other message.
         // In blocking mode this help to avoid to block the thread on a channel that won't receive any other message.
+        //TODO: Instead to doing this, drop the channel_tx when the terminating message is received.
         if self.stop {
             return None;
         }
@@ -299,14 +300,14 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                     counter %= self.next_node.get_num_of_replicas();
 
                     match op {
-                        Task::NewTask(task) => {
+                        Task::New(task) => {
                             let result = self.node.run(task);
 
                             match result {
                                 Some(msg) => {
                                     let err = self
                                         .next_node
-                                        .send(Message::new(Task::NewTask(msg), order), counter);
+                                        .send(Message::new(Task::New(msg), order), counter);
                                     if err.is_err() {
                                         panic!("Error: {}", err.unwrap_err())
                                     }
@@ -360,7 +361,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                     counter %= self.next_node.get_num_of_replicas();
 
                     match op {
-                        Task::NewTask(task) => {
+                        Task::New(task) => {
                             let _ = self.node.run(task);
                             let mut tmp = VecDeque::new();
                             loop {
@@ -388,7 +389,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                                 let mut tmp_counter = start;
                                                 while !tmp.is_empty() {
                                                     let msg = Message {
-                                                        op: Task::NewTask(tmp.pop_front().unwrap()),
+                                                        op: Task::New(tmp.pop_front().unwrap()),
                                                         order: tmp_counter,
                                                     };
                                                     let err = self.next_node.send(msg, counter);
@@ -401,11 +402,13 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                                 cvar.notify_all();
                                                 break;
                                             } else {
-                                                let err = cvar.wait(splitter);
-                                                if err.is_err() {
-                                                    panic!("Error: Poisoned mutex!");
-                                                } else {
-                                                    splitter = err.unwrap();
+                                                match cvar.wait(splitter) {
+                                                    Ok(mtx) => {
+                                                        splitter = mtx;
+                                                    }
+                                                    Err(err) => {
+                                                        panic!("Error: {}", err);
+                                                    }
                                                 }
                                             }
                                         }
@@ -419,7 +422,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                 // without any order.
                                 loop {
                                     let msg = Message {
-                                        op: Task::NewTask(tmp.pop_front().unwrap()),
+                                        op: Task::New(tmp.pop_front().unwrap()),
                                         order: 0,
                                     };
                                     let err = self.next_node.send(msg, counter);
@@ -491,7 +494,7 @@ impl<
 
         let Message { op, order } = input;
         match &op {
-            Task::NewTask(_e) => {
+            Task::New(_e) => {
                 if self.channels.len() == 1
                     && self.ordered
                     && order != self.next_msg.load(Ordering::SeqCst)
@@ -722,7 +725,7 @@ impl<
                     let msg = queue.remove(&c).unwrap();
                     let Message { op, order } = msg;
                     match &op {
-                        Task::NewTask(_e) => {
+                        Task::New(_e) => {
                             let err = self.send(Message::new(op, c), order);
                             if err.is_err() {
                                 panic!("Error: Cannot send message!");

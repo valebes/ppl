@@ -7,7 +7,7 @@
 #![feature(once_cell)]
 #![feature(let_chains)]
 
-pub mod channel;
+pub mod mpsc;
 //pub mod map;
 pub mod core;
 pub mod node;

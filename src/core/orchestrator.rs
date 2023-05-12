@@ -389,6 +389,7 @@ pub fn get_global_orchestrator() -> Arc<Orchestrator> {
             .clone()
     }
 }
+
 fn set_global_orchestrator(
     orchestrator: Orchestrator,
 ) -> Result<Arc<Orchestrator>, OrchestratorError> {

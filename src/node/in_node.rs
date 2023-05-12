@@ -9,7 +9,7 @@ use std::{
 use log::{trace, warn};
 
 use crate::{
-    channel::{
+    mpsc::{
         channel::{Channel, InputChannel, OutputChannel},
         err::ChannelError,
     },
@@ -70,7 +70,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
     fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), ChannelError> {
         let Message { op, order } = input;
         match &op {
-            Task::NewTask(_e) => {
+            Task::New(_e) => {
                 if self.ordered && order != self.counter.load(Ordering::Acquire) {
                     self.save_to_storage(Message::new(op, rec_id), order);
                     self.send_pending();
@@ -145,14 +145,12 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
         let bucket = Arc::clone(&result);
 
         let job_info = orchestrator.push(move || {
-            let res = InNode::rts(handler, channel_in);
-            if res.is_some() {
-                let err = bucket.lock();
-                if err.is_ok() {
-                    let mut lock_bucket = err.unwrap();
-                    *lock_bucket = res;
-                } else if err.is_err() {
-                    panic!("Error: Cannot collect results.")
+            if let Some(res) = InNode::rts(handler, channel_in) {
+                match bucket.lock() {
+                    Ok(mut lock_bucket) => {
+                        *lock_bucket = Some(res);
+                    }
+                    Err(_) => panic!("Error: Cannot collect results."),
                 }
             }
         });
@@ -176,7 +174,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
             match input {
                 Ok(Some(Message { op, order: _ })) => {
                     match op {
-                        Task::NewTask(arg) => {
+                        Task::New(arg) => {
                             node.run(arg);
                         }
                         Task::Dropped => {
@@ -222,7 +220,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                     let msg = queue.remove(&c).unwrap();
                     let Message { op, order } = msg;
                     match &op {
-                        Task::NewTask(_e) => {
+                        Task::New(_e) => {
                             let err = self.send(Message::new(op, c), order);
                             if err.is_err() {
                                 panic!("Error: Cannot send message!");

@@ -30,10 +30,9 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         match &mut self.first_block {
             Some(_block) => {
                 let block = self.first_block.take();
-                if block.is_some() {
-                    Node::<TOut, TCollected>::collect(block.unwrap())
-                } else {
-                    None
+                match block {
+                    Some(block) => Node::<TOut, TCollected>::collect(block),
+                    None => None,
                 }
             }
             None => None,
@@ -48,8 +47,8 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         match &mut self.first_block {
             Some(_block) => {
                 let block = self.first_block.take();
-                if block.is_some() {
-                    block.unwrap().terminate();
+                if let Some(block) = block {
+                    block.terminate();
                 }
             }
             None => (),
