@@ -600,6 +600,7 @@ mod tests {
         }
 
         assert_eq!(counter.load(Ordering::Acquire), 1000);
+        Orchestrator::delete_global_orchestrator();
     }
 
 }
