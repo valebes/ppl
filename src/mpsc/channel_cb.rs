@@ -59,9 +59,12 @@ impl<T> Clone for CBOutputChannel<T> {
     }
 }
 
+/// Channel is a factory for creating channels.
+/// It is a wrapper around crossbeam_channel.
 pub struct Channel;
 
 impl Channel {
+    /// Create a new channel using crossbeam_channel.
     pub fn channel<T: Send + 'static>(
         blocking: bool,
     ) -> (

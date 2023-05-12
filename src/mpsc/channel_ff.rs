@@ -58,6 +58,8 @@ impl<T: Send> Sender<T> for FFOutputChannel<T> {
     }
 }
 
+/// Channel is a factory for creating channels.
+///  It is a wrapper around the fastflow channel implementation.
 pub struct Channel;
 
 impl Channel {

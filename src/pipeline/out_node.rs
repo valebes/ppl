@@ -102,6 +102,11 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
+    /// RTS of the node.
+    /// It runs the node until a None is returned.
+    /// When None is returned, the node will terminate.
+    /// The node will send the output to the next node.
+    /// The node will terminate also when the stop flag is set to true.
     fn rts(mut node: Box<dyn Out<TOut>>, nn: &TNext, stop: &Mutex<bool>) {
         let mut order = 0;
         let mut counter = 0;
@@ -157,11 +162,13 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     }
 
     /// Start the node.
+    /// The node will start to send the output to the next node.
     pub fn start(&mut self) {
         self.send_start();
     }
 
     /// Terminate the current node and the following ones.
+    /// The node will terminate also when the stop flag is set to true.
     pub fn terminate(mut self) {
         self.send_stop();
         self.wait();
@@ -173,6 +180,8 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
+    /// Start the node.
+    /// The node will start to send the output to the next node.
     fn send_start(&self) {
         let mtx = self.stop.lock();
         match mtx {
@@ -181,6 +190,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
+    /// Terminate the current node and the following ones.
     fn send_stop(&self) {
         let mtx = self.stop.lock();
         match mtx {
@@ -189,6 +199,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
+    /// Wait until the node is terminated.
     fn wait(&mut self) {
         self.job_info.wait();
     }

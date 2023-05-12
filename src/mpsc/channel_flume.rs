@@ -60,6 +60,8 @@ impl<T> Clone for FlumeOutputChannel<T> {
     }
 }
 
+/// Channel is a factory for creating new channels.
+/// It is a wrapper around the flume channel.
 pub struct Channel;
 
 impl Channel {

@@ -60,6 +60,8 @@ impl<T> Clone for KanalOutputChannel<T> {
     }
 }
 
+/// Channel is a factory for creating channels
+/// It is a wrapper around kanal channel.
 pub struct Channel;
 
 impl Channel {

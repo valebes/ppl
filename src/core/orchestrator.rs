@@ -20,6 +20,9 @@ pub enum Job {
     Terminate,
 }
 
+/// Struct that reepresent a job in the queue.
+/// It contains a method to wait till the job is done.
+/// It is used to wait for the end of a job.
 #[derive(Debug)]
 pub(crate) struct JobInfo {
     status: Arc<AtomicBool>,
@@ -118,22 +121,14 @@ impl ExecutorInfo {
     }
 
     /// This is the main loop of the executor.
-    /// Need refactoring.
+    /// It will fetch jobs from it's own queue or from the global queue.
+    /// If no job is available, it will yield.
+    /// If a job is available, it will execute it.
+    /// If the job is a terminate message, it will terminate.
     fn run(&self) {
         let mut stop = false;
         loop {
-            if let Some(job) = self.pop() {
-                match job {
-                    Job::NewJob(f) => {
-                        self.warn_busy();
-                        f();
-                        self.warn_available();
-                    }
-                    Job::Terminate => {
-                        stop = true;
-                    }
-                }
-            } else if let Some(job) = self.steal_from_global() {
+            if let Some(job) = self.fetch_job() {
                 match job {
                     Job::NewJob(f) => {
                         self.warn_busy();
@@ -153,6 +148,20 @@ impl ExecutorInfo {
                 thread::yield_now();
             }
         }
+    }
+
+
+    /// Fetch a job. First from the executor queue, then from the global queue.
+    /// If no job is available, it will return None.
+    /// If a job is available, it will return Some(job).
+    fn fetch_job(&self) -> Option<Job> {
+        if let Some(job) = self.pop() {
+            return Some(job);
+        }
+        if let Some(job) = self.steal_from_global() {
+            return Some(job);
+        }
+        None
     }
 
     /// Pop a job from the executor queue.
@@ -177,12 +186,15 @@ impl ExecutorInfo {
     }
 }
 
-/// A thread.
+/// Struct that represent a thread.
+/// It contains a thread and a method to join it.
 struct Thread {
     thread: Option<thread::JoinHandle<()>>,
 }
 impl Thread {
     /// Create a new thread.
+    /// If pinning is enabled, it will pin the thread to the specified core.
+    /// If pinning is disabled, it will not pin the thread.
     fn new<F>(core_id: usize, f: F, configuration: Arc<Configuration>) -> Thread
     where
         F: FnOnce() + Send + 'static,
@@ -214,6 +226,7 @@ impl Thread {
     }
 
     /// Join the thread.
+    /// It will wait until the thread is terminated.
     fn join(&mut self) {
         if let Some(thread) = self.thread.take() {
             thread.join().unwrap();
@@ -221,6 +234,14 @@ impl Thread {
     }
 }
 
+/// Struct that represent a partition.
+/// It contains the list of workers (executors) and the number of available workers.
+/// It also contains a global queue, shared between all the executors of the partition.
+/// The global queue is used to steal jobs when the executor queue is empty.
+/// The global queue is also used to send terminate messages to all the executors.
+/// The global queue is a FIFO queue.
+/// A partition, if pinning is enabled, will be pinned to a specific core.
+/// Basically a partition represent a core, the executors are the threads pinned on thatS core.
 pub struct Partition {
     core_id: usize,
     workers: RwLock<Vec<Executor>>,
@@ -232,6 +253,8 @@ pub struct Partition {
 
 impl Partition {
     /// Create a new partition.
+    /// It will create the global queue and the list of workers (executors).
+    /// If pinning is enabled, it will pin the partition to the specified core.
     fn new(core_id: usize, configuration: Arc<Configuration>) -> Partition {
         let global = Arc::new(Injector::new());
         let workers = Vec::new();
@@ -323,6 +346,8 @@ impl Partition {
 }
 
 impl Drop for Partition {
+    /// Drop the partition.
+    /// It will terminate all the executors and join them.
     fn drop(&mut self) {
         trace!(
             "Dropping partition on core {}, total worker: {}.",
@@ -366,11 +391,18 @@ impl std::error::Error for OrchestratorError {
 }
 */
 
+/// The orchestrator is the main structure of the library.
+/// Is composed by a list of partitions, each partition, if pinning is enabled, is a core.
+/// The orchestrator is responsible to create the partitions and to distribute the jobs to the partitions.
+/// The orchestractor is global, implemented as a singleton.
+/// The main idea is to have a central point that distribuite evenly the jobs to the partitions, exploiting
+/// the numa architecture of the system.
 pub struct Orchestrator {
     partitions: Vec<Partition>,
     configuration: Arc<Configuration>,
 }
 
+/// OnceCell is a structure that allow to create a safe global singleton.
 static mut ORCHESTRATOR: OnceCell<Arc<Orchestrator>> = OnceCell::new();
 
 /* 
@@ -383,10 +415,13 @@ pub(crate) fn new_global_orchestrator(
 }
 */
 
+/// Create a new orchestrator with the default configuration.
 pub(crate) fn new_default_orchestrator() -> Arc<Orchestrator> {
     Arc::new(Orchestrator::new(Arc::new(Configuration::new_default())))
 }
 
+/// Get or initialize the global orchestrator.
+/// If the global orchestrator is not initialized, a new one is created with the default configuration.
 pub fn get_global_orchestrator() -> Arc<Orchestrator> {
     unsafe {
         ORCHESTRATOR
