@@ -26,7 +26,7 @@ fn image_processing(criterion: &mut Criterion) {
         })
         .expect("parsing error");
 
-    let replicas_for_stage = 10..(num_cpus::get() / 5);
+    let replicas_for_stage = 1..(num_cpus::get() / 5);
     for replicas in replicas_for_stage {
         let threads = replicas * 5;
 
