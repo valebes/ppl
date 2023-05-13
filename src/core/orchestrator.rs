@@ -354,15 +354,15 @@ impl Drop for Partition {
             self.get_worker_count()
         );
 
+        let mut workers = self.workers.write().unwrap();
+
         // Terminate all the workers.
-        for worker in self.workers.write().unwrap().iter_mut() {
+        for worker in workers.iter_mut() {
             worker.push(Job::Terminate);
         }
 
-        let mut worker = self.workers.write().unwrap();
-
         // Join all the workers.
-        for worker in worker.iter_mut() {
+        for worker in workers.iter_mut() {
             worker.join();
         }
     }
