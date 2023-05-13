@@ -142,7 +142,6 @@ impl ExecutorInfo {
             } else {
                 if stop {
                     self.warn_busy();
-                    self.global.push(Job::Terminate);
                     break;
                 }
                 thread::yield_now();
@@ -356,7 +355,9 @@ impl Drop for Partition {
         );
 
         // Terminate all the workers.
-        self.global.push(Job::Terminate);
+        for worker in self.workers.write().unwrap().iter_mut() {
+            worker.push(Job::Terminate);
+        }
 
         let mut worker = self.workers.write().unwrap();
 
