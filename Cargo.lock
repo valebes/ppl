@@ -849,6 +849,7 @@ dependencies = [
  "kanal",
  "log",
  "num_cpus",
+ "parking_lot",
  "rand",
  "raster",
  "rayon",

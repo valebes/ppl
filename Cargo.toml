@@ -17,6 +17,7 @@ debug = false
 core_affinity = "0.8.0"
 crossbeam-channel = { version = "0.5.8", optional = true }
 crossbeam-deque = "0.8.3"
+parking_lot = "0.12.1"
 dyn-clone = "1.0.11"
 log = "0.4.17"
 num_cpus = "1.15.0"

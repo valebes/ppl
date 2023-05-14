@@ -1,7 +1,8 @@
 use std::marker::PhantomData;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc};
 
 use log::trace;
+use parking_lot::{Mutex, Condvar};
 
 use crate::mpsc::err::ChannelError;
 use crate::core::orchestrator::{JobInfo, Orchestrator};
@@ -111,30 +112,26 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         let mut order = 0;
         let mut counter = 0;
 
-        let mut stop_mtx = stop.lock().unwrap();
+        let mut stop_mtx = stop.lock();
         let cvar = Condvar::new();
 
         // Wait until the node is started
         while *stop_mtx {
-            stop_mtx = cvar.wait(stop_mtx).unwrap();
+            cvar.wait(&mut stop_mtx);
         }
 
         drop(stop_mtx); // Release the lock to avoid deadlock
 
         loop {
             let stop_mtx = stop.lock();
-            match stop_mtx {
-                Ok(mtx) => {
-                    if *mtx {
+                    if *stop_mtx {
                         let err = nn.send(Message::new(Task::Terminate, order), counter);
                         if err.is_err() {
                             panic!("Error: {}", err.unwrap_err())
                         }
                         break;
                     }
-                }
-                Err(_) => panic!("Error: Cannot lock mutex."),
-            }
+           
 
             let res = node.run(); // Run the node and get the output
 
@@ -183,20 +180,15 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     /// Start the node.
     /// The node will start to send the output to the next node.
     fn send_start(&self) {
-        let mtx = self.stop.lock();
-        match mtx {
-            Ok(mut stop) => *stop = false,
-            Err(_) => panic!("Error: Cannot lock mutex."),
-        }
+        let mut mtx = self.stop.lock();
+        *mtx = false;
+            
     }
 
     /// Terminate the current node and the following ones.
     fn send_stop(&self) {
-        let mtx = self.stop.lock();
-        match mtx {
-            Ok(mut stop) => *stop = true,
-            Err(_) => panic!("Error: Cannot lock mutex."),
-        }
+        let mut mtx = self.stop.lock();
+        *mtx = true;
     }
 
     /// Wait until the node is terminated.
