@@ -277,7 +277,6 @@ impl Partition {
     where
         F: FnOnce() + Send + 'static,
     {
-        let mut workers = self.workers.write().unwrap();
         let worker = Executor::new(
             self.core_id,
             self.configuration.clone(),
@@ -295,7 +294,8 @@ impl Partition {
         }));
         worker.push(job);
 
-        // Push the new executor to the partition.
+        // Take lock and push the new executor to the partition.
+        let mut workers = self.workers.write().unwrap();
         workers.push(worker);
 
         // Update the number of executor in the partition.
