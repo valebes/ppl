@@ -43,7 +43,7 @@ impl JobInfo {
 
 /// An executor.
 /// It is a thread that execute jobs.
-/// It will fetch jobs from it's own queue or from the global queue.
+/// It will fetch jobs from the global queue of the partition.
 struct Executor {
     thread: Thread,
 }
@@ -106,11 +106,9 @@ impl ExecutorInfo {
         }
     }
 
-    /// This is the main loop of the executor.
-    /// It will fetch jobs from it's own queue or from the global queue.
-    /// If no job is available, it will yield.
-    /// If a job is available, it will execute it.
-    /// If the job is a terminate message, it will terminate.
+    /// Run the executor.
+    /// It will fetch jobs from the global queue.
+    /// It will terminate when it receives a terminate message.
     fn run(&self) {
         loop {
             if let Some(job) = self.fetch_job() {
@@ -131,17 +129,8 @@ impl ExecutorInfo {
         }
     }
 
-
-    /// Fetch a job from the queue.
+    /// Fetch a job from the global queue.
     fn fetch_job(&self) -> Option<Job> {
-        if let Some(job) = self.steal_from_global() {
-            return Some(job);
-        }
-        None
-    }
-
-    /// Steal a job from the global queue.
-    fn steal_from_global(&self) -> Option<Job> {
         loop {
             match self.global.steal() {
                 Steal::Success(job) => return Some(job),
@@ -198,12 +187,9 @@ impl Thread {
 
 /// Struct that represent a partition.
 /// It contains the list of workers (executors) and the number of available workers.
-/// It also contains a global queue, shared between all the executors of the partition.
-/// The global queue is used to steal jobs when the executor queue is empty.
-/// The global queue is also used to send terminate messages to all the executors.
-/// The global queue is a FIFO queue.
+/// Executors from the same partition share the same global queue.
 /// A partition, if pinning is enabled, will be pinned to a specific core.
-/// Basically a partition represent a core, the executors are the threads pinned on thatS core.
+/// Basically a partition represent a core, the executors are the threads pinned on that core.
 pub struct Partition {
     core_id: usize,
     workers: Mutex<Vec<Executor>>,
@@ -265,10 +251,9 @@ impl Partition {
         self.available_workers.load(Ordering::Acquire)
     }
 
-    /// Create a new job from a function and push it to the partition.
+    /// Push a new job to the partition.
     /// This method return a JobInfo that can be used to wait for the Job to finish.
     /// If there aren't executors in the partition or all the existing executors are busy, a new executor is created.
-    /// Otherwise, the function is put in the global queue of the partition.
     fn push<F>(&self, f: F) -> JobInfo
     where
         F: FnOnce() + Send + 'static,
