@@ -1,5 +1,5 @@
 use ff_buffer::{self, FFReceiver, FFSender};
-use parking_lot::Mutex;
+use std::sync::Mutex;
 
 use super::{
     channel::{Receiver, Sender},
@@ -45,14 +45,16 @@ pub struct FFOutputChannel<T> {
 impl<T: Send> Sender<T> for FFOutputChannel<T> {
     fn send(&self, msg: T) -> Result<(), ChannelError> {
         let mtx = self.tx.lock();
- 
-                let err = mtx.push(Box::new(msg));
+        match mtx {
+            Ok(ch) => {
+                let err = ch.push(Box::new(msg));
                 match err {
                     Some(_) => Err(ChannelError::new("Can't send the msg.")),
                     None => Ok(()),
                 }
-  
-        
+            }
+            Err(_) => panic!("Cannot lock mutex on this channel"),
+        }
     }
 }
 
