@@ -351,12 +351,13 @@ impl Drop for Partition {
             self.get_worker_count()
         );
 
-        let mut workers = self.workers.lock().unwrap();
-
-        // Terminate all the workers.
-        for worker in workers.iter_mut() {
-            worker.push(Job::Terminate);
+        // Push terminate messages to the global queue.
+        // This will terminate all the executors.
+        for _ in 0..self.get_worker_count() {
+            self.global.push(Job::Terminate);
         }
+
+        let mut workers = self.workers.lock().unwrap();
 
         // Join all the workers.
         for worker in workers.iter_mut() {
