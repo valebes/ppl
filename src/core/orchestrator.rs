@@ -3,7 +3,7 @@ use std::{
     hint,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Mutex, RwLock,
+        Arc, Mutex,
     },
     thread::{self},
 };
@@ -244,7 +244,7 @@ impl Thread {
 /// Basically a partition represent a core, the executors are the threads pinned on thatS core.
 pub struct Partition {
     core_id: usize,
-    workers: RwLock<Vec<Executor>>,
+    workers: Mutex<Vec<Executor>>,
     total_workers: Arc<AtomicUsize>, // total number of workers in the partition
     available_workers: Arc<AtomicUsize>, // number of available workers in the partition
     global: Arc<Injector<Job>>,
@@ -261,7 +261,7 @@ impl Partition {
 
         Partition {
             core_id,
-            workers: RwLock::new(workers),
+            workers: Mutex::new(workers),
             total_workers: Arc::new(AtomicUsize::new(0)),
             available_workers: Arc::new(AtomicUsize::new(0)),
             global,
@@ -295,7 +295,7 @@ impl Partition {
         worker.push(job);
 
         // Take lock and push the new executor to the partition.
-        let mut workers = self.workers.write().unwrap();
+        let mut workers = self.workers.lock().unwrap();
         workers.push(worker);
 
         // Update the number of executor in the partition.
@@ -358,7 +358,7 @@ impl Drop for Partition {
         // Terminate all the workers.
         self.global.push(Job::Terminate);
 
-        let mut worker = self.workers.write().unwrap();
+        let mut worker = self.workers.lock().unwrap();
 
         // Join all the workers.
         for worker in worker.iter_mut() {

@@ -181,7 +181,7 @@ impl ThreadPool {
             let barrier = Arc::clone(&barrier);
             let worker = workers.remove(0);
             let func = move || {
-                //barrier.wait();
+                barrier.wait();
                 worker.run();
             };
             funcs.push(Box::new(func));
