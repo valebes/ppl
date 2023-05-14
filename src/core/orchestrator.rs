@@ -45,7 +45,6 @@ impl JobInfo {
 /// It is a thread that execute jobs.
 /// It will fetch jobs from it's own queue or from the global queue.
 struct Executor {
-    worker_info: Arc<ExecutorInfo>,
     thread: Thread,
 }
 impl Executor {
@@ -58,17 +57,15 @@ impl Executor {
         available_workers: Arc<AtomicUsize>,
         global: Arc<Injector<Job>>,
     ) -> Executor {
-        let worker = Arc::new(ExecutorInfo::new(core_id, available_workers, global));
-        let worker_copy = Arc::clone(&worker);
+        let worker = ExecutorInfo::new(core_id, available_workers, global);
         let thread = Thread::new(
-            worker_copy.core_id,
+            worker.core_id,
             move || {
-                worker_copy.run();
+                worker.run();
             },
             config,
         );
         Executor {
-            worker_info: worker,
             thread,
         }
     }
@@ -76,11 +73,6 @@ impl Executor {
     /// Join the thread running the executor.
     fn join(&mut self) {
         self.thread.join();
-    }
-
-    /// Push a job to the executor queue.
-    fn push(&self, job: Job) {
-        self.worker_info.push(job);
     }
 }
 
@@ -90,7 +82,7 @@ struct ExecutorInfo {
     core_id: usize,
     available_workers: Arc<AtomicUsize>,
     global: Arc<Injector<Job>>,
-    worker: Mutex<Worker<Job>>,
+    worker: Worker<Job>,
 }
 impl ExecutorInfo {
     /// Create a new executor info.
@@ -104,7 +96,7 @@ impl ExecutorInfo {
             core_id,
             available_workers,
             global,
-            worker: Mutex::new(worker),
+            worker,
         }
     }
 
@@ -161,12 +153,7 @@ impl ExecutorInfo {
 
     /// Pop a job from the executor queue.
     fn pop(&self) -> Option<Job> {
-        self.worker.lock().unwrap().pop()
-    }
-
-    /// Push a job to the executor queue.
-    fn push(&self, job: Job) {
-        self.worker.lock().unwrap().push(job);
+        self.worker.pop()
     }
 
     /// Steal a job from the global queue.
@@ -261,12 +248,8 @@ impl Partition {
     }
 
     /// Add a worker (executor) to the partition.
-    /// The executor will be created and will execute the given closure.
-    /// After the closure is executed, the executor will fetch other jobs from
-    /// the global queue or its own queue.
-    fn add_worker<F>(&self, f: F) -> JobInfo
-    where
-        F: FnOnce() + Send + 'static,
+    /// The executor will be created and pushed to the partition.
+    fn add_worker(&self)
     {
         let worker = Executor::new(
             self.core_id,
@@ -275,24 +258,12 @@ impl Partition {
             self.global.clone(),
         );
 
-        // Create a job info to track the job status.
-        let job_info = JobInfo::new();
-        let job_info_clone = Arc::clone(&job_info.status);
-        // Create the job and push it to the executor.
-        let job = Job::NewJob(Box::new(move || {
-            f();
-            job_info_clone.store(true, Ordering::Release);
-        }));
-        worker.push(job);
-
         // Take lock and push the new executor to the partition.
         let mut workers = self.workers.lock().unwrap();
         workers.push(worker);
 
         // Update the number of executor in the partition.
         self.total_workers.fetch_add(1, Ordering::Release);
-
-        job_info
     }
 
     /// Get the number of executor in the partition.
@@ -319,7 +290,7 @@ impl Partition {
         F: FnOnce() + Send + 'static,
     {
         if self.get_free_worker_count() == 0 {
-            return self.add_worker(f);
+            self.add_worker();
         }
 
         let job_info = JobInfo::new();
