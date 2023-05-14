@@ -145,7 +145,7 @@ impl ExecutorInfo {
                     self.global.push(Job::Terminate);
                     break;
                 }
-                //thread::yield_now();
+                thread::yield_now();
             }
         }
     }
@@ -205,18 +205,14 @@ impl Thread {
         Thread {
             thread: Some(thread::spawn(move || {
                 if configuration.get_pinning() {
-                    let mut core_ids = core_affinity::get_core_ids().unwrap();
-                    if core_ids.get(pinning_position).is_none() {
-                        panic!("Cannot pin the thread in the choosen position.");
-                    } else {
-                        let core = core_ids.remove(pinning_position);
-                        let err = core_affinity::set_for_current(core);
+                   
+                        let err = core_affinity::set_for_current(pinning_position);
                         if !err {
-                            error!("Thread pinning on core {} failed!", core.id);
+                            error!("Thread pinning on core {} failed!", pinning_position.id);
                         } else {
-                            trace!("Thread pinned on core {}.", core.id);
+                            trace!("Thread pinned on core {}.", pinning_position.id);
                         }
-                    }
+                    
                 }
                 trace!("{:?} started", thread::current().id());
                 (f)();

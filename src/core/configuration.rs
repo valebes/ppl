@@ -1,5 +1,7 @@
 use std::env;
 
+use core_affinity::CoreId;
+
 /// Configuration of the framework.
 /// The configuration is set by the user through environment variables.
 /// The environment variables are:
@@ -10,7 +12,7 @@ use std::env;
 /// - PSPP_THREAD_MAPPING: core mapping. Default is the order in which the cores are found.
 pub struct Configuration {
     max_cores: usize,
-    thread_mapping: Vec<usize>,
+    thread_mapping: Vec<CoreId>,
     pinning: bool,
     scheduling: bool,
     blocking_channel: bool,
@@ -26,7 +28,7 @@ pub struct Configuration {
 /// If the environment variable is not set, the core mapping
 /// is set to the default mapping, i.e., the cores are used
 /// in the order in which they are found by the framework.
-fn parse_core_mapping() -> Vec<usize> {
+fn parse_core_mapping() -> Vec<CoreId> {
     let mut thread_mapping = Vec::new();
     match env::var("PSPP_THREAD_MAPPING") {
         Ok(val) => {
@@ -41,7 +43,15 @@ fn parse_core_mapping() -> Vec<usize> {
             }
         }
     }
-    thread_mapping
+
+    let core_ids = core_affinity::get_core_ids().unwrap();
+
+    let mut core_mapping = Vec::new();
+    for thread in thread_mapping {
+        core_mapping.push(core_ids[thread]);
+    }
+
+    core_mapping
 }
 
 impl Configuration {
@@ -124,7 +134,7 @@ impl Configuration {
     /// of a threadpool, or the replicas of a stage of a pipeline, in 
     /// a subset of neighboring cores. This is done to reduce the
     /// communication overhead between the workers.
-    pub(crate) fn get_thread_mapping(&self) -> &Vec<usize> {
+    pub(crate) fn get_thread_mapping(&self) -> &Vec<CoreId> {
         &self.thread_mapping
     }
 
@@ -197,11 +207,16 @@ mod tests {
     #[test]
     #[serial]
     fn test_configuration_with_mapping() {
-        env::set_var("PSPP_MAX_CORES", "4");
-        env::set_var("PSPP_THREAD_MAPPING", "1,0,2,3");
+        env::set_var("PSPP_MAX_CORES", "5");
+        env::set_var("PSPP_THREAD_MAPPING", "1,0,2,3,6");
         let conf = Configuration::new_default();
-        assert_eq!(conf.max_cores, 4);
-        assert_eq!(conf.thread_mapping, vec![1, 0, 2, 3]);
+        assert_eq!(conf.max_cores, 5);
+
+        let mut check = Vec::new();
+        for core in conf.thread_mapping {
+            check.push(core.id);
+        }
+        assert_eq!(check, vec![1, 0, 2, 3, 6]);
         reset_env();
     }
 }
