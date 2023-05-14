@@ -221,16 +221,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crossbeam-queue"
-version = "0.3.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1cfb3ea8a53f37c40dea2c7bedcbd88bdfae54f5e2175d6ecaff1c988353add"
-dependencies = [
- "cfg-if 1.0.0",
- "crossbeam-utils",
-]
-
-[[package]]
 name = "crossbeam-utils"
 version = "0.8.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -851,7 +841,6 @@ dependencies = [
  "criterion",
  "crossbeam-channel",
  "crossbeam-deque",
- "crossbeam-queue",
  "dashmap",
  "dyn-clone",
  "env_logger",

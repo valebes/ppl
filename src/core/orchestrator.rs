@@ -9,7 +9,7 @@ use std::{
 };
 
 use core_affinity::CoreId;
-use crossbeam_queue::SegQueue;
+use crossbeam_deque::{Injector, Steal};
 use log::{error, trace};
 
 use super::configuration::Configuration;
@@ -56,7 +56,7 @@ impl Executor {
         core_id: CoreId,
         config: Arc<Configuration>,
         available_workers: Arc<AtomicUsize>,
-        global: Arc<SegQueue<Job>>,
+        global: Arc<Injector<Job>>,
     ) -> Executor {
         let worker = ExecutorInfo::new( available_workers, global);
         let thread = Thread::new(
@@ -81,13 +81,13 @@ impl Executor {
 /// It contains the queue of jobs and the number of available executors in it's partition.
 struct ExecutorInfo {
     available_workers: Arc<AtomicUsize>,
-    global: Arc<SegQueue<Job>>,
+    global: Arc<Injector<Job>>,
 }
 impl ExecutorInfo {
     /// Create a new executor info.
     fn new(
         available_workers: Arc<AtomicUsize>,
-        global: Arc<SegQueue<Job>>,
+        global: Arc<Injector<Job>>,
     ) -> ExecutorInfo {
         ExecutorInfo {
             available_workers,
@@ -132,7 +132,13 @@ impl ExecutorInfo {
 
     /// Fetch a job from the global queue.
     fn fetch_job(&self) -> Option<Job> {
-        self.global.pop()
+        loop {
+            match self.global.steal() {
+                Steal::Success(job) => return Some(job),
+                Steal::Empty => return None,
+                Steal::Retry => continue,
+            };
+        }
     }
 }
 
@@ -188,7 +194,7 @@ pub struct Partition {
     workers: Mutex<Vec<Executor>>,
     total_workers: Arc<AtomicUsize>, // total number of workers in the partition
     available_workers: Arc<AtomicUsize>, // number of available workers in the partition
-    global: Arc<SegQueue<Job>>,
+    global: Arc<Injector<Job>>,
     configuration: Arc<Configuration>,
 }
 
@@ -197,7 +203,7 @@ impl Partition {
     /// It will create the global queue and the list of workers (executors).
     /// If pinning is enabled, it will pin the partition to the specified core.
     fn new(core_id: usize, configuration: Arc<Configuration>) -> Partition {
-        let global = Arc::new(SegQueue::new());
+        let global = Arc::new(Injector::new());
         let workers = Vec::new();
         let core_id = configuration.get_thread_mapping()[core_id];
         Partition {
