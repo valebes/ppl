@@ -291,7 +291,7 @@ impl ThreadPool {
         });
 
         drop(arc_tx);
-        
+
         self.wait();
 
         while !rx.is_empty() || !self.is_empty() {
@@ -299,7 +299,7 @@ impl ThreadPool {
                 Ok(Some((i, r))) => {
                     unordered_map.insert(i, r);
                 }
-                Ok(None) => std::thread::yield_now(),
+                Ok(None) => continue,
                 Err(_) => {}
             }
         }
