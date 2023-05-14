@@ -8,6 +8,7 @@ use std::{
     thread::{self},
 };
 
+use core_affinity::CoreId;
 use crossbeam_deque::{Injector, Steal};
 use log::{error, trace};
 
@@ -52,7 +53,7 @@ impl Executor {
     /// It will start executing jobs immediately.
     /// It will terminate when it receives a terminate message.
     fn new(
-        core_id: usize,
+        core_id: CoreId,
         config: Arc<Configuration>,
         available_workers: Arc<AtomicUsize>,
         global: Arc<Injector<Job>>,
@@ -150,22 +151,21 @@ impl Thread {
     /// Create a new thread.
     /// If pinning is enabled, it will pin the thread to the specified core.
     /// If pinning is disabled, it will not pin the thread.
-    fn new<F>(core_id: usize, f: F, configuration: Arc<Configuration>) -> Thread
+    fn new<F>(core_id: CoreId, f: F, configuration: Arc<Configuration>) -> Thread
     where
         F: FnOnce() + Send + 'static,
     {
-        // Get the pinning position
-        let pinning_position = *configuration.get_thread_mapping().get(core_id).unwrap();
+        
         // Create the thread and pin it if needed
         Thread {
             thread: Some(thread::spawn(move || {
                 if configuration.get_pinning() {
                    
-                        let err = core_affinity::set_for_current(pinning_position);
+                        let err = core_affinity::set_for_current(core_id);
                         if !err {
-                            error!("Thread pinning on core {} failed!", pinning_position.id);
+                            error!("Thread pinning on core {} failed!", core_id.id);
                         } else {
-                            trace!("Thread pinned on core {}.", pinning_position.id);
+                            trace!("Thread pinned on core {}.", core_id.id);
                         }
                     
                 }
@@ -191,7 +191,7 @@ impl Thread {
 /// A partition, if pinning is enabled, will be pinned to a specific core.
 /// Basically a partition represent a core, the executors are the threads pinned on that core.
 pub struct Partition {
-    core_id: usize,
+    core_id: CoreId,
     workers: Mutex<Vec<Executor>>,
     total_workers: Arc<AtomicUsize>, // total number of workers in the partition
     available_workers: Arc<AtomicUsize>, // number of available workers in the partition
@@ -206,7 +206,7 @@ impl Partition {
     fn new(core_id: usize, configuration: Arc<Configuration>) -> Partition {
         let global = Arc::new(Injector::new());
         let workers = Vec::new();
-
+        let core_id = configuration.get_thread_mapping()[core_id];
         Partition {
             core_id,
             workers: Mutex::new(workers),
@@ -282,7 +282,7 @@ impl Drop for Partition {
     fn drop(&mut self) {
         trace!(
             "Dropping partition on core {}, total worker: {}.",
-            self.core_id,
+            self.core_id.id,
             self.get_worker_count()
         );
 
