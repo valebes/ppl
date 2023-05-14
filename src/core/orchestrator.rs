@@ -8,7 +8,7 @@ use std::{
     thread::{self},
 };
 
-use crossbeam_deque::{Injector, Steal, Worker};
+use crossbeam_deque::{Injector, Steal};
 use log::{error, trace};
 
 use super::configuration::Configuration;
@@ -82,7 +82,6 @@ struct ExecutorInfo {
     core_id: usize,
     available_workers: Arc<AtomicUsize>,
     global: Arc<Injector<Job>>,
-    worker: Worker<Job>,
 }
 impl ExecutorInfo {
     /// Create a new executor info.
@@ -91,12 +90,10 @@ impl ExecutorInfo {
         available_workers: Arc<AtomicUsize>,
         global: Arc<Injector<Job>>,
     ) -> ExecutorInfo {
-        let worker = Worker::new_fifo();
         ExecutorInfo {
             core_id,
             available_workers,
             global,
-            worker,
         }
     }
 
@@ -138,22 +135,12 @@ impl ExecutorInfo {
     }
 
 
-    /// Fetch a job. First from the executor queue, then from the global queue.
-    /// If no job is available, it will return None.
-    /// If a job is available, it will return Some(job).
+    /// Fetch a job from the queue.
     fn fetch_job(&self) -> Option<Job> {
-        if let Some(job) = self.pop() {
-            return Some(job);
-        }
         if let Some(job) = self.steal_from_global() {
             return Some(job);
         }
         None
-    }
-
-    /// Pop a job from the executor queue.
-    fn pop(&self) -> Option<Job> {
-        self.worker.pop()
     }
 
     /// Steal a job from the global queue.
