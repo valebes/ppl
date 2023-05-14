@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier};
-use std::{hint, mem, iter};
+use std::{hint, mem};
 
 use crate::mpsc::channel::Channel;
 use crate::core::orchestrator::{get_global_orchestrator, JobInfo, Orchestrator};
@@ -58,38 +58,12 @@ impl ThreadPoolWorker {
         None
     }
 
-    fn find_task(
-        &self
-    ) -> Option<Job> {
-        let local = &self.worker;
-        let global = &self.global;
-        let stealers = self.stealers.as_ref().unwrap();
-
-        // Pop a task from the local queue, if not empty.
-        local.pop().or_else(|| {
-            // Otherwise, we need to look for a task elsewhere.
-            iter::repeat_with(|| {
-                // Try stealing a batch of tasks from the global queue.
-                global
-                    .steal_batch_and_pop(local)
-                    // Or try stealing a task from one of the other threads.
-                    .or_else(|| stealers.iter().map(|s| s.steal()).collect())
-            })
-            // Loop while no task was stolen and any steal operation needs to be retried.
-            .find(|s| !s.is_retry())
-            // Extract the stolen task, if there is one.
-            .and_then(|s| s.success())
-        })
-    }
-
-
-
     /// This is the main loop of the thread.
     fn run(&self) {
         trace!("Worker {} started", self.id);
         let mut stop = false;
         loop {
-            let res = self.find_task();
+            let res = self.fetch_task();
             match res {
                 Some(task) => match task {
                     Job::NewJob(func) => {
