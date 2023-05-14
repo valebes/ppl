@@ -145,7 +145,7 @@ impl ExecutorInfo {
                     self.global.push(Job::Terminate);
                     break;
                 }
-                thread::yield_now();
+                //thread::yield_now();
             }
         }
     }
