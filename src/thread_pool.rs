@@ -297,7 +297,7 @@ impl ThreadPool {
                 Ok(Some((i, r))) => {
                     unordered_map.insert(i, r);
                 }
-                Ok(None) => std::thread::yield_now(),
+                Ok(None) => continue,
                 Err(_) => {}
             }
         }
