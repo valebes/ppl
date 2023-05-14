@@ -126,7 +126,6 @@ impl ExecutorInfo {
     /// If a job is available, it will execute it.
     /// If the job is a terminate message, it will terminate.
     fn run(&self) {
-        let mut stop = false;
         loop {
             if let Some(job) = self.fetch_job() {
                 match job {
@@ -136,15 +135,11 @@ impl ExecutorInfo {
                         self.warn_available();
                     }
                     Job::Terminate => {
-                        stop = true;
+                       self.warn_busy();
+                       break;
                     }
                 }
             } else {
-                if stop {
-                    self.warn_busy();
-                    //self.global.push(Job::Terminate);
-                    break;
-                }
                 thread::yield_now();
             }
         }
