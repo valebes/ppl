@@ -57,9 +57,9 @@ impl Executor {
         available_workers: Arc<AtomicUsize>,
         global: Arc<Injector<Job>>,
     ) -> Executor {
-        let worker = ExecutorInfo::new(core_id, available_workers, global);
+        let worker = ExecutorInfo::new( available_workers, global);
         let thread = Thread::new(
-            worker.core_id,
+            core_id,
             move || {
                 worker.run();
             },
@@ -79,19 +79,16 @@ impl Executor {
 /// Information about the executor.
 /// It contains the queue of jobs and the number of available executors in it's partition.
 struct ExecutorInfo {
-    core_id: usize,
     available_workers: Arc<AtomicUsize>,
     global: Arc<Injector<Job>>,
 }
 impl ExecutorInfo {
     /// Create a new executor info.
     fn new(
-        core_id: usize,
         available_workers: Arc<AtomicUsize>,
         global: Arc<Injector<Job>>,
     ) -> ExecutorInfo {
         ExecutorInfo {
-            core_id,
             available_workers,
             global,
         }
