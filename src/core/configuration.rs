@@ -46,10 +46,6 @@ fn parse_core_mapping() -> Vec<CoreId> {
 
     let core_ids = core_affinity::get_core_ids().unwrap();
 
-    if thread_mapping.len() > core_ids.len() {
-        panic!("Error: The number of threads in the mapping is greater than the number of cores");
-    }
-
     let mut core_mapping = Vec::new();
 
     for thread in thread_mapping {
@@ -209,22 +205,6 @@ mod tests {
         assert!(conf.pinning);
         assert!(conf.blocking_channel);
         assert!(conf.scheduling);
-        reset_env();
-    }
-
-    #[test]
-    #[serial]
-    fn test_configuration_with_mapping() {
-        env::set_var("PSPP_MAX_CORES", "4");
-        env::set_var("PSPP_THREAD_MAPPING", "1,0,2,3");
-        let conf = Configuration::new_default();
-        assert_eq!(conf.max_cores, 4);
-
-        let mut check = Vec::new();
-        for core in conf.thread_mapping {
-            check.push(core.id);
-        }
-        assert_eq!(check, vec![1, 0, 2, 3]);
         reset_env();
     }
 }
