@@ -261,8 +261,12 @@ impl Partition {
     }
 
     /// Add a worker (executor) to the partition.
-    /// The executor will be created and pushed to the partition.
-    fn add_worker(&self) 
+    /// The executor will be created and will execute the given closure.
+    /// After the closure is executed, the executor will fetch other jobs from
+    /// the global queue or its own queue.
+    fn add_worker<F>(&self, f: F) -> JobInfo
+    where
+        F: FnOnce() + Send + 'static,
     {
         let worker = Executor::new(
             self.core_id,
@@ -271,12 +275,24 @@ impl Partition {
             self.global.clone(),
         );
 
+        // Create a job info to track the job status.
+        let job_info = JobInfo::new();
+        let job_info_clone = Arc::clone(&job_info.status);
+        // Create the job and push it to the executor.
+        let job = Job::NewJob(Box::new(move || {
+            f();
+            job_info_clone.store(true, Ordering::Release);
+        }));
+        worker.push(job);
+
         // Take lock and push the new executor to the partition.
         let mut workers = self.workers.lock().unwrap();
         workers.push(worker);
 
         // Update the number of executor in the partition.
         self.total_workers.fetch_add(1, Ordering::Release);
+
+        job_info
     }
 
     /// Get the number of executor in the partition.
@@ -303,7 +319,7 @@ impl Partition {
         F: FnOnce() + Send + 'static,
     {
         if self.get_free_worker_count() == 0 {
-            self.add_worker()
+            return self.add_worker(f);
         }
 
         let job_info = JobInfo::new();
