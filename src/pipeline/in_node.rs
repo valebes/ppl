@@ -2,12 +2,11 @@ use std::{
     collections::BTreeMap,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc
+        Arc, Mutex,
     },
 };
 
 use log::{trace, warn};
-use parking_lot::Mutex;
 
 use crate::{
     mpsc::{
@@ -108,12 +107,16 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
 
     fn collect(mut self) -> Option<TCollected> {
         self.wait();
-        let mut tmp = self.result.lock();
-        
-        if tmp.is_none() {
+        let tmp = self.result.lock();
+        if tmp.is_err() {
+            panic!("Error: Cannot collect results in.");
+        }
+
+        let mut res = tmp.unwrap();
+        if res.is_none() {
             None
         } else {
-            tmp.take()
+            res.take()
         }
     }
 
@@ -143,8 +146,12 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
         let job_info = orchestrator.push(move || {
             if let Some(res) = InNode::rts(handler, channel_in) {
-                let mut tmp = bucket.lock();
-                *tmp = Some(res);
+                match bucket.lock() {
+                    Ok(mut lock_bucket) => {
+                        *lock_bucket = Some(res);
+                    }
+                    Err(_) => panic!("Error: Cannot collect results."),
+                }
             }
         });
 
@@ -193,16 +200,24 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
     }
 
     fn save_to_storage(&self, task: Message<TIn>, order: usize) {
-        let mut mtx = self.storage.lock();
-        mtx.insert(order, task);
+        let mtx = self.storage.lock();
+
+        match mtx {
+            Ok(mut queue) => {
+                queue.insert(order, task);
+            }
+            Err(_) => panic!("Error: Cannot lock the storage!"),
+        }
     }
 
     fn send_pending(&self) {
-        let mut mtx = self.storage.lock();
+        let mtx = self.storage.lock();
 
+        match mtx {
+            Ok(mut queue) => {
                 let mut c = self.counter.load(Ordering::Acquire);
-                while mtx.contains_key(&c) {
-                    let msg: Message<TIn> = mtx.remove(&c).unwrap();
+                while queue.contains_key(&c) {
+                    let msg = queue.remove(&c).unwrap();
                     let Message { op, order } = msg;
                     match &op {
                         Task::New(_e) => {
@@ -226,6 +241,8 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                     }
                     c = self.counter.load(Ordering::Acquire);
                 }
-          
+            }
+            Err(_) => panic!("Error: Cannot lock the storage!"),
+        }
     }
 }

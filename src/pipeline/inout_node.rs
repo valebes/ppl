@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, Barrier
+        Arc, Barrier, Condvar, Mutex,
     },
     thread,
 };
@@ -11,7 +11,6 @@ use std::{
 use crossbeam_deque::{Steal, Stealer, Worker};
 use dyn_clone::DynClone;
 use log::{trace, warn};
-use parking_lot::{Mutex, Condvar};
 use std::collections::BTreeMap;
 
 use crate::{
@@ -382,7 +381,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                             if self.node.is_ordered() {
                                 match &self.splitter {
                                     Some(splitter_ref) => {
-                                        let mut splitter = splitter_ref.0.lock();
+                                        let mut splitter = splitter_ref.0.lock().unwrap();
                                         let cvar = &splitter_ref.1;
                                         loop {
                                             let (expected, start) = splitter.get();
@@ -403,7 +402,14 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
                                                 cvar.notify_all();
                                                 break;
                                             } else {
-                                                cvar.wait(&mut splitter);
+                                                match cvar.wait(splitter) {
+                                                    Ok(mtx) => {
+                                                        splitter = mtx;
+                                                    }
+                                                    Err(err) => {
+                                                        panic!("Error: {}", err);
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -683,7 +689,7 @@ impl<
         } else if self.ordered && self.producer {
             match &self.ordered_splitter {
                 Some(lock) => {
-                    let ordered_splitter = lock.0.lock();
+                    let ordered_splitter = lock.0.lock().unwrap();
                     (_, c) = ordered_splitter.get();
                 }
                 None => panic!("Error: Ordered splitter not initialized!"),
@@ -698,18 +704,25 @@ impl<
     /// If we cant send a message immediately, we need to save it to the storage.
     /// Take in example a pipeline that is ordered.
     fn save_to_storage(&self, msg: Message<TIn>, order: usize) {
-        let mut mtx = self.storage.lock();
-        mtx.insert(order, msg);
+        let mtx = self.storage.lock();
+
+        match mtx {
+            Ok(mut queue) => {
+                queue.insert(order, msg);
+            }
+            Err(_) => panic!("Error: Cannot lock the storage!"),
+        }
     }
 
     /// Send pending messages in the storage to the next node.
     fn send_pending(&self) {
-        let mut mtx = self.storage.lock();
+        let mtx = self.storage.lock();
 
-
+        match mtx {
+            Ok(mut queue) => {
                 let mut c = self.next_msg.load(Ordering::Acquire);
-                while mtx.contains_key(&c) {
-                    let msg = mtx.remove(&c).unwrap();
+                while queue.contains_key(&c) {
+                    let msg = queue.remove(&c).unwrap();
                     let Message { op, order } = msg;
                     match &op {
                         Task::New(_e) => {
@@ -733,7 +746,8 @@ impl<
                     }
                     c = self.next_msg.load(Ordering::Acquire);
                 }
-            
-
+            }
+            Err(_) => panic!("Error: Cannot lock the storage!"),
+        }
     }
 }

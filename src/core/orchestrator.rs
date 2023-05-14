@@ -3,7 +3,7 @@ use std::{
     hint,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc
+        Arc, Mutex,
     },
     thread::{self},
 };
@@ -11,7 +11,6 @@ use std::{
 use core_affinity::CoreId;
 use crossbeam_deque::{Injector, Steal};
 use log::{error, trace};
-use parking_lot::Mutex;
 
 use super::configuration::Configuration;
 
@@ -229,7 +228,7 @@ impl Partition {
         );
 
         // Take lock and push the new executor to the partition.
-        let mut workers = self.workers.lock();
+        let mut workers = self.workers.lock().unwrap();
         workers.push(worker);
 
         // Update the number of executor in the partition.
@@ -292,7 +291,7 @@ impl Drop for Partition {
             self.global.push(Job::Terminate);
         }
 
-        let mut workers = self.workers.lock();
+        let mut workers = self.workers.lock().unwrap();
 
         // Join all the workers.
         for worker in workers.iter_mut() {
