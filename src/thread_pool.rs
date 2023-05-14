@@ -292,13 +292,18 @@ impl ThreadPool {
 
         drop(arc_tx);
 
-        while !rx.is_empty() || !self.is_empty() {
-            match rx.receive() {
-                Ok(Some((i, r))) => {
-                    unordered_map.insert(i, r);
+        self.wait();
+
+        while !rx.is_empty() {
+            match rx.receive_all() {
+                Ok(vec) => {
+                    for (k, v) in vec {
+                        unordered_map.insert(k, v);
+                    }
                 }
-                Ok(None) => continue,
-                Err(_) => {}
+                Err(e) => {
+                    panic!("Error: {}", e);
+                }
             }
         }
         unordered_map.into_values()
@@ -416,7 +421,7 @@ mod tests {
         let mut vec = Vec::new();
         let mut tp = ThreadPool::new_with_global_registry(16);
 
-        for i in 0..1000 {
+        for i in 0..10000 {
             vec.push(i);
         }
         let res: Vec<String> = tp

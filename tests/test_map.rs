@@ -1,3 +1,5 @@
+use std::println;
+
 use pspp::core::orchestrator::get_global_orchestrator;
 use pspp::map::Map;
 use pspp::{
@@ -18,7 +20,7 @@ impl Out<Vec<i32>> for Source {
     fn run(&mut self) -> Option<Vec<i32>> {
         if self.counter < self.streamlen {
             self.counter += 1;
-            Some((0..99).collect())
+            Some((0..10000).collect())
         } else {
             None
         }
@@ -45,7 +47,7 @@ fn test_map() {
 
     let mut p = parallel![
         Source {
-            streamlen: 50,
+            streamlen: 100,
             counter: 0
         },
         Map::build(2, |el: i32| -> String {
