@@ -142,7 +142,7 @@ impl ExecutorInfo {
             } else {
                 if stop {
                     self.warn_busy();
-                    self.global.push(Job::Terminate);
+                    //self.global.push(Job::Terminate);
                     break;
                 }
                 thread::yield_now();
@@ -351,13 +351,15 @@ impl Drop for Partition {
             self.get_worker_count()
         );
 
-        // Terminate all the workers.
-        self.global.push(Job::Terminate);
+        let mut workers = self.workers.lock().unwrap();
 
-        let mut worker = self.workers.lock().unwrap();
+        // Terminate all the workers.
+        for worker in workers.iter_mut() {
+            worker.push(Job::Terminate);
+        }
 
         // Join all the workers.
-        for worker in worker.iter_mut() {
+        for worker in workers.iter_mut() {
             worker.join();
         }
     }
