@@ -291,6 +291,8 @@ impl ThreadPool {
         });
 
         drop(arc_tx);
+        
+        self.wait();
 
         while !rx.is_empty() || !self.is_empty() {
             match rx.receive() {
