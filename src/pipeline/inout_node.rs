@@ -194,7 +194,7 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // If there are a terminating message, then that is put in the system queue.
     fn steal_all_from_channel(&mut self) {
         match &mut self.channel_rx {
-            Some(channel_rx) => match channel_rx.receive_all() {
+            Some(channel_rx) => match channel_rx.try_receive_all() {
                 Ok(messages) => {
                     messages.into_iter().for_each(|message| {
                         if message.is_terminate() {

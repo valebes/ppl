@@ -39,11 +39,27 @@ impl<T: Send> InputChannel<T> {
         self.rx.receive()
     }
 
-    /// Receive all messages from the channel.
+    /// Receive all messages from the channel, if any.
+    /// This method does not block.
+    pub fn try_receive_all(&self) -> Result<Vec<T>, ChannelError> {
+        let mut res = Vec::new();
+        // if we're in blocking mode and the queue is empty, then we return immediately to avoid blocking
+        while !self.is_empty() {
+            match self.receive() {
+                Ok(Some(msg)) => res.push(msg),
+                Ok(None) => break,
+                Err(_e) => break,
+            }
+        }
+        
+        Ok(res)
+    }
+
+    // Receive all messages from the channel, if any.
+    // This method blocks until all messages are received.
     pub fn receive_all(&self) -> Result<Vec<T>, ChannelError> {
         let mut res = Vec::new();
-        // if is in blocking mode and the queue is empty, then we return immediately to avoid blocking
-        while !self.is_empty() {
+        loop {
             match self.receive() {
                 Ok(Some(msg)) => res.push(msg),
                 Ok(None) => break,
