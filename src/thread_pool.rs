@@ -276,7 +276,7 @@ impl ThreadPool {
 
         let (rx, tx) = Channel::channel(blocking);
         let arc_tx = Arc::new(tx);
-        let mut unordered_map = BTreeMap::<usize, R>::new();
+        let mut ordered_map = BTreeMap::<usize, R>::new();
 
         self.scoped(|s| {
             iter.into_iter().enumerate().for_each(|el| {
@@ -297,7 +297,7 @@ impl ThreadPool {
         while !rx.is_empty() {
             match rx.receive() {
                 Ok(Some((k, v))) => {
-                    unordered_map.insert(k, v);
+                    ordered_map.insert(k, v);
                 },
                 Ok(None) => {
                     continue;
@@ -307,7 +307,7 @@ impl ThreadPool {
                 }
             }
         }
-        unordered_map.into_values()
+        ordered_map.into_values()
     }
 
     /// Borrows the thread pool and allows executing jobs on other

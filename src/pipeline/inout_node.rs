@@ -497,7 +497,7 @@ impl<
             Task::New(_e) => {
                 if self.channels.len() == 1
                     && self.ordered
-                    && order != self.next_msg.load(Ordering::SeqCst)
+                    && order != self.next_msg.load(Ordering::Acquire)
                 {
                     self.save_to_storage(Message::new(op, rec_id), order);
                     self.send_pending();
