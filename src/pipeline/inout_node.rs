@@ -167,12 +167,6 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // and put them in the local queue, after return the first message.
     // If the channel is empty, then the worker return None.
     fn get_message_from_channel(&mut self) -> Option<Message<TIn>> {
-        // If we have received a terminating message, then we don't want to receive any other message.
-        // In blocking mode this help to avoid to block the thread on a channel that won't receive any other message.
-        //TODO: Instead to doing this, drop the channel_tx when the terminating message is received.
-        if self.stop {
-            return None;
-        }
         match &mut self.channel_rx {
             Some(channel_rx) => match channel_rx.receive() {
                 Ok(Some(message)) => {
@@ -544,7 +538,7 @@ impl<
                             panic!("Error: Cannot send message!");
                         }
                     }
-
+        
                     if self.ordered {
                         self.next_msg.store(order, Ordering::Release);
                     }
@@ -677,6 +671,12 @@ impl<
 
     /// Wait for all the workers to finish
     fn wait(&mut self) {
+
+        // Drop the sender side of channels
+        for _i in 0..self.channels.len() {
+            drop(self.channels.pop().unwrap());
+        }
+
         for job in &self.job_infos {
             job.wait();
         }

@@ -1,5 +1,5 @@
 use crossbeam_deque::{Injector, Steal, Stealer, Worker};
-use log::trace;
+use log::{trace, warn};
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
@@ -302,7 +302,7 @@ impl ThreadPool {
                     }
                 }
                 Err(e) => {
-                    panic!("Error: {}", e);
+                    warn!("Error: {}", e);
                 }
             }
         }
