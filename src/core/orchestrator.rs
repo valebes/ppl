@@ -455,7 +455,7 @@ impl Orchestrator {
     /// This algorithm will use the sum of the previous subarray, removing the first element, to compute the sum of the next subarray.
     /// This will reduce the complexity from O(n^2) to O(n).
     /// If there are no executors in any partition, the first sequence of 'count' partitions is returned.
-    /// This method is used to find the best sequence of partitions to pin a job.
+    /// This method is used to find the best sequence of partitions to pin a set jobs.
     fn find_partition_sequence_optimized(&self, count: usize) -> Option<Vec<&Partition>> {
         if count > self.partitions.len() {
             return None;
