@@ -295,18 +295,6 @@ impl ThreadPool {
         self.wait();
 
         while !rx.is_empty() {
-            /* 
-            match rx.receive_all() {
-                Ok(vec) => {
-                    for (k, v) in vec {
-                        unordered_map.insert(k, v);
-                    }
-                }
-                Err(e) => {
-                    warn!("Error: {}", e);
-                }
-            }
-            */
             match rx.receive() {
                 Ok(Some((k, v))) => {
                     unordered_map.insert(k, v);
