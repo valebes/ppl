@@ -50,7 +50,7 @@ fn test_map() {
             streamlen: 100,
             counter: 0
         },
-        Map::build(2, |el: i32| -> String {
+        Map::build(6, |el: i32| -> String {
             "Hello from: ".to_string() + &el.to_string()
         }),
         Sink { res: Vec::new() }

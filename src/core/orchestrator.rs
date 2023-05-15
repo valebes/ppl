@@ -250,6 +250,11 @@ impl Partition {
         self.available_workers.load(Ordering::Acquire)
     }
 
+    // Get the partition id.
+    fn get_id(&self) -> usize {
+        self.core_id.id
+    }
+
     /// Push a new job to the partition.
     /// This method return a JobInfo that can be used to wait for the Job to finish.
     /// If there aren't executors in the partition or all the existing executors are busy, a new executor is created.
@@ -445,6 +450,46 @@ impl Orchestrator {
         min
     }
 
+    /// Find the subarray of size count of partition that minimize the number of busy executors contained in each partition of the subarray.
+    /// If there are more than one partition with the same number of executors, the first sequence found is returned.
+    /// This algorithm will use the sum of the previous subarray, removing the first element, to compute the sum of the next subarray.
+    /// This will reduce the complexity from O(n^2) to O(n).
+    /// If there are no executors in any partition, the first sequence of 'count' partitions is returned.
+    /// This method is used to find the best sequence of partitions to pin a job.
+    fn find_partition_sequence_optimized(&self, count: usize) -> Option<Vec<&Partition>> {
+        if count > self.partitions.len() {
+            return None;
+        }
+
+        let mut min = None;
+        let mut min_busy = usize::MAX;
+        let mut busy = 0;
+        for i in 0..count {
+            busy += self.partitions[i].get_busy_worker_count();
+        }
+        if busy == 0 {
+            return Some(self.partitions[0..count].iter().collect());
+        }
+        if busy < min_busy {
+            min = Some(self.partitions[0..count].iter().collect());
+            min_busy = busy;
+        }
+        for i in count..self.partitions.len() {
+            busy -= self.partitions[i - count].get_busy_worker_count();
+            busy += self.partitions[i].get_busy_worker_count();
+            if busy == 0 {
+                return Some(self.partitions[i - count + 1..i + 1].iter().collect());
+            }
+            if busy < min_busy {
+                min = Some(self.partitions[i - count + 1..i + 1].iter().collect());
+                min_busy = busy;
+            }
+        }
+        min
+    }
+
+    
+
     /// Get the number of partitions of the orchestrator.
     pub fn get_partition_count(&self) -> usize {
         self.partitions.len()
@@ -475,8 +520,30 @@ impl Orchestrator {
     {
         let mut job_info = Vec::with_capacity(f.len());
 
-        let partitions = self.find_partition_sequence(f.len());
+        //let partitiona = self.find_partition_sequence(f.len());
+        //let partitionb = self.find_partition_sequence_optimized(f.len());
+ 
+        let partitions = self.find_partition_sequence_optimized(f.len());
 
+        /* 
+        let mut check = true;
+
+        //Check if both methods return the same result
+        if partitiona.is_some() && partitionb.is_some() {
+            let p1 = partitiona.unwrap();
+            let p2 = partitionb.unwrap();
+            for i in 0..p1.len() {
+                if p1[i].get_id() != p2[i].get_id() {
+                    check = false;
+                    break;
+                }
+            }
+        } else {
+            check = true;
+        }
+
+        assert!(check, "The two methods should return the same result!");
+        */
         match partitions {
             Some(p) => {
                 for partition in p {
