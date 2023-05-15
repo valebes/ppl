@@ -56,7 +56,8 @@ impl<T: Send> InputChannel<T> {
     }
 
     // Receive all messages from the channel, if any.
-    // This method blocks until all messages are received.
+    // This method when in blocking mode will block until the sender side of the channel is closed.
+    // Instead, when in non-blocking mode, it will return after at least one message is received.
     pub fn receive_all(&self) -> Result<Vec<T>, ChannelError> {
         let mut res = Vec::new();
         loop {
