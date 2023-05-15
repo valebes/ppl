@@ -42,15 +42,15 @@ impl<T: Send> InputChannel<T> {
     /// Receive all messages from the channel.
     pub fn receive_all(&self) -> Result<Vec<T>, ChannelError> {
         let mut res = Vec::new();
-      
-        loop {
+        // if is in blocking mode and the queue is empty, then we return immediately to avoid blocking
+        while !self.is_empty() {
             match self.receive() {
                 Ok(Some(msg)) => res.push(msg),
                 Ok(None) => break,
                 Err(_e) => break,
             }
         }
-
+        
         Ok(res)
     }
     /// Check if the channel is in blocking mode.
