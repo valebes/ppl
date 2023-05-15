@@ -292,6 +292,8 @@ impl ThreadPool {
 
         drop(arc_tx);
 
+        self.wait();
+
         while !rx.is_empty() {
             match rx.receive() {
                 Ok(Some((k, v))) => {
@@ -304,22 +306,6 @@ impl ThreadPool {
                     warn!("Error: {}", e);
                 }
             }
-        }
-
-        self.wait();
-
-        while !rx.is_empty() {
-            match rx.try_receive_all() {
-                Ok(vec) => {
-                    for (k, v) in vec {
-                        ordered_map.insert(k, v);
-                    }
-                },
-                Err(e) => {
-                    warn!("Error: {}", e);
-                },
-            }
-            
         }
         ordered_map.into_values()
     }
