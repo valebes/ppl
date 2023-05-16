@@ -296,7 +296,7 @@ impl ThreadPool {
 
         let mut disconnected = false;
 
-        while (!rx.is_empty() || !self.is_empty()) || !disconnected {
+        while /* (!rx.is_empty() || !self.is_empty()) ||  */ !disconnected {
             match rx.receive() {
                 Ok(Some((k, v))) => {
                     ordered_map.insert(k, v);
