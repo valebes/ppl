@@ -47,8 +47,8 @@ impl<T: Send> InputChannel<T> {
         while !self.is_empty() {
             match self.receive() {
                 Ok(Some(msg)) => res.push(msg),
-                Ok(None) => break,
-                Err(_e) => break,
+                Ok(None) => break, // The channel is empty, so we break
+                Err(_e) => break, // The channel is disconnected, so we break
             }
         }
         

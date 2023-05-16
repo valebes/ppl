@@ -13,7 +13,13 @@ impl<T: Send> Receiver<T> for FFInputChannel<T> {
     fn receive(&self) -> Result<Option<T>, ChannelError> {
         match self.rx.try_pop() {
             Some(boxed) => Ok(Some(Box::into_inner(boxed))),
-            None => Ok(None),
+            None => {
+                if self.rx.is_disconnected() {
+                    Err(ChannelError::new("Can't receive the msg."))
+                } else {
+                    Ok(None)
+                }
+            }
         }
     }
 
@@ -29,7 +35,7 @@ impl<T: Send> Receiver<T> for FFBlockingInputChannel<T> {
     fn receive(&self) -> Result<Option<T>, ChannelError> {
         match self.rx.pop() {
             Some(boxed) => Ok(Some(Box::into_inner(boxed))),
-            None => Ok(None),
+            None => Err(ChannelError::new("Can't receive the msg.")),
         }
     }
 

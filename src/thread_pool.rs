@@ -292,9 +292,11 @@ impl ThreadPool {
 
         drop(arc_tx);
 
-        self.wait();
+        //self.wait();
 
-        while !rx.is_empty() {
+        let mut disconnected = false;
+
+        while (!rx.is_empty() || !self.is_empty()) || !disconnected {
             match rx.receive() {
                 Ok(Some((k, v))) => {
                     ordered_map.insert(k, v);
@@ -303,7 +305,9 @@ impl ThreadPool {
                     continue;
                 },
                 Err(e) => {
+                    // The channel is closed. We can exit the loop.
                     warn!("Error: {}", e);
+                    disconnected = true;
                 }
             }
         }
