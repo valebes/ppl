@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{thread_pool::ThreadPool, pipeline::inout_node::InOut};
+use crate::{pipeline::inout_node::InOut, thread_pool::ThreadPool};
 
 #[derive(Clone)]
 pub struct Map<TIn: Send, TOut: Send, F: FnOnce(TIn) -> TOut + Send + Copy> {

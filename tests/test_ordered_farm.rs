@@ -4,12 +4,13 @@
 
 use pspp::core::orchestrator::get_global_orchestrator;
 use pspp::{
+    parallel,
     pipeline::{
         in_node::{In, InNode},
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
-    parallel, propagate,
+    propagate,
     pspp::Parallel,
 };
 
@@ -70,7 +71,7 @@ impl InOut<usize, usize> for WorkerC {
         true
     }
     fn number_of_replicas(&self) -> usize {
-        2
+        4
     }
 }
 

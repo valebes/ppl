@@ -9,11 +9,11 @@ use std::{
 use log::{trace, warn};
 
 use crate::{
+    core::orchestrator::{JobInfo, Orchestrator},
     mpsc::{
         channel::{Channel, InputChannel, OutputChannel},
-        err::ChannelError,
+        err::SenderError,
     },
-    core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
 };
 
@@ -67,7 +67,7 @@ pub struct InNode<TIn: Send, TCollected> {
 impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
     for InNode<TIn, TCollected>
 {
-    fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), ChannelError> {
+    fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), SenderError> {
         let Message { op, order } = input;
         match &op {
             Task::New(_e) => {

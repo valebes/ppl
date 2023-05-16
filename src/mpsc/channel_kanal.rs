@@ -1,18 +1,21 @@
 use kanal::{Receiver, Sender};
 
-use super::{channel, err::ChannelError};
+use super::{
+    channel,
+    err::{ReceiverError, SenderError},
+};
 
 pub struct KanalInputChannel<T> {
     rx: Receiver<T>,
 }
 impl<T: Send> channel::Receiver<T> for KanalInputChannel<T> {
-    fn receive(&self) -> Result<Option<T>, ChannelError> {
+    fn receive(&self) -> Result<Option<T>, ReceiverError> {
         let err = self.rx.try_recv();
         match err {
             Ok(msg) => Ok(msg),
             Err(e) => match e {
-                kanal::ReceiveError::Closed => Err(ChannelError::new(&e.to_string())),
-                kanal::ReceiveError::SendClosed => Err(ChannelError::new(&e.to_string())),
+                kanal::ReceiveError::Closed => Err(ReceiverError),
+                kanal::ReceiveError::SendClosed => Err(ReceiverError),
             },
         }
     }
@@ -26,11 +29,11 @@ pub struct KanalBlockingInputChannel<T> {
     rx: Receiver<T>,
 }
 impl<T: Send> channel::Receiver<T> for KanalBlockingInputChannel<T> {
-    fn receive(&self) -> Result<Option<T>, ChannelError> {
+    fn receive(&self) -> Result<Option<T>, ReceiverError> {
         let err = self.rx.recv();
         match err {
             Ok(msg) => Ok(Some(msg)),
-            Err(e) => Err(ChannelError::new(&e.to_string())),
+            Err(_e) => Err(ReceiverError),
         }
     }
 
@@ -44,11 +47,11 @@ pub struct KanalOutputChannel<T> {
 }
 
 impl<T: Send> channel::Sender<T> for KanalOutputChannel<T> {
-    fn send(&self, msg: T) -> Result<(), ChannelError> {
+    fn send(&self, msg: T) -> Result<(), SenderError> {
         let err = self.tx.send(msg);
         match err {
             Ok(()) => Ok(()),
-            Err(e) => Err(ChannelError::new(&e.to_string())),
+            Err(_e) => Err(SenderError),
         }
     }
 }
@@ -75,12 +78,12 @@ impl Channel {
         if blocking {
             (
                 Box::new(KanalBlockingInputChannel { rx }),
-                Box::new(KanalOutputChannel { tx: tx }),
+                Box::new(KanalOutputChannel { tx }),
             )
         } else {
             (
                 Box::new(KanalInputChannel { rx }),
-                Box::new(KanalOutputChannel { tx: tx }),
+                Box::new(KanalOutputChannel { tx }),
             )
         }
     }

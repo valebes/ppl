@@ -14,11 +14,11 @@ use log::{trace, warn};
 use std::collections::BTreeMap;
 
 use crate::{
+    core::orchestrator::{JobInfo, Orchestrator},
     mpsc::{
         channel::{Channel, InputChannel, OutputChannel},
-        err::ChannelError,
+        err::SenderError,
     },
-    core::orchestrator::{JobInfo, Orchestrator},
     task::{Message, Task},
 };
 
@@ -194,19 +194,14 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     // If there are a terminating message, then that is put in the system queue.
     fn steal_all_from_channel(&mut self) {
         match &mut self.channel_rx {
-            Some(channel_rx) => match channel_rx.try_receive_all() {
-                Ok(messages) => {
-                    messages.into_iter().for_each(|message| {
-                        if message.is_terminate() {
-                            self.system_queue.push(message);
-                        } else {
-                            self.local_queue.push(message);
-                        }
-                    });
-                }
-                Err(e) => {
-                    warn!("Error: {}", e);
-                }
+            Some(channel_rx) => {
+                channel_rx.try_receive_all().into_iter().for_each(|message| {
+                    if message.is_terminate() {
+                        self.system_queue.push(message);
+                    } else {
+                        self.local_queue.push(message);
+                    }
+                });
             },
             None => {}
         }
@@ -486,7 +481,7 @@ impl<
         TNext: Node<TOut, TCollected> + Send + Sync + 'static,
     > Node<TIn, TCollected> for InOutNode<TIn, TOut, TCollected, TNext>
 {
-    fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), ChannelError> {
+    fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), SenderError> {
         let mut rec_id = rec_id;
         if rec_id >= self.job_infos.len() {
             rec_id %= self.job_infos.len();
@@ -544,7 +539,7 @@ impl<
                             panic!("Error: Cannot send message!");
                         }
                     }
-        
+
                     if self.ordered {
                         self.next_msg.store(order, Ordering::Release);
                     }
@@ -677,7 +672,6 @@ impl<
 
     /// Wait for all the workers to finish
     fn wait(&mut self) {
-
         // Drop the sender side of channels
         for _i in 0..self.channels.len() {
             drop(self.channels.pop().unwrap());

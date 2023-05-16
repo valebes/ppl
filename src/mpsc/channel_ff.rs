@@ -3,19 +3,19 @@ use std::sync::Mutex;
 
 use super::{
     channel::{Receiver, Sender},
-    err::ChannelError,
+    err::{ReceiverError, SenderError},
 };
 
 pub struct FFInputChannel<T> {
     rx: FFReceiver<T>,
 }
 impl<T: Send> Receiver<T> for FFInputChannel<T> {
-    fn receive(&self) -> Result<Option<T>, ChannelError> {
+    fn receive(&self) -> Result<Option<T>, ReceiverError> {
         match self.rx.try_pop() {
             Some(boxed) => Ok(Some(Box::into_inner(boxed))),
             None => {
                 if self.rx.is_disconnected() {
-                    Err(ChannelError::new("Can't receive the msg."))
+                    Err(ReceiverError)
                 } else {
                     Ok(None)
                 }
@@ -32,10 +32,10 @@ pub struct FFBlockingInputChannel<T> {
     rx: FFReceiver<T>,
 }
 impl<T: Send> Receiver<T> for FFBlockingInputChannel<T> {
-    fn receive(&self) -> Result<Option<T>, ChannelError> {
+    fn receive(&self) -> Result<Option<T>, ReceiverError> {
         match self.rx.pop() {
             Some(boxed) => Ok(Some(Box::into_inner(boxed))),
-            None => Err(ChannelError::new("Can't receive the msg.")),
+            None => Err(ReceiverError),
         }
     }
 
@@ -49,13 +49,13 @@ pub struct FFOutputChannel<T> {
 }
 
 impl<T: Send> Sender<T> for FFOutputChannel<T> {
-    fn send(&self, msg: T) -> Result<(), ChannelError> {
+    fn send(&self, msg: T) -> Result<(), SenderError> {
         let mtx = self.tx.lock();
         match mtx {
             Ok(ch) => {
                 let err = ch.push(Box::new(msg));
                 match err {
-                    Some(_) => Err(ChannelError::new("Can't send the msg.")),
+                    Some(_) => Err(SenderError),
                     None => Ok(()),
                 }
             }

@@ -6,8 +6,8 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier};
 use std::{hint, mem};
 
-use crate::mpsc::channel::Channel;
 use crate::core::orchestrator::{get_global_orchestrator, JobInfo, Orchestrator};
+use crate::mpsc::channel::Channel;
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
@@ -300,10 +300,10 @@ impl ThreadPool {
             match rx.receive() {
                 Ok(Some((k, v))) => {
                     ordered_map.insert(k, v);
-                },
+                }
                 Ok(None) => {
                     continue;
-                },
+                }
                 Err(e) => {
                     // The channel is closed. We can exit the loop.
                     warn!("Error: {}", e);

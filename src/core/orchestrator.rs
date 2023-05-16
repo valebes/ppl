@@ -58,7 +58,7 @@ impl Executor {
         available_workers: Arc<AtomicUsize>,
         global: Arc<Injector<Job>>,
     ) -> Executor {
-        let worker = ExecutorInfo::new( available_workers, global);
+        let worker = ExecutorInfo::new(available_workers, global);
         let thread = Thread::new(
             core_id,
             move || {
@@ -66,9 +66,7 @@ impl Executor {
             },
             config,
         );
-        Executor {
-            thread,
-        }
+        Executor { thread }
     }
 
     /// Join the thread running the executor.
@@ -85,10 +83,7 @@ struct ExecutorInfo {
 }
 impl ExecutorInfo {
     /// Create a new executor info.
-    fn new(
-        available_workers: Arc<AtomicUsize>,
-        global: Arc<Injector<Job>>,
-    ) -> ExecutorInfo {
+    fn new(available_workers: Arc<AtomicUsize>, global: Arc<Injector<Job>>) -> ExecutorInfo {
         ExecutorInfo {
             available_workers,
             global,
@@ -120,8 +115,8 @@ impl ExecutorInfo {
                         self.warn_available();
                     }
                     Job::Terminate => {
-                       self.warn_busy();
-                       break;
+                        self.warn_busy();
+                        break;
                     }
                 }
             } else {
@@ -159,14 +154,12 @@ impl Thread {
         Thread {
             thread: Some(thread::spawn(move || {
                 if configuration.get_pinning() {
-                   
-                        let err = core_affinity::set_for_current(core_id);
-                        if !err {
-                            error!("Thread pinning on core {} failed!", core_id.id);
-                        } else {
-                            trace!("Thread pinned on core {}.", core_id.id);
-                        }
-                    
+                    let err = core_affinity::set_for_current(core_id);
+                    if !err {
+                        error!("Thread pinning on core {} failed!", core_id.id);
+                    } else {
+                        trace!("Thread pinned on core {}.", core_id.id);
+                    }
                 }
                 trace!("{:?} started", thread::current().id());
                 (f)();
@@ -218,8 +211,7 @@ impl Partition {
 
     /// Add a worker (executor) to the partition.
     /// The executor will be created and pushed to the partition.
-    fn add_worker(&self)
-    {
+    fn add_worker(&self) {
         let worker = Executor::new(
             self.core_id,
             self.configuration.clone(),
@@ -305,7 +297,7 @@ impl Drop for Partition {
     }
 }
 
-/* 
+/*
 #[derive(Debug)]
 pub struct OrchestratorError {
     details: String,
@@ -343,7 +335,7 @@ pub struct Orchestrator {
 /// OnceCell is a structure that allow to create a safe global singleton.
 static mut ORCHESTRATOR: OnceCell<Arc<Orchestrator>> = OnceCell::new();
 
-/* 
+/*
 pub(crate) fn new_global_orchestrator(
     configuration: Arc<Configuration>,
 ) -> Result<Arc<Orchestrator>, OrchestratorError> {
@@ -368,7 +360,7 @@ pub fn get_global_orchestrator() -> Arc<Orchestrator> {
     }
 }
 
-/* 
+/*
 fn set_global_orchestrator(
     orchestrator: Orchestrator,
 ) -> Result<Arc<Orchestrator>, OrchestratorError> {
@@ -424,39 +416,13 @@ impl Orchestrator {
         min
     }
 
-    /// Find a contiguos interval of 'count' partitions that minimize the number of busy executors contained in each partition of the interval.
-    /// If there are more than one partition with the same number of executors, the first sequence found is returned.
-    /// If there are no executors in any partition, the first sequence of 'count' partitions is returned.
-    fn find_partition_sequence(&self, count: usize) -> Option<Vec<&Partition>> {
-        if count > self.partitions.len() {
-            return None;
-        }
-
-        let mut min = None;
-        let mut min_busy = usize::MAX;
-        for i in 0..self.partitions.len() - count {
-            let mut busy = 0;
-            for j in i..i + count {
-                busy += self.partitions[j].get_busy_worker_count();
-            }
-            if busy == 0 {
-                return Some(self.partitions[i..i + count].iter().collect());
-            }
-            if busy < min_busy {
-                min = Some(self.partitions[i..i + count].iter().collect());
-                min_busy = busy;
-            }
-        }
-        min
-    }
-
     /// Find the subarray of size count of partition that minimize the number of busy executors contained in each partition of the subarray.
     /// If there are more than one partition with the same number of executors, the first sequence found is returned.
     /// This algorithm will use the sum of the previous subarray, removing the first element, to compute the sum of the next subarray.
     /// This will reduce the complexity from O(n^2) to O(n).
     /// If there are no executors in any partition, the first sequence of 'count' partitions is returned.
     /// This method is used to find the best sequence of partitions to pin a set jobs.
-    fn find_partition_sequence_optimized(&self, count: usize) -> Option<Vec<&Partition>> {
+    fn find_partition_sequence(&self, count: usize) -> Option<Vec<&Partition>> {
         if count > self.partitions.len() {
             return None;
         }
@@ -488,8 +454,6 @@ impl Orchestrator {
         min
     }
 
-    
-
     /// Get the number of partitions of the orchestrator.
     pub fn get_partition_count(&self) -> usize {
         self.partitions.len()
@@ -504,7 +468,9 @@ impl Orchestrator {
     {
         let partition = self.find_partition();
         match partition {
-            Some(p) => p.push(f),
+            Some(p) => {
+                p.push(f)
+            }
             None => panic!("No partition found!"), // This should never happen.
         }
     }
@@ -520,30 +486,8 @@ impl Orchestrator {
     {
         let mut job_info = Vec::with_capacity(f.len());
 
-        //let partitiona = self.find_partition_sequence(f.len());
-        //let partitionb = self.find_partition_sequence_optimized(f.len());
- 
-        let partitions = self.find_partition_sequence_optimized(f.len());
+        let partitions = self.find_partition_sequence(f.len());
 
-        /* 
-        let mut check = true;
-
-        //Check if both methods return the same result
-        if partitiona.is_some() && partitionb.is_some() {
-            let p1 = partitiona.unwrap();
-            let p2 = partitionb.unwrap();
-            for i in 0..p1.len() {
-                if p1[i].get_id() != p2[i].get_id() {
-                    check = false;
-                    break;
-                }
-            }
-        } else {
-            check = true;
-        }
-
-        assert!(check, "The two methods should return the same result!");
-        */
         match partitions {
             Some(p) => {
                 for partition in p {
@@ -588,7 +532,7 @@ impl Drop for Orchestrator {
 mod tests {
     use super::*;
     use serial_test::serial;
-    use std::{sync::Arc};
+    use std::sync::Arc;
 
     #[test]
     #[serial]
@@ -637,5 +581,4 @@ mod tests {
         assert_eq!(counter.load(Ordering::Acquire), 1000);
         Orchestrator::delete_global_orchestrator();
     }
-
 }

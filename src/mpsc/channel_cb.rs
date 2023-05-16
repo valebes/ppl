@@ -1,17 +1,20 @@
-use super::{channel, err::ChannelError};
+use super::{
+    channel,
+    err::{ReceiverError, SenderError},
+};
 use crossbeam_channel::{Receiver, Sender, TryRecvError};
 
 pub struct CBInputChannel<T> {
     rx: Receiver<T>,
 }
 impl<T: Send> channel::Receiver<T> for CBInputChannel<T> {
-    fn receive(&self) -> Result<Option<T>, ChannelError> {
+    fn receive(&self) -> Result<Option<T>, ReceiverError> {
         let err = self.rx.try_recv();
         match err {
             Ok(msg) => Ok(Some(msg)),
             Err(e) => match e {
                 TryRecvError::Empty => Ok(None),
-                TryRecvError::Disconnected => Err(ChannelError::new(&e.to_string())),
+                TryRecvError::Disconnected => Err(ReceiverError),
             },
         }
     }
@@ -25,11 +28,11 @@ pub struct CBBlockingInputChannel<T> {
     rx: Receiver<T>,
 }
 impl<T: Send> channel::Receiver<T> for CBBlockingInputChannel<T> {
-    fn receive(&self) -> Result<Option<T>, ChannelError> {
+    fn receive(&self) -> Result<Option<T>, ReceiverError> {
         let err = self.rx.recv();
         match err {
             Ok(msg) => Ok(Some(msg)),
-            Err(e) => Err(ChannelError::new(&e.to_string())),
+            Err(_e) => Err(ReceiverError),
         }
     }
 
@@ -43,11 +46,11 @@ pub struct CBOutputChannel<T> {
 }
 
 impl<T: Send> channel::Sender<T> for CBOutputChannel<T> {
-    fn send(&self, msg: T) -> Result<(), ChannelError> {
+    fn send(&self, msg: T) -> Result<(), SenderError> {
         let err = self.tx.send(msg);
         match err {
             Ok(()) => Ok(()),
-            Err(e) => Err(ChannelError::new(&e.to_string())),
+            Err(_e) => Err(SenderError),
         }
     }
 }

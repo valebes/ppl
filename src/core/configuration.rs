@@ -24,7 +24,7 @@ pub struct Configuration {
 /// in the string is the order in which the cores are used.
 /// For example, if the string is "0,1,2,3", the first core
 /// is used first, then the second core, and so on.
-/// 
+///
 /// If the environment variable is not set, the core mapping
 /// is set to the default mapping, i.e., the cores are used
 /// in the order in which they are found by the framework.
@@ -82,7 +82,6 @@ impl Configuration {
         }
     }
 
-
     /// Create a new configuration with the default values.
     /// The default values are:
     /// - max_cores: the number of cores found by the framework.
@@ -119,8 +118,8 @@ impl Configuration {
 
     /// Get the maximum number of cores allowed.
     /// Only valid when pinning is active.
-    /// Obliously, the maximum number of cores allowed is 
-    /// not the maximum number of threads allowed. 
+    /// Obliously, the maximum number of cores allowed is
+    /// not the maximum number of threads allowed.
     /// More thread can be pinned to the same core.
     pub(crate) fn get_max_cores(&self) -> usize {
         self.max_cores
@@ -134,8 +133,8 @@ impl Configuration {
     /// in the first position of the thread mapping, partition two
     /// is pinned to the core specified in the second position of the
     /// thread mapping, and so on.
-    /// When pinning is enabled, the framework will try to put the workers 
-    /// of a threadpool, or the replicas of a stage of a pipeline, in 
+    /// When pinning is enabled, the framework will try to put the workers
+    /// of a threadpool, or the replicas of a stage of a pipeline, in
     /// a subset of neighboring cores. This is done to reduce the
     /// communication overhead between the workers.
     pub(crate) fn get_thread_mapping(&self) -> &Vec<CoreId> {

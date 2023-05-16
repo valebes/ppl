@@ -1,4 +1,4 @@
-use super::err::ChannelError;
+use super::err::{ReceiverError, SenderError};
 
 #[cfg(feature = "ff")]
 use super::channel_ff as backend;
@@ -15,7 +15,7 @@ use super::channel_flume as backend;
 /// Trait defining a channel receiver.
 pub trait Receiver<T> {
     /// Receive a message from the channel.
-    fn receive(&self) -> Result<Option<T>, ChannelError>;
+    fn receive(&self) -> Result<Option<T>, ReceiverError>;
     /// Check if the channel is empty.
     fn is_empty(&self) -> bool;
 }
@@ -23,7 +23,7 @@ pub trait Receiver<T> {
 /// Trait defining a channel sender.
 pub trait Sender<T> {
     /// Send a message to the channel.
-    fn send(&self, msg: T) -> Result<(), ChannelError>;
+    fn send(&self, msg: T) -> Result<(), SenderError>;
 }
 
 /// Struct defining the receiver side of a channel.
@@ -35,24 +35,24 @@ pub struct InputChannel<T> {
 }
 impl<T: Send> InputChannel<T> {
     /// Receive a message from the channel.
-    pub fn receive(&self) -> Result<Option<T>, ChannelError> {
+    pub fn receive(&self) -> Result<Option<T>, ReceiverError> {
         self.rx.receive()
     }
 
     /// Receive all messages from the channel, if any.
     /// This method does not block.
-    pub fn try_receive_all(&self) -> Result<Vec<T>, ChannelError> {
+    pub fn try_receive_all(&self) -> Vec<T> {
         let mut res = Vec::new();
         // if we're in blocking mode and the queue is empty, then we return immediately to avoid blocking
         while !self.is_empty() {
             match self.receive() {
                 Ok(Some(msg)) => res.push(msg),
                 Ok(None) => break, // The channel is empty, so we break
-                Err(_e) => break, // The channel is disconnected, so we break
+                Err(_e) => break,  // The channel is disconnected, so we break
             }
         }
-        
-        Ok(res)
+
+        res
     }
 
     /// Check if the channel is in blocking mode.
@@ -73,7 +73,7 @@ pub struct OutputChannel<T> {
 }
 impl<T: Send> OutputChannel<T> {
     /// Send a message to the channel.
-    pub fn send(&self, msg: T) -> Result<(), ChannelError> {
+    pub fn send(&self, msg: T) -> Result<(), SenderError> {
         self.tx.send(msg)
     }
 }

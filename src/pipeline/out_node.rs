@@ -3,8 +3,8 @@ use std::sync::{Arc, Condvar, Mutex};
 
 use log::trace;
 
-use crate::mpsc::err::ChannelError;
 use crate::core::orchestrator::{JobInfo, Orchestrator};
+use crate::mpsc::err::SenderError;
 use crate::task::{Message, Task};
 
 use super::node::Node;
@@ -51,7 +51,7 @@ impl<
         TNext: Node<TOut, TCollected> + Send + Sync + 'static,
     > Node<TIn, TCollected> for OutNode<TOut, TCollected, TNext>
 {
-    fn send(&self, _input: Message<TIn>, _rec_id: usize) -> Result<(), ChannelError> {
+    fn send(&self, _input: Message<TIn>, _rec_id: usize) -> Result<(), SenderError> {
         Ok(())
     }
 

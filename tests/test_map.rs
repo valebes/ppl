@@ -3,12 +3,13 @@ use std::println;
 use pspp::core::orchestrator::get_global_orchestrator;
 use pspp::map::Map;
 use pspp::{
+    parallel,
     pipeline::{
         in_node::{In, InNode},
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
-    parallel, propagate,
+    propagate,
     pspp::Parallel,
 };
 

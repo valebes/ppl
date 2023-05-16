@@ -7,9 +7,9 @@
 #![feature(once_cell)]
 #![feature(let_chains)]
 
-pub mod mpsc;
-pub mod map;
 pub mod core;
+pub mod map;
+pub mod mpsc;
 pub mod pipeline;
 pub mod pspp;
 mod task;
