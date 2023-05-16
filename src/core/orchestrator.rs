@@ -242,11 +242,6 @@ impl Partition {
         self.available_workers.load(Ordering::Acquire)
     }
 
-    // Get the partition id.
-    fn get_id(&self) -> usize {
-        self.core_id.id
-    }
-
     /// Push a new job to the partition.
     /// This method return a JobInfo that can be used to wait for the Job to finish.
     /// If there aren't executors in the partition or all the existing executors are busy, a new executor is created.
