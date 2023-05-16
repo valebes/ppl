@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier};
-use std::{hint, mem};
+use std::{hint, mem, thread};
 
 use crate::core::orchestrator::{get_global_orchestrator, JobInfo, Orchestrator};
 use crate::mpsc::channel::Channel;
@@ -77,7 +77,7 @@ impl ThreadPoolWorker {
                         self.global.push(Job::Terminate);
                         break;
                     } else {
-                        continue;
+                        thread::yield_now();
                     }
                 }
             }
@@ -292,11 +292,9 @@ impl ThreadPool {
 
         drop(arc_tx);
 
-        //self.wait();
-
         let mut disconnected = false;
 
-        while /* (!rx.is_empty() || !self.is_empty()) ||  */ !disconnected {
+        while !disconnected {
             match rx.receive() {
                 Ok(Some((k, v))) => {
                     ordered_map.insert(k, v);
