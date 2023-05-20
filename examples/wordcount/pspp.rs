@@ -177,7 +177,7 @@ pub fn pspp_map(dataset: &str, threads: usize) {
 
     let mut total_words = 0;
     for (str, count) in res {
-        println!("{}: {}", str, count);
+        //println!("{}: {}", str, count);
         total_words += count;
     }
 

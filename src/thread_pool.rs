@@ -337,7 +337,7 @@ impl ThreadPool {
         K: Send + Ord + 'static,
         V: Send + 'static,
         R: Send + 'static,
-        Reduce: Fn(K, Vec<V>) -> (K, R) + Send + Copy,
+        Reduce: Fn(K, Vec<V>) -> (K, R) + Send + Copy + Sync,
     {
         let blocking = self.orchestrator.get_configuration().get_blocking_channel();
 
@@ -377,11 +377,7 @@ impl ThreadPool {
             }
         }
 
-        ordered_map
-            .into_iter()
-            .map(|(k, v)| reduce(k, v))
-            .collect::<BTreeMap<K, R>>()
-            .into_iter()
+        self.par_map(ordered_map.into_iter(), move |(k, v)| reduce(k, v))
     }
 
     /// Borrows the thread pool and allows executing jobs on other
@@ -492,7 +488,6 @@ mod tests {
     #[test]
     #[serial]
     fn test_par_map() {
-        env_logger::init();
         let mut vec = Vec::new();
         let mut tp = ThreadPool::new_with_global_registry(16);
 
@@ -519,7 +514,6 @@ mod tests {
     #[test]
     #[serial]
     fn test_par_map_reduce() {
-        env_logger::init();
         let mut vec = Vec::new();
         let mut tp = ThreadPool::new_with_global_registry(16);
 
