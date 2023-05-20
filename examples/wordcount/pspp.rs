@@ -1,9 +1,9 @@
-use pspp::core::orchestrator::get_global_orchestrator;
+use pspp::{core::orchestrator::get_global_orchestrator, thread_pool::ThreadPool};
 use std::{
     collections::VecDeque,
     fs::File,
     io::{BufRead, BufReader},
-    sync::Arc,
+    sync::Arc, usize,
 };
 
 use dashmap::DashMap;
@@ -134,5 +134,55 @@ pub fn pspp(dataset: &str, threads: usize) {
 
     p.start();
     let res = p.wait_and_collect();
-    println!("Total words: {}", res.unwrap());
+    println!("[PIPELINE] Total words: {}", res.unwrap());
+}
+
+// Version that use par_map_reduce instead of the pipeline
+pub fn pspp_map(dataset: &str, threads: usize) {
+    let file = File::open(dataset).expect("no such file");
+    let reader = BufReader::new(file);
+
+    let mut tp = ThreadPool::new_with_global_registry(threads);
+
+    let mut words = Vec::new();
+    
+        reader
+            .lines()
+            .map(|s| s.unwrap())
+            .for_each(|s| words.push(s));
+
+
+
+
+    let res = tp.par_map_reduce(
+        words // Collect all the lines in a vector
+            .iter()
+            .flat_map(|s| s.split_whitespace())
+            .map(|s| {
+                s.to_lowercase()
+                    .chars()
+                    .filter(|c| c.is_alphabetic())
+                    .collect::<String>()
+            })
+            .collect::<Vec<String>>(),
+        |str| -> (String, usize) { (str, 1)},
+        |str, count| {
+            let mut sum = 0;
+            for c in count {
+                sum += c;
+            }
+            (str, sum)
+        },
+    );
+
+    let mut total_words = 0;
+    for (str, count) in res {
+        println!("{}: {}", str, count);
+        total_words += count;
+    }
+
+    println!("[MAP] Total words: {}", total_words);
+  
+    
+
 }

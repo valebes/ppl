@@ -412,7 +412,7 @@ impl Orchestrator {
     }
 
     /// Find the subarray of size count of partition that minimize the number of busy executors contained in each partition of the subarray.
-    /// If there are more than one partition with the same number of executors, the first sequence found is returned.
+    /// If there are more than one sequence with the same number of busy executors, the first sequence found is returned.
     /// This algorithm will use the sum of the previous subarray, removing the first element, to compute the sum of the next subarray.
     /// This will reduce the complexity from O(n^2) to O(n).
     /// If there are no executors in any partition, the first sequence of 'count' partitions is returned.

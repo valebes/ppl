@@ -1,7 +1,6 @@
-use std::println;
-
 use pspp::core::orchestrator::get_global_orchestrator;
-use pspp::map::Map;
+
+use pspp::pipeline::collections::map::Map;
 use pspp::{
     parallel,
     pipeline::{

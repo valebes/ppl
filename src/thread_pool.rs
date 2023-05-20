@@ -312,6 +312,78 @@ impl ThreadPool {
         ordered_map.into_values()
     }
 
+
+    /// Parallel Map Reduce.
+    /// Applies in parallel the function `f` on a iterable object `iter`,
+    /// producing a new object with the results.
+    /// The function `f` must return a tuple of two elements, the first one
+    /// is the key and the second one is the value.
+    /// The results are grouped by key and reduced by the function `reduce`.
+    /// The function `reduce` must take two arguments, the first one is the
+    /// key and the second one is a vector of values.
+    /// The function `reduce` must return a tuple of two elements, the first one
+    /// is the key and the second one is the value.
+    /// This method return an iterator of tuples of two elements, the first one
+    /// is the key and the second one is the value.
+    pub fn par_map_reduce<Iter: IntoIterator, F, K, V, R, Reduce>(
+        &mut self,
+        iter: Iter,
+        f: F,
+        reduce: Reduce,
+    ) -> impl Iterator<Item = (K, R)>
+    where
+        F: FnOnce(Iter::Item) -> (K, V) + Send + Copy,
+        <Iter as IntoIterator>::Item: Send,
+        K: Send + Ord + 'static,
+        V: Send + 'static,
+        R: Send + 'static,
+        Reduce: Fn(K, Vec<V>) -> (K, R) + Send + Copy,
+    {
+        let blocking = self.orchestrator.get_configuration().get_blocking_channel();
+
+        let (rx, tx) = Channel::channel(blocking);
+        let arc_tx = Arc::new(tx);
+        let mut ordered_map = BTreeMap::<K, Vec<V>>::new();
+
+        self.scoped(|s| {
+            iter.into_iter().for_each(|el| {
+                let cp = Arc::clone(&arc_tx);
+                s.execute(move || {
+                    let err = cp.send(f(el));
+                    if err.is_err() {
+                        panic!("Error: {}", err.unwrap_err());
+                    }
+                });
+            });
+        });
+
+        drop(arc_tx);
+
+        let mut disconnected = false;
+
+        while !disconnected {
+            match rx.receive() {
+                Ok(Some((k, v))) => {
+                    ordered_map.entry(k).or_insert_with(Vec::new).push(v);
+                }
+                Ok(None) => {
+                    continue;
+                }
+                Err(e) => {
+                    // The channel is closed. We can exit the loop.
+                    warn!("Error: {}", e);
+                    disconnected = true;
+                }
+            }
+        }
+
+        ordered_map
+            .into_iter()
+            .map(|(k, v)| reduce(k, v))
+            .collect::<BTreeMap<K, R>>()
+            .into_iter()
+    }
+
     /// Borrows the thread pool and allows executing jobs on other
     /// threads during that scope via the argument of the closure.
     pub fn scoped<'pool, 'scope, F, R>(&'pool mut self, f: F) -> R
@@ -439,6 +511,38 @@ mod tests {
                 check = false;
             }
         }
+        Orchestrator::delete_global_orchestrator();
+        assert!(check)
+    }
+
+    // Test par_map_reduce
+    #[test]
+    #[serial]
+    fn test_par_map_reduce() {
+        env_logger::init();
+        let mut vec = Vec::new();
+        let mut tp = ThreadPool::new_with_global_registry(16);
+
+        for i in 0..100000 {
+            for i in 0..10 {
+                vec.push(i);
+            }
+        }
+        
+        let res = tp.par_map_reduce(vec, |el| -> (i32, i32) {
+            (el, 1)
+        }, |k, v| {
+            (k, v.iter().sum::<i32>())
+        });
+        
+        let mut check = true;
+        for (k, v) in res {
+            if v != 100000 {
+                check = false;
+            }
+            println!("Key: {} Total: {}", k, v)
+        }
+
         Orchestrator::delete_global_orchestrator();
         assert!(check)
     }

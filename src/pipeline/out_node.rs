@@ -37,6 +37,17 @@ pub trait Out<TOut: 'static + Send> {
     fn run(&mut self) -> Option<TOut>;
 }
 
+// Implement the Out trait for a closure
+impl<TOut: 'static + Send, F> Out<TOut> for F
+where
+    F: FnMut() -> Option<TOut>,
+{
+    fn run(&mut self) -> Option<TOut> {
+        self()
+    }
+}
+
+
 pub struct OutNode<TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     next_node: Arc<TNext>,
     stop: Arc<Mutex<bool>>,

@@ -69,6 +69,17 @@ pub trait InOut<TIn, TOut>: DynClone {
     }
 }
 
+// Implement the InOut trait for a closure
+impl<TIn, TOut, F> InOut<TIn, TOut> for F
+where
+    F: FnMut(TIn) -> Option<TOut> + Send + Sync + 'static + Clone,
+{
+    fn run(&mut self, input: TIn) -> Option<TOut> {
+        self(input)
+    }
+}
+
+
 struct OrderedSplitter {
     latest: usize,
     start: usize,

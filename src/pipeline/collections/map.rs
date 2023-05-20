@@ -2,16 +2,21 @@ use std::marker::PhantomData;
 
 use crate::{pipeline::inout_node::InOut, thread_pool::ThreadPool};
 
+/// Map
+/// 
 #[derive(Clone)]
 pub struct Map<TIn: Send, TOut: Send, F: FnOnce(TIn) -> TOut + Send + Copy> {
     threadpool: ThreadPool,
     f: F,
     phantom: PhantomData<(TIn, TOut)>,
 }
-
 impl<TIn: Send + Clone, TOut: Send + Clone + 'static, F: FnOnce(TIn) -> TOut + Send + Copy>
     Map<TIn, TOut, F>
 {
+    /// Create a new Map node.
+    /// # Arguments
+    /// * `n_worker` - Number of worker threads.
+    /// * `f` - Function to apply to each element of the input.
     pub fn build<TInIter: IntoIterator<Item = TIn>, TOutIter: FromIterator<TOut>>(
         n_worker: usize,
         f: F,

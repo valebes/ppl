@@ -8,7 +8,6 @@
 #![feature(let_chains)]
 
 pub mod core;
-pub mod map;
 pub mod mpsc;
 pub mod pipeline;
 pub mod pspp;

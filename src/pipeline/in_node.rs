@@ -42,18 +42,33 @@ use super::node::Node;
 ///   }
 /// }
 /// ```
-pub trait In<TIn: 'static + Send, TOut> {
+pub trait In<TIn: 'static + Send, TCollected> {
     /// This method is called each time the node receive an input.
     fn run(&mut self, input: TIn);
     /// This method is called before the node terminates. Is useful to take out data
     /// at the end of the computation.
-    fn finalize(self) -> Option<TOut>;
+    fn finalize(self) -> Option<TCollected>;
     /// This method return a boolean that represent if the node receive the input in an ordered way.
     /// Overload this method allow to choose if the node is ordered or not.
     fn is_ordered(&self) -> bool {
         false
     }
 }
+
+// Implement the In trait for a closure
+impl<TIn: 'static + Send, TCollected, F> In<TIn, TCollected> for F
+where
+    F: FnMut(TIn) -> TCollected,
+{
+    fn run(&mut self, input: TIn) {
+        self(input);
+    }
+
+    fn finalize(self) -> Option<TCollected> {
+        None
+    }
+}
+
 
 pub struct InNode<TIn: Send, TCollected> {
     channel: OutputChannel<Message<TIn>>,
