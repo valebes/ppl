@@ -47,7 +47,6 @@ where
     }
 }
 
-
 pub struct OutNode<TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
     next_node: Arc<TNext>,
     stop: Arc<Mutex<bool>>,

@@ -25,7 +25,7 @@ fn main() {
         "pspp" => {
             pspp::pspp(dataset, threads);
             pspp::pspp_map(dataset, threads);
-        },
+        }
         _ => println!("Invalid run_mode, use: sequential | rust-ssp | std-threads | rayon | pspp "),
     }
 }

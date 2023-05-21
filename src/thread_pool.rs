@@ -312,7 +312,6 @@ impl ThreadPool {
         ordered_map.into_values()
     }
 
-
     /// Parallel Map Reduce.
     /// Applies in parallel the function `f` on a iterable object `iter`,
     /// producing a new object with the results.
@@ -337,47 +336,38 @@ impl ThreadPool {
         K: Send + Ord + 'static,
         V: Send + 'static,
         R: Send + 'static,
-        Reduce: Fn(K, Vec<V>) -> (K, R) + Send + Copy + Sync,
+        Reduce: FnOnce(K, Vec<V>) -> (K, R) + Send + Copy,
     {
-        let blocking = self.orchestrator.get_configuration().get_blocking_channel();
+        let map = self.par_map(iter, f);
+        self.par_reduce(map, reduce)
+    }
 
-        let (rx, tx) = Channel::channel(blocking);
-        let arc_tx = Arc::new(tx);
-        let mut ordered_map = BTreeMap::<K, Vec<V>>::new();
-
-        self.scoped(|s| {
-            iter.into_iter().for_each(|el| {
-                let cp = Arc::clone(&arc_tx);
-                s.execute(move || {
-                    let err = cp.send(f(el));
-                    if err.is_err() {
-                        panic!("Error: {}", err.unwrap_err());
-                    }
-                });
-            });
-        });
-
-        drop(arc_tx);
-
-        let mut disconnected = false;
-
-        while !disconnected {
-            match rx.receive() {
-                Ok(Some((k, v))) => {
-                    ordered_map.entry(k).or_insert_with(Vec::new).push(v);
-                }
-                Ok(None) => {
-                    continue;
-                }
-                Err(e) => {
-                    // The channel is closed. We can exit the loop.
-                    warn!("Error: {}", e);
-                    disconnected = true;
-                }
-            }
+    /// Reduces in parallel the elements of an iterator `iter` by the function `f`.
+    /// The function `f` must take two arguments, the first one is the
+    /// key and the second one is a vector of values.
+    /// The function `f` must return a tuple of two elements, the first one
+    /// is the key and the second one is the value.
+    /// This method take in input an iterator, it groups the elements by key and then
+    /// reduces them by the function `f`.
+    pub fn par_reduce<Iter: IntoIterator<Item = (K, V)>, K, V, R, F>(
+        &mut self,
+        iter: Iter,
+        f: F,
+    ) -> impl Iterator<Item = (K, R)>
+    where
+        <Iter as IntoIterator>::Item: Send,
+        K: Send + Ord + 'static,
+        V: Send + 'static,
+        R: Send + 'static,
+        F: FnOnce(K, Vec<V>) -> (K, R) + Send + Copy,
+    {
+        // Shuffle by grouping the elements by key.
+        let mut ordered_map = BTreeMap::new();
+        for (k, v) in iter {
+            ordered_map.entry(k).or_insert_with(Vec::new).push(v);
         }
-
-        self.par_map(ordered_map.into_iter(), move |(k, v)| reduce(k, v))
+        // Reduce the elements by key.
+        self.par_map(ordered_map.into_iter(), move |(k, v)| f(k, v))
     }
 
     /// Borrows the thread pool and allows executing jobs on other
@@ -522,13 +512,13 @@ mod tests {
                 vec.push(i);
             }
         }
-        
-        let res = tp.par_map_reduce(vec, |el| -> (i32, i32) {
-            (el, 1)
-        }, |k, v| {
-            (k, v.iter().sum::<i32>())
-        });
-        
+
+        let res = tp.par_map_reduce(
+            vec,
+            |el| -> (i32, i32) { (el, 1) },
+            |k, v| (k, v.iter().sum::<i32>()),
+        );
+
         let mut check = true;
         for (k, v) in res {
             if v != 100000 {

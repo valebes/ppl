@@ -69,7 +69,6 @@ where
     }
 }
 
-
 pub struct InNode<TIn: Send, TCollected> {
     channel: OutputChannel<Message<TIn>>,
     ordered: bool,

@@ -79,7 +79,6 @@ where
     }
 }
 
-
 struct OrderedSplitter {
     latest: usize,
     start: usize,
@@ -206,14 +205,17 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
     fn steal_all_from_channel(&mut self) {
         match &mut self.channel_rx {
             Some(channel_rx) => {
-                channel_rx.try_receive_all().into_iter().for_each(|message| {
-                    if message.is_terminate() {
-                        self.system_queue.push(message);
-                    } else {
-                        self.local_queue.push(message);
-                    }
-                });
-            },
+                channel_rx
+                    .try_receive_all()
+                    .into_iter()
+                    .for_each(|message| {
+                        if message.is_terminate() {
+                            self.system_queue.push(message);
+                        } else {
+                            self.local_queue.push(message);
+                        }
+                    });
+            }
             None => {}
         }
     }

@@ -463,9 +463,7 @@ impl Orchestrator {
     {
         let partition = self.find_partition();
         match partition {
-            Some(p) => {
-                p.push(f)
-            }
+            Some(p) => p.push(f),
             None => panic!("No partition found!"), // This should never happen.
         }
     }
