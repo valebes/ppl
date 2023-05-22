@@ -2,9 +2,10 @@ use crossbeam_deque::{Injector, Steal, Stealer, Worker};
 use log::{trace, warn};
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
+use std::ops::Range;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier};
-use std::{hint, mem, thread};
+use std::{hint, mem, thread, cmp};
 
 use crate::core::orchestrator::{get_global_orchestrator, JobInfo, Orchestrator};
 use crate::mpsc::channel::Channel;
@@ -225,6 +226,33 @@ impl ThreadPool {
         }
     }
 
+    /// A Parallel For. Given a function 'f' that contain a for cycle, a range of indices 'range',
+    /// and a chunk size 'chunk_size', it applies the function 'f' in parallel on the range 'range'.
+    /// The range is split in chunks of size 'chunk_size' and each chunk is assigned to a thread.
+    /// This method wont wait for the threads to finish the jobs, if you want to wait for the threads
+    /// to finish the jobs, call the method 'wait'.
+    pub fn par_for<F>(&mut self, range: Range<usize>, chunk_size: usize, f: F)
+    where
+        F: FnOnce(Range<usize>) + Send + 'static + Copy,
+    {
+        let mut start = range.start;
+        let mut end = start + chunk_size;
+
+        while end < range.end {
+            self.scoped(|scope| {
+                scope.execute(move || f(start..end));
+            });
+            start = end;
+            end += chunk_size;
+        }
+
+        if start < range.end {
+            self.scoped(|scope| {
+                scope.execute(move || f(start..range.end));
+            });
+        }
+    }
+
     /// Applies in parallel the function `f` on a iterable object `iter`.
     ///
     /// # Examples
@@ -237,10 +265,10 @@ impl ThreadPool {
     /// let mut pool = ThreadPool::new_with_global_registry(8);
     /// let mut vec = vec![0; 100];
     ///
-    /// pool.par_for(&mut vec, |el: &mut i32| *el = *el + 1);
+    /// pool.par_for_each(&mut vec, |el: &mut i32| *el = *el + 1);
     /// pool.wait(); // wait the threads to finish the jobs
     ///
-    pub fn par_for<Iter, F>(&mut self, iter: Iter, f: F)
+    pub fn par_for_each<Iter, F>(&mut self, iter: Iter, f: F)
     where
         F: FnOnce(Iter::Item) + Send + 'static + Copy,
         <Iter as IntoIterator>::Item: Send,
@@ -469,7 +497,7 @@ mod tests {
         let mut vec = vec![0; 100];
         let mut tp = ThreadPool::new_with_global_registry(8);
 
-        tp.par_for(&mut vec, |el: &mut i32| *el += 1);
+        tp.par_for_each(&mut vec, |el: &mut i32| *el += 1);
         tp.wait();
         Orchestrator::delete_global_orchestrator();
         assert_eq!(vec, vec![1i32; 100])
@@ -569,5 +597,13 @@ mod tests {
 
         }
         Orchestrator::delete_global_orchestrator();
+    }
+
+    #[test]
+    #[serial]
+    fn test_parallel_for() {
+        let mut tp = ThreadPool::new_with_global_registry(8);
+        let mut vec = vec![0; 100];
+    
     }
 }
