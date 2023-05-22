@@ -205,6 +205,7 @@ impl ThreadPool {
     }
 
     /// Execute a function `task` on a thread in the thread pool.
+    /// This method is non-blocking, so the developer must call `wait` to wait for the task to finish.
     pub fn execute<F>(&self, task: F)
     where
         F: FnOnce() + Send + 'static,
@@ -226,33 +227,6 @@ impl ThreadPool {
         }
     }
 
-    /// A Parallel For. Given a function 'f' that contain a for cycle, a range of indices 'range',
-    /// and a chunk size 'chunk_size', it applies the function 'f' in parallel on the range 'range'.
-    /// The range is split in chunks of size 'chunk_size' and each chunk is assigned to a thread.
-    /// This method wont wait for the threads to finish the jobs, if you want to wait for the threads
-    /// to finish the jobs, call the method 'wait'.
-    pub fn par_for<F>(&mut self, range: Range<usize>, chunk_size: usize, f: F)
-    where
-        F: FnOnce(Range<usize>) + Send + 'static + Copy,
-    {
-        let mut start = range.start;
-        let mut end = start + chunk_size;
-
-        while end < range.end {
-            self.scoped(|scope| {
-                scope.execute(move || f(start..end));
-            });
-            start = end;
-            end += chunk_size;
-        }
-
-        if start < range.end {
-            self.scoped(|scope| {
-                scope.execute(move || f(start..range.end));
-            });
-        }
-    }
-
     /// Applies in parallel the function `f` on a iterable object `iter`.
     ///
     /// # Examples
@@ -266,7 +240,6 @@ impl ThreadPool {
     /// let mut vec = vec![0; 100];
     ///
     /// pool.par_for_each(&mut vec, |el: &mut i32| *el = *el + 1);
-    /// pool.wait(); // wait the threads to finish the jobs
     ///
     pub fn par_for_each<Iter, F>(&mut self, iter: Iter, f: F)
     where
@@ -318,27 +291,27 @@ impl ThreadPool {
                     }
                 });
             });
-        });
+       
+            drop(arc_tx);
 
-        drop(arc_tx);
-
-        let mut disconnected = false;
-
-        while !disconnected {
-            match rx.receive() {
-                Ok(Some((k, v))) => {
-                    ordered_map.insert(k, v);
-                }
-                Ok(None) => {
-                    continue;
-                }
-                Err(e) => {
-                    // The channel is closed. We can exit the loop.
-                    warn!("Error: {}", e);
-                    disconnected = true;
+            let mut disconnected = false;
+    
+            while !disconnected {
+                match rx.receive() {
+                    Ok(Some((k, v))) => {
+                        ordered_map.insert(k, v);
+                    }
+                    Ok(None) => {
+                        continue;
+                    }
+                    Err(e) => {
+                        // The channel is closed. We can exit the loop.
+                        warn!("Error: {}", e);
+                        disconnected = true;
+                    }
                 }
             }
-        }
+        });
         ordered_map.into_values()
     }
 
@@ -408,7 +381,9 @@ impl ThreadPool {
             pool: self,
             _marker: PhantomData,
         };
-        f(&scope)
+        let res = f(&scope);
+        scope.pool.wait();
+        res
     }
 }
 
@@ -426,9 +401,9 @@ pub struct Scope<'pool, 'scope> {
     pool: &'pool mut ThreadPool,
     _marker: PhantomData<::std::cell::Cell<&'scope mut ()>>,
 }
-
 impl<'pool, 'scope> Scope<'pool, 'scope> {
     /// Execute a function `task` on a thread in the thread pool.
+    /// At the end of the scope, all the job will be terminated.
     pub fn execute<F>(&self, task: F)
     where
         F: FnOnce() + Send + 'scope,
@@ -485,8 +460,6 @@ mod tests {
                 });
             }
         });
-
-        tp.wait();
         Orchestrator::delete_global_orchestrator();
         assert_eq!(vec, vec![1i32; 100])
     }
@@ -498,7 +471,6 @@ mod tests {
         let mut tp = ThreadPool::new_with_global_registry(8);
 
         tp.par_for_each(&mut vec, |el: &mut i32| *el += 1);
-        tp.wait();
         Orchestrator::delete_global_orchestrator();
         assert_eq!(vec, vec![1i32; 100])
     }
@@ -597,13 +569,5 @@ mod tests {
 
         }
         Orchestrator::delete_global_orchestrator();
-    }
-
-    #[test]
-    #[serial]
-    fn test_parallel_for() {
-        let mut tp = ThreadPool::new_with_global_registry(8);
-        let mut vec = vec![0; 100];
-    
     }
 }
