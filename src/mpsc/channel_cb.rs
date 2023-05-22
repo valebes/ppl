@@ -7,7 +7,10 @@ use crossbeam_channel::{Receiver, Sender, TryRecvError};
 pub struct CBInputChannel<T> {
     rx: Receiver<T>,
 }
-impl<T: Send> channel::Receiver<T> for CBInputChannel<T> {
+impl<T> channel::Receiver<T> for CBInputChannel<T>
+where
+    T: Send,
+{
     fn receive(&self) -> Result<Option<T>, ReceiverError> {
         let err = self.rx.try_recv();
         match err {
@@ -27,7 +30,10 @@ impl<T: Send> channel::Receiver<T> for CBInputChannel<T> {
 pub struct CBBlockingInputChannel<T> {
     rx: Receiver<T>,
 }
-impl<T: Send> channel::Receiver<T> for CBBlockingInputChannel<T> {
+impl<T> channel::Receiver<T> for CBBlockingInputChannel<T>
+where
+    T: Send,
+{
     fn receive(&self) -> Result<Option<T>, ReceiverError> {
         let err = self.rx.recv();
         match err {
@@ -45,7 +51,10 @@ pub struct CBOutputChannel<T> {
     tx: Sender<T>,
 }
 
-impl<T: Send> channel::Sender<T> for CBOutputChannel<T> {
+impl<T> channel::Sender<T> for CBOutputChannel<T>
+where
+    T: Send,
+{
     fn send(&self, msg: T) -> Result<(), SenderError> {
         let err = self.tx.send(msg);
         match err {
@@ -68,12 +77,15 @@ pub struct Channel;
 
 impl Channel {
     /// Create a new channel using crossbeam_channel.
-    pub fn channel<T: Send + 'static>(
+    pub fn channel<T>(
         blocking: bool,
     ) -> (
         Box<dyn channel::Receiver<T> + Sync + Send>,
         Box<dyn channel::Sender<T> + Sync + Send>,
-    ) {
+    )
+    where
+        T: Send + 'static,
+    {
         let (tx, rx) = crossbeam_channel::unbounded();
         if blocking {
             (

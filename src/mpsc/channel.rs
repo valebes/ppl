@@ -33,7 +33,10 @@ pub struct InputChannel<T> {
     rx: Box<dyn Receiver<T> + Sync + Send>,
     blocking: bool,
 }
-impl<T: Send> InputChannel<T> {
+impl<T> InputChannel<T>
+where
+    T: Send,
+{
     /// Receive a message from the channel.
     pub fn receive(&self) -> Result<Option<T>, ReceiverError> {
         self.rx.receive()
@@ -71,7 +74,10 @@ impl<T: Send> InputChannel<T> {
 pub struct OutputChannel<T> {
     tx: Box<dyn Sender<T> + Sync + Send>,
 }
-impl<T: Send> OutputChannel<T> {
+impl<T> OutputChannel<T>
+where
+    T: Send,
+{
     /// Send a message to the channel.
     pub fn send(&self, msg: T) -> Result<(), SenderError> {
         self.tx.send(msg)

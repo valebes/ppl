@@ -9,7 +9,10 @@ use super::{
 pub struct FFInputChannel<T> {
     rx: FFReceiver<T>,
 }
-impl<T: Send> Receiver<T> for FFInputChannel<T> {
+impl<T> Receiver<T> for FFInputChannel<T>
+where
+    T: Send,
+{
     fn receive(&self) -> Result<Option<T>, ReceiverError> {
         match self.rx.try_pop() {
             Some(boxed) => Ok(Some(Box::into_inner(boxed))),
@@ -31,7 +34,10 @@ impl<T: Send> Receiver<T> for FFInputChannel<T> {
 pub struct FFBlockingInputChannel<T> {
     rx: FFReceiver<T>,
 }
-impl<T: Send> Receiver<T> for FFBlockingInputChannel<T> {
+impl<T> Receiver<T> for FFBlockingInputChannel<T>
+where
+    T: Send,
+{
     fn receive(&self) -> Result<Option<T>, ReceiverError> {
         match self.rx.pop() {
             Some(boxed) => Ok(Some(Box::into_inner(boxed))),
@@ -48,7 +54,10 @@ pub struct FFOutputChannel<T> {
     tx: Mutex<FFSender<T>>,
 }
 
-impl<T: Send> Sender<T> for FFOutputChannel<T> {
+impl<T> Sender<T> for FFOutputChannel<T>
+where
+    T: Send,
+{
     fn send(&self, msg: T) -> Result<(), SenderError> {
         let mtx = self.tx.lock();
         match mtx {
@@ -69,12 +78,15 @@ impl<T: Send> Sender<T> for FFOutputChannel<T> {
 pub struct Channel;
 
 impl Channel {
-    pub fn channel<T: Send + 'static>(
+    pub fn channel<T>(
         blocking: bool,
     ) -> (
         Box<dyn Receiver<T> + Sync + Send>,
         Box<dyn Sender<T> + Sync + Send>,
-    ) {
+    )
+    where
+        T: Send + 'static,
+    {
         let (tx, rx) = ff_buffer::build::<T>();
         if blocking {
             (

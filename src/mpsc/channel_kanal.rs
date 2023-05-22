@@ -8,7 +8,10 @@ use super::{
 pub struct KanalInputChannel<T> {
     rx: Receiver<T>,
 }
-impl<T: Send> channel::Receiver<T> for KanalInputChannel<T> {
+impl<T> channel::Receiver<T> for KanalInputChannel<T>
+where
+    T: Send,
+{
     fn receive(&self) -> Result<Option<T>, ReceiverError> {
         let err = self.rx.try_recv();
         match err {
@@ -28,7 +31,10 @@ impl<T: Send> channel::Receiver<T> for KanalInputChannel<T> {
 pub struct KanalBlockingInputChannel<T> {
     rx: Receiver<T>,
 }
-impl<T: Send> channel::Receiver<T> for KanalBlockingInputChannel<T> {
+impl<T> channel::Receiver<T> for KanalBlockingInputChannel<T>
+where
+    T: Send,
+{
     fn receive(&self) -> Result<Option<T>, ReceiverError> {
         let err = self.rx.recv();
         match err {
@@ -46,7 +52,10 @@ pub struct KanalOutputChannel<T> {
     tx: Sender<T>,
 }
 
-impl<T: Send> channel::Sender<T> for KanalOutputChannel<T> {
+impl<T> channel::Sender<T> for KanalOutputChannel<T>
+where
+    T: Send,
+{
     fn send(&self, msg: T) -> Result<(), SenderError> {
         let err = self.tx.send(msg);
         match err {
@@ -68,12 +77,15 @@ impl<T> Clone for KanalOutputChannel<T> {
 pub struct Channel;
 
 impl Channel {
-    pub fn channel<T: Send + 'static>(
+    pub fn channel<T>(
         blocking: bool,
     ) -> (
         Box<dyn channel::Receiver<T> + Sync + Send>,
         Box<dyn channel::Sender<T> + Sync + Send>,
-    ) {
+    )
+    where
+        T: Send + 'static,
+    {
         let (tx, rx) = kanal::unbounded();
         if blocking {
             (

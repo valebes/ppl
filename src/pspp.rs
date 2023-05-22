@@ -1,14 +1,16 @@
 pub use crate::pipeline::{node::Node, out_node::*};
 
-pub struct Parallel<
+pub struct Parallel<TOut, TCollected, TNext>
+where
     TOut: Send + 'static,
-    TCollected,
     TNext: Node<TOut, TCollected> + Send + Sync + 'static,
-> {
+{
     first_block: Option<OutNode<TOut, TCollected, TNext>>,
 }
-impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static>
-    Parallel<TOut, TCollected, TNext>
+impl<TOut, TCollected, TNext> Parallel<TOut, TCollected, TNext>
+where
+    TOut: Send + 'static,
+    TNext: Node<TOut, TCollected> + Send + Sync + 'static,
 {
     /// Creates a new parallel pipeline.
     pub fn new(first_block: OutNode<TOut, TCollected, TNext>) -> Parallel<TOut, TCollected, TNext> {
@@ -40,8 +42,10 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
     }
 }
 
-impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static> Drop
-    for Parallel<TOut, TCollected, TNext>
+impl<TOut, TCollected, TNext> Drop for Parallel<TOut, TCollected, TNext>
+where
+    TOut: Send + 'static,
+    TNext: Node<TOut, TCollected> + Send + Sync + 'static,
 {
     fn drop(&mut self) {
         match &mut self.first_block {
