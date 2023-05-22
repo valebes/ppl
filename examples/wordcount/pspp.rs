@@ -1,17 +1,15 @@
 use pspp::{
     core::orchestrator::get_global_orchestrator,
-    pipeline::collections::map::{Map, Reduce},
+    pipeline::collections::map::{Map, Reduce, MapReduce},
     thread_pool::ThreadPool,
 };
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap},
     fs::File,
     io::{BufRead, BufReader},
-    sync::Arc,
     usize,
 };
 
-use dashmap::DashMap;
 use pspp::{
     parallel,
     pipeline::{
@@ -94,12 +92,42 @@ pub fn pspp(dataset: &str, threads: usize) {
     let res = p.wait_and_collect();
 
     let mut total_words = 0;
-    for (key, value) in res.unwrap() {
+    for (_key, value) in res.unwrap() {
         total_words += value;
     }
     println!("[PIPELINE] Total words: {}", total_words);
 }
 
+// Version that use a node that combine map and reduce
+pub fn pspp_combined_map_reduce(dataset: &str, threads: usize) {
+    let file = File::open(dataset).expect("no such file");
+    let reader = BufReader::new(file);
+
+    let mut p = parallel![
+        Source { reader },
+        MapReduce::build_with_replicas(threads/2, |str| -> (String, usize) {
+            (str, 1)
+        }, |str, count| {
+            let mut sum = 0;
+            for c in count {
+                sum += c;
+            }
+            (str, sum)
+        }, 2),
+        Sink {
+            counter: HashMap::new()
+        }
+    ];
+
+    p.start();
+    let res = p.wait_and_collect();
+
+    let mut total_words = 0;
+    for (_key, value) in res.unwrap() {
+        total_words += value;
+    }
+    println!("[PIPELINE MAP REDUCE COMBINED] Total words: {}", total_words);
+}
 // Version that use par_map_reduce instead of the pipeline
 pub fn pspp_map(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
@@ -136,7 +164,7 @@ pub fn pspp_map(dataset: &str, threads: usize) {
     );
 
     let mut total_words = 0;
-    for (str, count) in res {
+    for (_str, count) in res {
         //println!("{}: {}", str, count);
         total_words += count;
     }

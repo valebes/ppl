@@ -27,7 +27,6 @@ flume = { version = "0.10.14", optional = true }
 [dev-dependencies]
 criterion = {version = "0.4", features = ["html_reports"]}
 crossbeam-channel = { version = "0.5.8"}
-dashmap = "5.4.0"
 env_logger = "0.10.0"
 rand = "*"
 raster = {git = "https://github.com/valebes/raster.git"}

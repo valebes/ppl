@@ -1,6 +1,19 @@
 use std::env;
 mod pspp;
 
+
+// Take a function and calculate its execution time
+fn timeit<F>(f: F)
+where
+    F: FnOnce(),
+{
+    let start = std::time::Instant::now();
+    f();
+    let end = std::time::Instant::now();
+    let duration = end.duration_since(start);
+    println!("Time: {}", duration.as_secs_f64());
+}
+
 fn main() {
     env_logger::init();
 
@@ -23,8 +36,10 @@ fn main() {
         //"rayon" => rayon::rayon(dir_name, threads),
         //"std-threads" => std_threads::std_threads(dir_name, threads),
         "pspp" => {
-            pspp::pspp(dataset, threads);
-            pspp::pspp_map(dataset, threads);
+            
+            timeit(|| pspp::pspp(dataset, threads));
+            timeit(|| pspp::pspp_combined_map_reduce(dataset, threads));
+            timeit(||pspp::pspp_map(dataset, threads));
         }
         _ => println!("Invalid run_mode, use: sequential | rust-ssp | std-threads | rayon | pspp "),
     }

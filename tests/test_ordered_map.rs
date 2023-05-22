@@ -62,10 +62,10 @@ fn test_ordered_map() {
     let res = p.wait_and_collect().unwrap();
 
     assert_eq!(res.len(), 100);
-    for i in 0..100 {
+    (0..100).for_each(|i| {
         assert_eq!(res[i].len(), 10000);
         for j in 0..10000 {
             assert_eq!(res[i][j], "Hello from: ".to_string() + &j.to_string());
         }
-    }
+    });
 }

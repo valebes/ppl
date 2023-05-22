@@ -507,7 +507,7 @@ mod tests {
         let mut vec = Vec::new();
         let mut tp = ThreadPool::new_with_global_registry(16);
 
-        for i in 0..100000 {
+        for _i in 0..100000 {
             for i in 0..10 {
                 vec.push(i);
             }
@@ -518,6 +518,33 @@ mod tests {
             |el| -> (i32, i32) { (el, 1) },
             |k, v| (k, v.iter().sum::<i32>()),
         );
+
+        let mut check = true;
+        for (k, v) in res {
+            if v != 100000 {
+                check = false;
+            }
+            println!("Key: {} Total: {}", k, v)
+        }
+
+        Orchestrator::delete_global_orchestrator();
+        assert!(check)
+    }
+
+    #[test]
+    #[serial]
+    fn test_par_map_reduce_seq() {
+        let mut vec = Vec::new();
+        let mut tp = ThreadPool::new_with_global_registry(16);
+
+        for _i in 0..100000 {
+            for i in 0..10 {
+                vec.push(i);
+            }
+        }
+
+        let res = tp.par_map(vec, |el| -> (i32, i32) { (el, 1) });
+        let res = tp.par_reduce(res, |k, v| (k, v.iter().sum::<i32>()));
 
         let mut check = true;
         for (k, v) in res {
