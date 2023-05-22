@@ -101,7 +101,12 @@ impl OrderedSplitter {
 
 /// Struct that represent a node that receive an input and produce an output.
 /// This struct is used by the rts to execute the node.
-struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
+struct NodeWorker<TIn, TOut, TCollected, TNext>
+where
+    TIn: Send,
+    TOut: Send,
+    TNext: Node<TOut, TCollected>,
+{
     id: usize,
     channel_rx: Option<InputChannel<Message<TIn>>>,
     node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
@@ -115,8 +120,11 @@ struct NodeWorker<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollecte
 
     phantom: PhantomData<(TOut, TCollected)>,
 }
-impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
-    NodeWorker<TIn, TOut, TCollected, TNext>
+impl<TIn, TOut, TCollected, TNext> NodeWorker<TIn, TOut, TCollected, TNext>
+where
+    TIn: Send + 'static,
+    TOut: Send,
+    TNext: Node<TOut, TCollected>,
 {
     // Create a new workernode with default values.
     // Is created a new channel for the input and the output.
@@ -475,7 +483,12 @@ impl<TIn: Send + 'static, TOut: Send, TCollected, TNext: Node<TOut, TCollected>>
 }
 
 /// Struct representing a stage, with an input and an output, of a pipeline.
-pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
+pub struct InOutNode<TIn, TOut, TCollected, TNext>
+where
+    TIn: Send,
+    TOut: Send,
+    TNext: Node<TOut, TCollected>,
+{
     channels: Vec<OutputChannel<Message<TIn>>>,
     next_node: Arc<TNext>,
     ordered: bool,
@@ -487,12 +500,12 @@ pub struct InOutNode<TIn: Send, TOut: Send, TCollected, TNext: Node<TOut, TColle
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
-impl<
-        TIn: Send + 'static,
-        TOut: Send + Sync + 'static,
-        TCollected: Sync + Send + 'static,
-        TNext: Node<TOut, TCollected> + Send + Sync + 'static,
-    > Node<TIn, TCollected> for InOutNode<TIn, TOut, TCollected, TNext>
+impl<TIn, TOut, TCollected, TNext> Node<TIn, TCollected> for InOutNode<TIn, TOut, TCollected, TNext>
+where
+    TIn: Send + 'static,
+    TOut: Send + Sync + 'static,
+    TCollected: Sync + Send + 'static,
+    TNext: Node<TOut, TCollected> + Send + Sync + 'static,
 {
     fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), SenderError> {
         let mut rec_id = rec_id;
@@ -575,12 +588,12 @@ impl<
     }
 }
 
-impl<
-        TIn: Send + 'static,
-        TOut: Send + 'static + Sync,
-        TCollected: Sync + Send + 'static,
-        TNext: Node<TOut, TCollected> + Sync + Send + 'static,
-    > InOutNode<TIn, TOut, TCollected, TNext>
+impl<TIn, TOut, TCollected, TNext> InOutNode<TIn, TOut, TCollected, TNext>
+where
+    TIn: Send + 'static,
+    TOut: Send + 'static + Sync,
+    TCollected: Sync + Send + 'static,
+    TNext: Node<TOut, TCollected> + Sync + Send + 'static,
 {
     /// Create a new Node.
     /// The `handler` is the  struct that implement the trait `InOut` and defines

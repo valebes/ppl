@@ -240,10 +240,11 @@ impl ThreadPool {
     /// pool.par_for(&mut vec, |el: &mut i32| *el = *el + 1);
     /// pool.wait(); // wait the threads to finish the jobs
     ///
-    pub fn par_for<Iter: IntoIterator, F>(&mut self, iter: Iter, f: F)
+    pub fn par_for<Iter, F>(&mut self, iter: Iter, f: F)
     where
         F: FnOnce(Iter::Item) + Send + 'static + Copy,
         <Iter as IntoIterator>::Item: Send,
+        Iter: IntoIterator,
     {
         self.scoped(|s| {
             iter.into_iter().for_each(|el| s.execute(move || (f)(el)));
@@ -266,11 +267,12 @@ impl ThreadPool {
     ///            String::from("Hello from: ".to_string() + &el.to_string())
     ///       }).collect();
     ///
-    pub fn par_map<Iter: IntoIterator, F, R>(&mut self, iter: Iter, f: F) -> impl Iterator<Item = R>
+    pub fn par_map<Iter, F, R>(&mut self, iter: Iter, f: F) -> impl Iterator<Item = R>
     where
         F: FnOnce(Iter::Item) -> R + Send + Copy,
         <Iter as IntoIterator>::Item: Send,
         R: Send + 'static,
+        Iter: IntoIterator,
     {
         let blocking = self.orchestrator.get_configuration().get_blocking_channel();
 
@@ -324,7 +326,7 @@ impl ThreadPool {
     /// is the key and the second one is the value.
     /// This method return an iterator of tuples of two elements, the first one
     /// is the key and the second one is the value.
-    pub fn par_map_reduce<Iter: IntoIterator, F, K, V, R, Reduce>(
+    pub fn par_map_reduce<Iter, F, K, V, R, Reduce>(
         &mut self,
         iter: Iter,
         f: F,
@@ -337,6 +339,7 @@ impl ThreadPool {
         V: Send + 'static,
         R: Send + 'static,
         Reduce: FnOnce(K, Vec<V>) -> (K, R) + Send + Copy,
+        Iter: IntoIterator,
     {
         let map = self.par_map(iter, f);
         self.par_reduce(map, reduce)
@@ -349,17 +352,14 @@ impl ThreadPool {
     /// is the key and the second one is the value.
     /// This method take in input an iterator, it groups the elements by key and then
     /// reduces them by the function `f`.
-    pub fn par_reduce<Iter: IntoIterator<Item = (K, V)>, K, V, R, F>(
-        &mut self,
-        iter: Iter,
-        f: F,
-    ) -> impl Iterator<Item = (K, R)>
+    pub fn par_reduce<Iter, K, V, R, F>(&mut self, iter: Iter, f: F) -> impl Iterator<Item = (K, R)>
     where
         <Iter as IntoIterator>::Item: Send,
         K: Send + Ord + 'static,
         V: Send + 'static,
         R: Send + 'static,
         F: FnOnce(K, Vec<V>) -> (K, R) + Send + Copy,
+        Iter: IntoIterator<Item = (K, V)>,
     {
         // Shuffle by grouping the elements by key.
         let mut ordered_map = BTreeMap::new();

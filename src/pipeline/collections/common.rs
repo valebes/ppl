@@ -1,8 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{
-    pipeline::{out_node::Out, in_node::In, inout_node::InOut},
-};
+use crate::pipeline::{in_node::In, inout_node::InOut, out_node::Out};
 
 /// SourceIter
 /// This source node produces data from a iterator
@@ -15,8 +13,9 @@ where
 }
 impl<I, T> SourceIter<I, T>
 where
-    I: Iterator<Item = T>, T: Send + 'static
-{   
+    I: Iterator<Item = T>,
+    T: Send + 'static,
+{
     /// Creates a new source from a iterator
     /// The source will terminate when the iterator is exhausted
     pub fn build(iterator: I) -> impl Out<T> {
@@ -28,7 +27,8 @@ where
 }
 impl<I, T> Out<T> for SourceIter<I, T>
 where
-    I: Iterator<Item = T>, T: Send + 'static
+    I: Iterator<Item = T>,
+    T: Send + 'static,
 {
     fn run(&mut self) -> Option<T> {
         self.iterator.next()
@@ -43,7 +43,10 @@ where
 pub struct SinkVec<T> {
     data: Vec<T>,
 }
-impl<T: Send + 'static> SinkVec<T> {
+impl<T> SinkVec<T>
+where
+    T: Send + 'static,
+{
     /// Creates a new sink that accumulates data into a vector
     /// The sink will terminate when the upstream terminates
     /// The sink will produce a vector containing all the data received.
@@ -51,7 +54,10 @@ impl<T: Send + 'static> SinkVec<T> {
         Self { data: Vec::new() }
     }
 }
-impl<T: Send + 'static> In<T, Vec<T>> for SinkVec<T> {
+impl<T> In<T, Vec<T>> for SinkVec<T>
+where
+    T: Send + 'static,
+{
     fn run(&mut self, input: T) {
         self.data.push(input);
     }
@@ -69,7 +75,10 @@ pub struct Splitter<T> {
     chunk_size: usize,
     data: Vec<T>,
 }
-impl<T: Send + 'static + Clone> Splitter<T> {
+impl<T> Splitter<T>
+where
+    T: Send + 'static + Clone,
+{
     /// Creates a new splitter node
     /// The node will terminate when the upstream terminates.
     pub fn build(chunk_size: usize) -> impl InOut<Vec<T>, Vec<T>> {
@@ -79,7 +88,10 @@ impl<T: Send + 'static + Clone> Splitter<T> {
         }
     }
 }
-impl<T: Send + 'static + Clone> InOut<Vec<T>, Vec<T>> for Splitter<T> {
+impl<T> InOut<Vec<T>, Vec<T>> for Splitter<T>
+where
+    T: Send + 'static + Clone,
+{
     fn run(&mut self, input: Vec<T>) -> Option<Vec<T>> {
         self.data.extend(input);
         None
@@ -107,7 +119,10 @@ pub struct Aggregator<T> {
     chunk_size: usize,
     data: Vec<T>,
 }
-impl<T: Send + 'static + Clone> Aggregator<T> {
+impl<T> Aggregator<T>
+where
+    T: Send + 'static + Clone,
+{
     /// Creates a new aggregator node
     /// The node will terminate when the upstream terminates.
     pub fn build(chunk_size: usize) -> impl InOut<T, Vec<T>> {
@@ -117,7 +132,10 @@ impl<T: Send + 'static + Clone> Aggregator<T> {
         }
     }
 }
-impl<T: Send + 'static + Clone> InOut<T, Vec<T>> for Aggregator<T> {
+impl<T> InOut<T, Vec<T>> for Aggregator<T>
+where
+    T: Send + 'static + Clone,
+{
     fn run(&mut self, input: T) -> Option<Vec<T>> {
         self.data.push(input);
         if self.data.len() >= self.chunk_size {
@@ -151,7 +169,10 @@ impl<T: Send + 'static + Clone> InOut<T, Vec<T>> for Aggregator<T> {
 pub struct OrderedSinkVec<T> {
     data: Vec<T>,
 }
-impl<T: Send + 'static> OrderedSinkVec<T> {
+impl<T> OrderedSinkVec<T>
+where
+    T: Send + 'static,
+{
     /// Creates a new sink that accumulates data into a vector
     /// This is a ordered version of SinkVec
     /// The sink will terminate when the upstream terminates
@@ -161,7 +182,10 @@ impl<T: Send + 'static> OrderedSinkVec<T> {
         Self { data: Vec::new() }
     }
 }
-impl<T: Send + 'static> In<T, Vec<T>> for OrderedSinkVec<T> {
+impl<T> In<T, Vec<T>> for OrderedSinkVec<T>
+where
+    T: Send + 'static,
+{
     fn run(&mut self, input: T) {
         self.data.push(input);
     }
@@ -184,7 +208,10 @@ pub struct OrderedSplitter<T> {
     chunk_size: usize,
     data: Vec<T>,
 }
-impl<T: Send + 'static + Clone> OrderedSplitter<T> {
+impl<T> OrderedSplitter<T>
+where
+    T: Send + 'static + Clone,
+{
     /// Creates a new splitter node
     /// The node will terminate when the upstream terminates.
     /// The node will produce data in the same order as it is received from the upstream.
@@ -195,7 +222,10 @@ impl<T: Send + 'static + Clone> OrderedSplitter<T> {
         }
     }
 }
-impl<T: Send + 'static + Clone> InOut<Vec<T>, Vec<T>> for OrderedSplitter<T> {
+impl<T> InOut<Vec<T>, Vec<T>> for OrderedSplitter<T>
+where
+    T: Send + 'static + Clone,
+{
     fn run(&mut self, input: Vec<T>) -> Option<Vec<T>> {
         self.data.extend(input);
         None
@@ -228,7 +258,10 @@ pub struct OrderedAggregator<T> {
     chunk_size: usize,
     data: Vec<T>,
 }
-impl<T: Send + 'static + Clone> OrderedAggregator<T> {
+impl<T> OrderedAggregator<T>
+where
+    T: Send + 'static + Clone,
+{
     /// Creates a new aggregator node
     /// The node will terminate when the upstream terminates.
     /// The node will produce data in the same order as it is received from the upstream.
@@ -239,7 +272,10 @@ impl<T: Send + 'static + Clone> OrderedAggregator<T> {
         }
     }
 }
-impl<T: Send + 'static + Clone> InOut<T, Vec<T>> for OrderedAggregator<T> {
+impl<T> InOut<T, Vec<T>> for OrderedAggregator<T>
+where
+    T: Send + 'static + Clone,
+{
     fn run(&mut self, input: T) -> Option<Vec<T>> {
         self.data.push(input);
         if self.data.len() >= self.chunk_size {

@@ -31,35 +31,42 @@ use super::node::Node;
 ///     }
 ///  }
 /// ```
-pub trait Out<TOut: 'static + Send> {
+pub trait Out<TOut>
+where
+    TOut: 'static + Send,
+{
     /// This method is called by the rts until a None is returned.
     /// When None is returned, the node will terminate.
     fn run(&mut self) -> Option<TOut>;
 }
 
 // Implement the Out trait for a closure
-impl<TOut: 'static + Send, F> Out<TOut> for F
+impl<TOut, F> Out<TOut> for F
 where
     F: FnMut() -> Option<TOut>,
+    TOut: 'static + Send,
 {
     fn run(&mut self) -> Option<TOut> {
         self()
     }
 }
 
-pub struct OutNode<TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
+pub struct OutNode<TOut, TCollected, TNext>
+where
+    TOut: Send,
+    TNext: Node<TOut, TCollected>,
+{
     next_node: Arc<TNext>,
     stop: Arc<Mutex<bool>>,
     job_info: JobInfo,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
-impl<
-        TIn: Send,
-        TOut: Send + 'static,
-        TCollected,
-        TNext: Node<TOut, TCollected> + Send + Sync + 'static,
-    > Node<TIn, TCollected> for OutNode<TOut, TCollected, TNext>
+impl<TIn, TOut, TCollected, TNext> Node<TIn, TCollected> for OutNode<TOut, TCollected, TNext>
+where
+    TIn: Send,
+    TOut: Send + 'static,
+    TNext: Node<TOut, TCollected> + Send + Sync + 'static,
 {
     fn send(&self, _input: Message<TIn>, _rec_id: usize) -> Result<(), SenderError> {
         Ok(())
@@ -79,8 +86,10 @@ impl<
     }
 }
 
-impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static>
-    OutNode<TOut, TCollected, TNext>
+impl<TOut, TCollected, TNext> OutNode<TOut, TCollected, TNext>
+where
+    TOut: Send + 'static,
+    TNext: Node<TOut, TCollected> + Send + Sync + 'static,
 {
     /// Create a new output Node.
     /// The `handler` is the  struct that implement the trait `Out` and defines

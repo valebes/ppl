@@ -1,10 +1,10 @@
 use pspp::{
     core::orchestrator::get_global_orchestrator,
-    pipeline::collections::map::{Map, Reduce, MapReduce},
+    pipeline::collections::map::{Map, MapReduce, Reduce},
     thread_pool::ThreadPool,
 };
 use std::{
-    collections::{HashMap},
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
     usize,
@@ -73,10 +73,10 @@ pub fn pspp(dataset: &str, threads: usize) {
 
     let mut p = parallel![
         Source { reader },
-        Map::build::<Vec<String>, Vec<(String, usize)>>(threads/2, |str| -> (String, usize) {
+        Map::build::<Vec<String>, Vec<(String, usize)>>(threads / 2, |str| -> (String, usize) {
             (str, 1)
         }),
-        Reduce::build(threads/2, |str, count| {
+        Reduce::build(threads / 2, |str, count| {
             let mut sum = 0;
             for c in count {
                 sum += c;
@@ -105,15 +105,18 @@ pub fn pspp_combined_map_reduce(dataset: &str, threads: usize) {
 
     let mut p = parallel![
         Source { reader },
-        MapReduce::build_with_replicas(threads/2, |str| -> (String, usize) {
-            (str, 1)
-        }, |str, count| {
-            let mut sum = 0;
-            for c in count {
-                sum += c;
-            }
-            (str, sum)
-        }, 2),
+        MapReduce::build_with_replicas(
+            threads / 2,
+            |str| -> (String, usize) { (str, 1) },
+            |str, count| {
+                let mut sum = 0;
+                for c in count {
+                    sum += c;
+                }
+                (str, sum)
+            },
+            2
+        ),
         Sink {
             counter: HashMap::new()
         }
@@ -126,7 +129,10 @@ pub fn pspp_combined_map_reduce(dataset: &str, threads: usize) {
     for (_key, value) in res.unwrap() {
         total_words += value;
     }
-    println!("[PIPELINE MAP REDUCE COMBINED] Total words: {}", total_words);
+    println!(
+        "[PIPELINE MAP REDUCE COMBINED] Total words: {}",
+        total_words
+    );
 }
 // Version that use par_map_reduce instead of the pipeline
 pub fn pspp_map(dataset: &str, threads: usize) {

@@ -42,7 +42,10 @@ use super::node::Node;
 ///   }
 /// }
 /// ```
-pub trait In<TIn: 'static + Send, TCollected> {
+pub trait In<TIn, TCollected>
+where
+    TIn: 'static + Send,
+{
     /// This method is called each time the node receive an input.
     fn run(&mut self, input: TIn);
     /// This method is called before the node terminates. Is useful to take out data
@@ -56,9 +59,10 @@ pub trait In<TIn: 'static + Send, TCollected> {
 }
 
 // Implement the In trait for a closure
-impl<TIn: 'static + Send, TCollected, F> In<TIn, TCollected> for F
+impl<TIn, TCollected, F> In<TIn, TCollected> for F
 where
     F: FnMut(TIn) -> TCollected,
+    TIn: 'static + Send,
 {
     fn run(&mut self, input: TIn) {
         self(input);
@@ -69,7 +73,10 @@ where
     }
 }
 
-pub struct InNode<TIn: Send, TCollected> {
+pub struct InNode<TIn, TCollected>
+where
+    TIn: Send,
+{
     channel: OutputChannel<Message<TIn>>,
     ordered: bool,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
@@ -78,8 +85,10 @@ pub struct InNode<TIn: Send, TCollected> {
     job_info: JobInfo,
 }
 
-impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
-    for InNode<TIn, TCollected>
+impl<TIn, TCollected> Node<TIn, TCollected> for InNode<TIn, TCollected>
+where
+    TIn: Send + 'static,
+    TCollected: Send + 'static,
 {
     fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), SenderError> {
         let Message { op, order } = input;
@@ -139,7 +148,11 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
     }
 }
 
-impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
+impl<TIn, TCollected> InNode<TIn, TCollected>
+where
+    TIn: Send + 'static,
+    TCollected: Send + 'static,
+{
     /// Create a new input Node.
     /// The `handler` is the  struct that implement the trait `In` and defines
     /// the behavior of the node we're creating.
