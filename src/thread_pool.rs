@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::ops::Range;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier};
-use std::{hint, mem, thread, cmp};
+use std::{cmp, hint, mem, thread};
 
 use crate::core::orchestrator::{get_global_orchestrator, JobInfo, Orchestrator};
 use crate::mpsc::channel::Channel;
@@ -227,6 +227,37 @@ impl ThreadPool {
         }
     }
 
+    /// A Parallel For.
+    /// Given a function 'f', a range of indices 'range', and a chunk size 'chunk_size',
+    /// it distrubues works of size 'chunk_size' to the threads in the pool.
+    /// The function 'f' is applied to each element in the range.
+    /// The range is split in chunks of size 'chunk_size' and each chunk is assigned to a thread.
+    pub fn par_for<F>(&mut self, range: Range<usize>, chunk_size: usize, mut f: F)
+    where
+        F: FnMut(usize) + Send + Copy,
+    {
+        let mut start = range.start;
+        let mut end = start + chunk_size;
+
+        self.scoped(|s| {
+            while start < range.end {
+                if end > range.end {
+                    end = range.end;
+                }
+
+                let range = start..end;
+
+                s.execute(move || {
+                    for i in range {
+                        (f)(i);
+                    }
+                });
+                start = end;
+                end = start + chunk_size;
+            }
+        });
+    }
+
     /// Applies in parallel the function `f` on a iterable object `iter`.
     ///
     /// # Examples
@@ -291,11 +322,11 @@ impl ThreadPool {
                     }
                 });
             });
-       
+
             drop(arc_tx);
 
             let mut disconnected = false;
-    
+
             while !disconnected {
                 match rx.receive() {
                     Ok(Some((k, v))) => {
@@ -418,6 +449,8 @@ impl<'pool, 'scope> Scope<'pool, 'scope> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use super::ThreadPool;
     use crate::core::orchestrator::Orchestrator;
     use serial_test::serial;
@@ -466,7 +499,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_par_for() {
+    fn test_par_for_each() {
         let mut vec = vec![0; 100];
         let mut tp = ThreadPool::new_with_global_registry(8);
 
@@ -498,6 +531,34 @@ mod tests {
         }
         Orchestrator::delete_global_orchestrator();
         assert!(check)
+    }
+
+    #[test]
+    #[serial]
+    fn test_par_for() {
+        let mut tp = ThreadPool::new_with_global_registry(8);
+
+        let vec = {
+            let mut v = Vec::with_capacity(100);
+            (0..100).for_each(|_| v.push(Arc::new(Mutex::new(0))));
+            v
+        };
+
+        tp.par_for(0..100, 2, |i| {
+            let mut lock = vec[i].lock().unwrap();
+            *lock += 1;
+        });
+
+        let mut check = true;
+
+        for i in 0..100 {
+            let lock = vec[i].lock().unwrap();
+            if *lock != 1 {
+                check = false;
+            }
+        }
+
+        Orchestrator::delete_global_orchestrator();
     }
 
     // Test par_map_reduce

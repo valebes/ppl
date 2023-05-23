@@ -1,13 +1,13 @@
 /*
-     Pipeline with a filter node.
- */
+    Pipeline with a filter node.
+*/
 
 use pspp::core::orchestrator::get_global_orchestrator;
 use pspp::pipeline::collections::common::{Filter, SinkVec};
 use pspp::{
     parallel,
     pipeline::{
-        in_node::{InNode},
+        in_node::InNode,
         inout_node::{InOut, InOutNode},
         out_node::{Out, OutNode},
     },
@@ -43,9 +43,7 @@ fn test_filter() {
             streamlen: 100,
             counter: 0
         },
-        Filter::build(|el: &usize| -> bool {
-            is_even(el)
-        }),
+        Filter::build(|el: &usize| -> bool { is_even(el) }),
         SinkVec::build()
     ];
     p.start();
