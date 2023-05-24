@@ -1,4 +1,8 @@
+<p align="center">
+  <img width="336" height="280" src="logo.png">
+</p>
+
 [![Rust](https://github.com/valebes/pspp/actions/workflows/rust.yml/badge.svg)](https://github.com/valebes/pspp/actions/workflows/rust.yml)
-# pspp
-Parallelo Structured Parallel Processing is a small parallel framework written in rust.
+# Parallelo
+Parallelo Parallel Library (PPL) is a small parallel framework written in rust.
 
