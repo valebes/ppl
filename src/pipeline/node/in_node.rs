@@ -17,7 +17,7 @@ use crate::{
     task::{Message, Task},
 };
 
-use super::node::Node;
+use super::Node;
 
 /// Trait defining a node that receive data.
 ///
@@ -26,7 +26,7 @@ use super::node::Node;
 /// A node that increment an internal counter each time an input is received
 /// and return the total count of input received:
 /// ```
-/// use pspp::pipeline::{in_node::{In, InNode}};
+/// use pspp::prelude::*;
 /// struct Sink {
 /// counter: usize,
 /// }

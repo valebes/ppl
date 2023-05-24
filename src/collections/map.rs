@@ -1,6 +1,7 @@
+use crate::pipeline::node::InOut;
 use std::marker::PhantomData;
 
-use crate::{pipeline::inout_node::InOut, thread_pool::ThreadPool};
+use crate::thread_pool::ThreadPool;
 
 /// Map
 #[derive(Clone)]
@@ -83,6 +84,7 @@ where
 }
 
 /// Ordered Map
+/// 
 /// In this Map, the elements are processed in the same order as they are received.
 #[derive(Clone)]
 pub struct OrderedMap<TIn, TOut, F>
@@ -165,6 +167,7 @@ where
 }
 
 /// Reduce
+/// 
 /// In this Reduce, the elements are grouped by key and then reduced.
 #[derive(Clone)]
 pub struct Reduce<TIn, TKey, TReduce, F>
@@ -181,10 +184,10 @@ where
 }
 impl<TIn, TKey, TReduce, F> Reduce<TIn, TKey, TReduce, F>
 where
-    TIn: Send + Clone + Sync + 'static,
-    TKey: Send + Clone + 'static + Sync + Ord,
-    TReduce: Send + Clone + 'static + Sync,
-    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy + Sync,
+    TIn: Send + Clone + 'static,
+    TKey: Send + Clone + 'static + Ord,
+    TReduce: Send + Clone + 'static ,
+    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy ,
 {
     /// Create a new Reduce node.
     /// # Arguments
@@ -231,12 +234,12 @@ where
 impl<TIn, TInIter, TKey, TReduce, TOutIter, F> InOut<TInIter, TOutIter>
     for Reduce<TIn, TKey, TReduce, F>
 where
-    TIn: Send + Clone + Sync + 'static,
+    TIn: Send + Clone + 'static,
     TInIter: IntoIterator<Item = (TKey, TIn)>,
-    TKey: Send + Clone + 'static + Sync + Ord,
-    TReduce: Send + Clone + 'static + std::marker::Sync,
+    TKey: Send + Clone + 'static + Ord,
+    TReduce: Send + Clone + 'static,
     TOutIter: FromIterator<(TKey, TReduce)>,
-    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy + Sync,
+    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
 {
     fn run(&mut self, input: TInIter) -> Option<TOutIter> {
         let res: TOutIter = self.threadpool.par_reduce(input, self.f).collect();
@@ -248,6 +251,7 @@ where
 }
 
 /// Ordered Reduce
+/// 
 /// In this Reduce, the elements are processed in the same order as they are received.
 /// The order of the output is the same as the order of the input.
 #[derive(Clone)]
@@ -265,10 +269,10 @@ where
 }
 impl<TIn, TKey, TReduce, F> OrderedReduce<TIn, TKey, TReduce, F>
 where
-    TIn: Send + Clone + Sync + 'static,
-    TKey: Send + Clone + 'static + Sync + Ord,
-    TReduce: Send + Clone + 'static + Sync,
-    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy + Sync,
+    TIn: Send + Clone + 'static,
+    TKey: Send + Clone + 'static + Ord,
+    TReduce: Send + Clone + 'static ,
+    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
 {
     /// Create a new OrderedReduce node.
     /// # Arguments
@@ -315,12 +319,12 @@ where
 impl<TIn, TInIter, TKey, TReduce, TOutIter, F> InOut<TInIter, TOutIter>
     for OrderedReduce<TIn, TKey, TReduce, F>
 where
-    TIn: Send + Clone + Sync + 'static,
+    TIn: Send + Clone + 'static,
     TInIter: IntoIterator<Item = (TKey, TIn)>,
-    TKey: Send + Clone + 'static + Sync + Ord,
-    TReduce: Send + Clone + 'static + std::marker::Sync,
+    TKey: Send + Clone + 'static + Ord,
+    TReduce: Send + Clone + 'static,
     TOutIter: FromIterator<(TKey, TReduce)>,
-    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy + Sync,
+    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
 {
     fn run(&mut self, input: TInIter) -> Option<TOutIter> {
         let res: TOutIter = self.threadpool.par_reduce(input, self.f).collect();
@@ -335,6 +339,7 @@ where
 }
 
 /// Map Reduce
+/// 
 /// Nodes of this type are composed of a Map and a Reduce.
 /// The Map is applied to each element of the input, and the Reduce is applied to the output of the Map.
 #[derive(Clone)]
@@ -356,12 +361,12 @@ where
 impl<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
     MapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
 where
-    TIn: Send + Clone + Sync + 'static,
-    TMapOut: Send + Clone + Sync + 'static,
-    TKey: Send + Clone + 'static + Sync + Ord,
-    TReduce: Send + Clone + 'static + Sync,
-    FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy + Sync,
-    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy + Sync,
+    TIn: Send + Clone + 'static,
+    TMapOut: Send + Clone + 'static,
+    TKey: Send + Clone + 'static + Ord,
+    TReduce: Send + Clone + 'static,
+    FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
+    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
 {
     /// Create a new MapReduce node.
     /// # Arguments
@@ -417,14 +422,14 @@ where
 impl<TIn, TMapOut, TInIter, TKey, TReduce, TOutIter, FMap, FReduce> InOut<TInIter, TOutIter>
     for MapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
 where
-    TIn: Send + Clone + Sync + 'static,
-    TMapOut: Send + Clone + Sync + 'static,
+    TIn: Send + Clone + 'static,
+    TMapOut: Send + Clone + 'static,
     TInIter: IntoIterator<Item = TIn>,
-    TKey: Send + Clone + 'static + Sync + Ord,
-    TReduce: Send + Clone + 'static + Sync,
+    TKey: Send + Clone + 'static + Ord,
+    TReduce: Send + Clone + 'static ,
     TOutIter: FromIterator<(TKey, TReduce)>,
-    FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy + Sync,
-    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy + Sync,
+    FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
+    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
 {
     fn run(&mut self, input: TInIter) -> Option<TOutIter> {
         let res: TOutIter = self
@@ -439,6 +444,7 @@ where
 }
 
 /// Ordered Map Reduce
+/// 
 /// Nodes of this type are composed of a Map and a Reduce.
 /// The Map is applied to each element of the input, and the Reduce is applied to the output of the Map.
 /// The order of the input is preserved in the output.
@@ -463,12 +469,12 @@ where
 impl<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
     OrderedMapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
 where
-    TIn: Send + Clone + Sync + 'static,
-    TMapOut: Send + Clone + Sync + 'static,
-    TKey: Send + Clone + 'static + Sync + Ord,
-    TReduce: Send + Clone + 'static + Sync,
-    FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy + Sync,
-    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy + Sync,
+    TIn: Send + Clone + 'static,
+    TMapOut: Send + Clone + 'static,
+    TKey: Send + Clone + 'static + Ord,
+    TReduce: Send + Clone + 'static ,
+    FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
+    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
 {
     /// Create a new OrderedMapReduce node.
     /// # Arguments
@@ -524,14 +530,14 @@ where
 impl<TIn, TMapOut, TInIter, TKey, TReduce, TOutIter, FMap, FReduce> InOut<TInIter, TOutIter>
     for OrderedMapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
 where
-    TIn: Send + Clone + Sync + 'static,
-    TMapOut: Send + Clone + Sync + 'static,
+    TIn: Send + Clone + 'static,
+    TMapOut: Send + Clone + 'static,
     TInIter: IntoIterator<Item = TIn>,
-    TKey: Send + Clone + 'static + Sync + Ord,
-    TReduce: Send + Clone + 'static + Sync,
+    TKey: Send + Clone + 'static + Ord,
+    TReduce: Send + Clone + 'static,
     TOutIter: FromIterator<(TKey, TReduce)>,
-    FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy + Sync,
-    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy + Sync,
+    FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
+    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
 {
     fn run(&mut self, input: TInIter) -> Option<TOutIter> {
         let res: TOutIter = self

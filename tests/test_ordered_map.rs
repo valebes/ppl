@@ -1,17 +1,6 @@
 /*  An ordered pipeline with a map */
 
-use pspp::core::orchestrator::get_global_orchestrator;
-use pspp::pipeline::collections::map::OrderedMap;
-use pspp::{
-    parallel,
-    pipeline::{
-        in_node::{In, InNode},
-        inout_node::{InOut, InOutNode},
-        out_node::{Out, OutNode},
-    },
-    propagate,
-    pspp::Parallel,
-};
+use pspp::{collections::map::OrderedMap, prelude::*};
 
 struct Source {
     streamlen: usize,

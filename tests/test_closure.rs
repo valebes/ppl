@@ -1,14 +1,4 @@
-use pspp::core::orchestrator::get_global_orchestrator;
-use pspp::{
-    parallel,
-    pipeline::{
-        in_node::InNode,
-        inout_node::{InOut, InOutNode},
-        out_node::OutNode,
-    },
-    propagate,
-    pspp::Parallel,
-};
+use pspp::prelude::*;
 
 // Test that a closures can be used to build a pipeline
 // When using a closure, the node created is sequential

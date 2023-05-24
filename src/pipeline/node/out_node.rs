@@ -7,7 +7,7 @@ use crate::core::orchestrator::{JobInfo, Orchestrator};
 use crate::mpsc::err::SenderError;
 use crate::task::{Message, Task};
 
-use super::node::Node;
+use super::Node;
 
 /// Trait defining a node that output data.
 ///
@@ -15,7 +15,7 @@ use super::node::Node;
 ///
 /// A node emitting a vector containing numbers from 0 to 99 for `streamlen` times:
 /// ```
-/// use pspp::pipeline::{out_node::{Out, OutNode}};
+/// use pspp::prelude::*;
 /// struct Source {
 ///      streamlen: usize,
 ///      counter: usize,

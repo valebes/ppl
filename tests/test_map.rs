@@ -1,16 +1,4 @@
-use pspp::core::orchestrator::get_global_orchestrator;
-
-use pspp::pipeline::collections::map::Map;
-use pspp::{
-    parallel,
-    pipeline::{
-        in_node::{In, InNode},
-        inout_node::{InOut, InOutNode},
-        out_node::{Out, OutNode},
-    },
-    propagate,
-    pspp::Parallel,
-};
+use pspp::{collections::map::Map, prelude::*};
 
 struct Source {
     streamlen: usize,

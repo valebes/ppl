@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::pipeline::{in_node::In, inout_node::InOut, out_node::Out};
+use crate::pipeline::node::{In, InOut, Out};
 
 /// SourceIter
 /// This source node produces data from a iterator

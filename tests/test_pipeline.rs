@@ -5,17 +5,7 @@
    Fibonacci number.
 */
 
-use pspp::core::orchestrator::get_global_orchestrator;
-use pspp::{
-    parallel,
-    pipeline::{
-        in_node::{In, InNode},
-        inout_node::{InOut, InOutNode},
-        out_node::{Out, OutNode},
-    },
-    propagate,
-    pspp::Parallel,
-};
+use pspp::{prelude::*, collections::misc::{SourceIter, Sequential, SinkVec}};
 
 struct Source {
     streamlen: usize,
@@ -32,7 +22,7 @@ impl Out<i32> for Source {
     }
 }
 
-pub fn fibonacci_reccursive(n: i32) -> u64 {
+pub fn fibonacci_recursive(n: i32) -> u64 {
     if n < 0 {
         panic!("{} is negative!", n);
     }
@@ -43,7 +33,7 @@ pub fn fibonacci_reccursive(n: i32) -> u64 {
         /*
         50    => 12586269025,
         */
-        _ => fibonacci_reccursive(n - 1) + fibonacci_reccursive(n - 2),
+        _ => fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2),
     }
 }
 
@@ -51,7 +41,7 @@ pub fn fibonacci_reccursive(n: i32) -> u64 {
 struct Worker {}
 impl InOut<i32, u64> for Worker {
     fn run(&mut self, input: i32) -> Option<u64> {
-        Some(fibonacci_reccursive(input))
+        Some(fibonacci_recursive(input))
     }
 }
 
@@ -86,4 +76,18 @@ fn fibonacci_pipe() {
     p.start();
     let res = p.wait_and_collect();
     assert_eq!(res.unwrap(), 20);
+
+
+    // Another way to write the same pipeline
+    let mut p = parallel![
+        SourceIter::build(1..21),
+        Sequential::build(fibonacci_recursive),
+        SinkVec::build()
+    ];
+    p.start();
+    let res = p.wait_and_collect()
+        .unwrap().len();
+    assert_eq!(res, 20);
+        
+
 }

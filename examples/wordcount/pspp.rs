@@ -1,8 +1,3 @@
-use pspp::{
-    core::orchestrator::get_global_orchestrator,
-    pipeline::collections::map::{Map, MapReduce, Reduce},
-    thread_pool::ThreadPool,
-};
 use std::{
     collections::HashMap,
     fs::File,
@@ -11,14 +6,8 @@ use std::{
 };
 
 use pspp::{
-    parallel,
-    pipeline::{
-        in_node::{In, InNode},
-        inout_node::{InOut, InOutNode},
-        out_node::{Out, OutNode},
-    },
-    propagate,
-    pspp::Parallel,
+    collections::map::{Map, MapReduce, Reduce},
+    prelude::*,
 };
 
 struct Source {

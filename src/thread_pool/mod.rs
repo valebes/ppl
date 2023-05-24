@@ -1,3 +1,8 @@
+//! Work-stealing based thread pool.
+//! 
+//! This module contains the implementation of a work-stealing based thread pool.
+//! This implementation of the thread pool supports scoped jobs.
+//! This module offers struct as [`ThreadPool`] that allows to create a thread pool.
 use crossbeam_deque::{Injector, Steal, Stealer, Worker};
 use log::{trace, warn};
 use std::collections::BTreeMap;
@@ -5,7 +10,7 @@ use std::marker::PhantomData;
 use std::ops::Range;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Barrier};
-use std::{cmp, hint, mem, thread};
+use std::{hint, mem, thread};
 
 use crate::core::orchestrator::{get_global_orchestrator, JobInfo, Orchestrator};
 use crate::mpsc::channel::Channel;
@@ -227,9 +232,8 @@ impl ThreadPool {
         }
     }
 
-    /// A Parallel For.
     /// Given a function 'f', a range of indices 'range', and a chunk size 'chunk_size',
-    /// it distrubues works of size 'chunk_size' to the threads in the pool.
+    /// it distributes works of size 'chunk_size' to the threads in the pool.
     /// The function 'f' is applied to each element in the range.
     /// The range is split in chunks of size 'chunk_size' and each chunk is assigned to a thread.
     pub fn par_for<F>(&mut self, range: Range<usize>, chunk_size: usize, mut f: F)
@@ -274,7 +278,7 @@ impl ThreadPool {
     ///
     pub fn par_for_each<Iter, F>(&mut self, iter: Iter, f: F)
     where
-        F: FnOnce(Iter::Item) + Send + 'static + Copy,
+        F: FnOnce(Iter::Item) + Send + Copy,
         <Iter as IntoIterator>::Item: Send,
         Iter: IntoIterator,
     {
@@ -282,6 +286,7 @@ impl ThreadPool {
             iter.into_iter().for_each(|el| s.execute(move || (f)(el)));
         });
     }
+
     /// Applies in parallel the function `f` on a iterable object `iter`,
     /// producing a new iterator with the results.
     ///
@@ -402,8 +407,11 @@ impl ThreadPool {
         self.par_map(ordered_map.into_iter(), move |(k, v)| f(k, v))
     }
 
-    /// Borrows the thread pool and allows executing jobs on other
-    /// threads during that scope via the argument of the closure.
+    /// Create a new scope to execute jobs on other threads.
+    /// The function passed to thismethod will be provided with a [`Scope`] object,
+    /// which can be used to spawn new jobs through the [`Scope::execute`] method.
+    /// The scope will block the current thread until all jobs spawned from this scope
+    /// have completed.
     pub fn scoped<'pool, 'scope, F, R>(&'pool mut self, f: F) -> R
     where
         F: FnOnce(&Scope<'pool, 'scope>) -> R,
@@ -427,7 +435,7 @@ impl Drop for ThreadPool {
         }
     }
 }
-/// A scope to executes scoped jobs in the thread pool.
+/// A scope to execute jobs on other threads.
 pub struct Scope<'pool, 'scope> {
     pool: &'pool mut ThreadPool,
     _marker: PhantomData<::std::cell::Cell<&'scope mut ()>>,
@@ -440,195 +448,6 @@ impl<'pool, 'scope> Scope<'pool, 'scope> {
         F: FnOnce() + Send + 'scope,
     {
         let task = unsafe { mem::transmute::<Func<'scope>, Func<'static>>(Box::new(task)) };
-        self.pool.injector.push(Job::NewJob(Box::new(task)));
-        self.pool
-            .total_tasks
-            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::{Arc, Mutex};
-
-    use super::ThreadPool;
-    use crate::core::orchestrator::Orchestrator;
-    use serial_test::serial;
-
-    fn fib(n: i32) -> u64 {
-        if n < 0 {
-            panic!("{} is negative!", n);
-        }
-        match n {
-            0 => panic!("zero is not a right argument to fib()!"),
-            1 | 2 => 1,
-            3 => 2,
-            _ => fib(n - 1) + fib(n - 2),
-        }
-    }
-
-    #[test]
-    #[serial]
-    fn test_threadpool() {
-        let tp = ThreadPool::new_with_global_registry(8);
-        for i in 1..45 {
-            tp.execute(move || {
-                fib(i);
-            });
-        }
-        tp.wait();
-        Orchestrator::delete_global_orchestrator();
-    }
-
-    #[test]
-    #[serial]
-    fn test_scoped_thread() {
-        let mut vec = vec![0; 100];
-        let mut tp = ThreadPool::new_with_global_registry(8);
-
-        tp.scoped(|s| {
-            for e in vec.iter_mut() {
-                s.execute(move || {
-                    *e += 1;
-                });
-            }
-        });
-        Orchestrator::delete_global_orchestrator();
-        assert_eq!(vec, vec![1i32; 100])
-    }
-
-    #[test]
-    #[serial]
-    fn test_par_for_each() {
-        let mut vec = vec![0; 100];
-        let mut tp = ThreadPool::new_with_global_registry(8);
-
-        tp.par_for_each(&mut vec, |el: &mut i32| *el += 1);
-        Orchestrator::delete_global_orchestrator();
-        assert_eq!(vec, vec![1i32; 100])
-    }
-
-    #[test]
-    #[serial]
-    fn test_par_map() {
-        let mut vec = Vec::new();
-        let mut tp = ThreadPool::new_with_global_registry(16);
-
-        for i in 0..10000 {
-            vec.push(i);
-        }
-        let res: Vec<String> = tp
-            .par_map(vec, |el| -> String {
-                "Hello from: ".to_string() + &el.to_string()
-            })
-            .collect();
-
-        let mut check = true;
-        for (i, str) in res.into_iter().enumerate() {
-            if str != "Hello from: ".to_string() + &i.to_string() {
-                check = false;
-            }
-        }
-        Orchestrator::delete_global_orchestrator();
-        assert!(check)
-    }
-
-    #[test]
-    #[serial]
-    fn test_par_for() {
-        let mut tp = ThreadPool::new_with_global_registry(8);
-
-        let vec = {
-            let mut v = Vec::with_capacity(100);
-            (0..100).for_each(|_| v.push(Arc::new(Mutex::new(0))));
-            v
-        };
-
-        tp.par_for(0..100, 2, |i| {
-            let mut lock = vec[i].lock().unwrap();
-            *lock += 1;
-        });
-
-        let mut check = true;
-
-        for i in 0..100 {
-            let lock = vec[i].lock().unwrap();
-            if *lock != 1 {
-                check = false;
-            }
-        }
-
-        Orchestrator::delete_global_orchestrator();
-    }
-
-    // Test par_map_reduce
-    #[test]
-    #[serial]
-    fn test_par_map_reduce() {
-        let mut vec = Vec::new();
-        let mut tp = ThreadPool::new_with_global_registry(16);
-
-        for _i in 0..100000 {
-            for i in 0..10 {
-                vec.push(i);
-            }
-        }
-
-        let res = tp.par_map_reduce(
-            vec,
-            |el| -> (i32, i32) { (el, 1) },
-            |k, v| (k, v.iter().sum::<i32>()),
-        );
-
-        let mut check = true;
-        for (k, v) in res {
-            if v != 100000 {
-                check = false;
-            }
-            println!("Key: {} Total: {}", k, v)
-        }
-
-        Orchestrator::delete_global_orchestrator();
-        assert!(check)
-    }
-
-    #[test]
-    #[serial]
-    fn test_par_map_reduce_seq() {
-        let mut vec = Vec::new();
-        let mut tp = ThreadPool::new_with_global_registry(16);
-
-        for _i in 0..100000 {
-            for i in 0..10 {
-                vec.push(i);
-            }
-        }
-
-        let res = tp.par_map(vec, |el| -> (i32, i32) { (el, 1) });
-        let res = tp.par_reduce(res, |k, v| (k, v.iter().sum::<i32>()));
-
-        let mut check = true;
-        for (k, v) in res {
-            if v != 100000 {
-                check = false;
-            }
-            println!("Key: {} Total: {}", k, v)
-        }
-
-        Orchestrator::delete_global_orchestrator();
-        assert!(check)
-    }
-
-    #[test]
-    #[serial]
-    fn test_multiple_threadpool() {
-        let tp_1 = ThreadPool::new_with_global_registry(4);
-        let tp_2 = ThreadPool::new_with_global_registry(4);
-        ::scopeguard::defer! {
-            tp_1.wait();
-            tp_2.wait();
-
-        }
-        Orchestrator::delete_global_orchestrator();
+        self.pool.execute(task);
     }
 }

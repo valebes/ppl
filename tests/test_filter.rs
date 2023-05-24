@@ -2,18 +2,7 @@
     Pipeline with a filter node.
 */
 
-use pspp::core::orchestrator::get_global_orchestrator;
-use pspp::pipeline::collections::common::{Filter, SinkVec};
-use pspp::{
-    parallel,
-    pipeline::{
-        in_node::InNode,
-        inout_node::{InOut, InOutNode},
-        out_node::{Out, OutNode},
-    },
-    propagate,
-    pspp::Parallel,
-};
+use pspp::{prelude::*, collections::misc::{Filter, SinkVec}};
 
 struct Source {
     streamlen: usize,

@@ -22,7 +22,7 @@ use crate::{
     task::{Message, Task},
 };
 
-use super::node::Node;
+use super::Node;
 
 /// Trait defining a node that receive an input and produce an output.
 ///
@@ -30,7 +30,7 @@ use super::node::Node;
 ///
 /// A node that receive an integer and increment it by one:
 /// ```
-/// use pspp::pipeline::{inout_node::{InOut, InOutNode}};
+/// use pspp::prelude::*;
 /// #[derive(Clone)]
 /// struct Worker {}
 /// impl InOut<i32, i32> for Worker {
