@@ -22,6 +22,7 @@ pub enum Job {
 }
 
 /// Struct that reepresent a job in the queue.
+/// 
 /// It contains a method to wait till the job is done.
 /// It is used to wait for the end of a job.
 #[derive(Debug)]

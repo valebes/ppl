@@ -3,6 +3,7 @@ use std::env;
 use core_affinity::CoreId;
 
 /// Configuration of the framework.
+/// 
 /// The configuration is set by the user through environment variables.
 /// The environment variables are:
 /// - PSPP_MAX_CORES: maximum number of cores allowed. Only valid when pinning is active.
