@@ -1,13 +1,13 @@
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 use log::trace;
 
-use crate::channel::err::ChannelError;
 use crate::core::orchestrator::{JobInfo, Orchestrator};
+use crate::mpsc::err::SenderError;
 use crate::task::{Message, Task};
 
-use super::node::Node;
+use super::Node;
 
 /// Trait defining a node that output data.
 ///
@@ -15,7 +15,7 @@ use super::node::Node;
 ///
 /// A node emitting a vector containing numbers from 0 to 99 for `streamlen` times:
 /// ```
-/// use pspp::node::{out_node::{Out, OutNode}};
+/// use pspp::prelude::*;
 /// struct Source {
 ///      streamlen: usize,
 ///      counter: usize,
@@ -31,27 +31,44 @@ use super::node::Node;
 ///     }
 ///  }
 /// ```
-pub trait Out<TOut: 'static + Send> {
+pub trait Out<TOut>
+where
+    TOut: 'static + Send,
+{
     /// This method is called by the rts until a None is returned.
     /// When None is returned, the node will terminate.
     fn run(&mut self) -> Option<TOut>;
 }
 
-pub struct OutNode<TOut: Send, TCollected, TNext: Node<TOut, TCollected>> {
+// Implement the Out trait for a closure
+impl<TOut, F> Out<TOut> for F
+where
+    F: FnMut() -> Option<TOut>,
+    TOut: 'static + Send,
+{
+    fn run(&mut self) -> Option<TOut> {
+        self()
+    }
+}
+
+pub struct OutNode<TOut, TCollected, TNext>
+where
+    TOut: Send,
+    TNext: Node<TOut, TCollected>,
+{
     next_node: Arc<TNext>,
     stop: Arc<Mutex<bool>>,
     job_info: JobInfo,
     phantom: PhantomData<(TOut, TCollected)>,
 }
 
-impl<
-        TIn: Send,
-        TOut: Send + 'static,
-        TCollected,
-        TNext: Node<TOut, TCollected> + Send + Sync + 'static,
-    > Node<TIn, TCollected> for OutNode<TOut, TCollected, TNext>
+impl<TIn, TOut, TCollected, TNext> Node<TIn, TCollected> for OutNode<TOut, TCollected, TNext>
+where
+    TIn: Send,
+    TOut: Send + 'static,
+    TNext: Node<TOut, TCollected> + Send + Sync + 'static,
 {
-    fn send(&self, _input: Message<TIn>, _rec_id: usize) -> Result<(), ChannelError> {
+    fn send(&self, _input: Message<TIn>, _rec_id: usize) -> Result<(), SenderError> {
         Ok(())
     }
 
@@ -69,15 +86,15 @@ impl<
     }
 }
 
-impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sync + 'static>
-    OutNode<TOut, TCollected, TNext>
+impl<TOut, TCollected, TNext> OutNode<TOut, TCollected, TNext>
+where
+    TOut: Send + 'static,
+    TNext: Node<TOut, TCollected> + Send + Sync + 'static,
 {
     /// Create a new output Node.
     /// The `handler` is the  struct that implement the trait `Out` and defines
     /// the behavior of the node we're creating.
     /// `next_node` contains the stage that follows the node.
-    /// If `pinning` is `true` the node will be pinned to the thread in position `id`.
-    ///
     pub fn new(
         id: usize,
         handler: Box<dyn Out<TOut> + Send + Sync>,
@@ -104,20 +121,25 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
+    /// RTS of the node.
+    /// It runs the node until a None is returned.
+    /// When None is returned, the node will terminate.
+    /// The node will send the output to the next node.
+    /// The node will terminate also when the stop flag is set to true.
     fn rts(mut node: Box<dyn Out<TOut>>, nn: &TNext, stop: &Mutex<bool>) {
         let mut order = 0;
         let mut counter = 0;
-        loop { // Maybe this could be better
-            let stop_mtx = stop.lock();
-            match stop_mtx {
-                Ok(mtx) => {
-                    if !*mtx {
-                        break;
-                    }
-                }
-                Err(_) => panic!("Error: Cannot lock mutex."),
-            }
+
+        let mut stop_mtx = stop.lock().unwrap();
+        let cvar = Condvar::new();
+
+        // Wait until the node is started
+        while *stop_mtx {
+            stop_mtx = cvar.wait(stop_mtx).unwrap();
         }
+
+        drop(stop_mtx); // Release the lock to avoid deadlock
+
         loop {
             let stop_mtx = stop.lock();
             match stop_mtx {
@@ -127,20 +149,19 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                         if err.is_err() {
                             panic!("Error: {}", err.unwrap_err())
                         }
-                        // to do cleanup
                         break;
                     }
                 }
                 Err(_) => panic!("Error: Cannot lock mutex."),
             }
 
-            if counter >= nn.get_num_of_replicas() {
-                counter = 0;
-            }
-            let res = node.run();
+            let res = node.run(); // Run the node and get the output
+
+            counter %= nn.get_num_of_replicas(); // Get the next node
+
             match res {
                 Some(output) => {
-                    let err = nn.send(Message::new(Task::NewTask(output), order), counter);
+                    let err = nn.send(Message::new(Task::New(output), order), counter);
                     if err.is_err() {
                         panic!("Error: {}", err.unwrap_err())
                     }
@@ -154,16 +175,19 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
                     break;
                 }
             }
+
             counter += 1;
         }
     }
 
     /// Start the node.
+    /// The node will start to send the output to the next node.
     pub fn start(&mut self) {
         self.send_start();
     }
 
     /// Terminate the current node and the following ones.
+    /// The node will terminate also when the stop flag is set to true.
     pub fn terminate(mut self) {
         self.send_stop();
         self.wait();
@@ -175,6 +199,8 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
+    /// Start the node.
+    /// The node will start to send the output to the next node.
     fn send_start(&self) {
         let mtx = self.stop.lock();
         match mtx {
@@ -183,6 +209,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
+    /// Terminate the current node and the following ones.
     fn send_stop(&self) {
         let mtx = self.stop.lock();
         match mtx {
@@ -191,6 +218,7 @@ impl<TOut: Send + 'static, TCollected, TNext: Node<TOut, TCollected> + Send + Sy
         }
     }
 
+    /// Wait until the node is terminated.
     fn wait(&mut self) {
         self.job_info.wait();
     }

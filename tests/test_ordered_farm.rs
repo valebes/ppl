@@ -2,16 +2,7 @@
   Farm of pipeline.
 */
 
-use pspp::core::orchestrator::get_global_orchestrator;
-use pspp::{
-    node::{
-        in_node::{In, InNode},
-        inout_node::{InOut, InOutNode},
-        out_node::{Out, OutNode},
-    },
-    parallel, propagate,
-    pspp::Parallel,
-};
+use pspp::prelude::*;
 
 struct Source {
     streamlen: usize,
@@ -38,7 +29,7 @@ impl InOut<usize, usize> for WorkerA {
         true
     }
     fn number_of_replicas(&self) -> usize {
-        2
+        4
     }
 }
 
@@ -70,7 +61,7 @@ impl InOut<usize, usize> for WorkerC {
         true
     }
     fn number_of_replicas(&self) -> usize {
-        2
+        4
     }
 }
 
@@ -101,7 +92,7 @@ fn test_ordered_farm() {
 
     let mut p = parallel![
         Source {
-            streamlen: 100,
+            streamlen: 10000,
             counter: 0
         },
         WorkerA {},

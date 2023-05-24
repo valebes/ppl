@@ -9,7 +9,7 @@ fn image_processing(criterion: &mut Criterion) {
     group
         .sampling_mode(SamplingMode::Auto)
         .plot_config(plot_cfg)
-        .sample_size(10);
+        .sample_size(20);
 
     // Parses the images.
     let images = std::fs::read_dir("benches/img/images")
@@ -26,7 +26,7 @@ fn image_processing(criterion: &mut Criterion) {
         })
         .expect("parsing error");
 
-    let replicas_for_stage = 1..=(num_cpus::get() / 5);
+    let replicas_for_stage = 1..(num_cpus::get() / 5);
     for replicas in replicas_for_stage {
         let threads = replicas * 5;
 

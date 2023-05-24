@@ -18,7 +18,6 @@ pub fn fibonacci_recursive(n: u64) -> u64 {
         _ => fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2),
     }
 }
-
 struct Source {
     streamlen: usize,
 }
@@ -26,7 +25,7 @@ impl Out<u64> for Source {
     fn run(&mut self) -> Option<u64> {
         let mut ret = None;
         if self.streamlen > 0 {
-            ret = Some(self.streamlen as u64);
+            ret = Some((self.streamlen as u64 % 20) + 1);
             self.streamlen -= 1;
         }
         ret
@@ -37,10 +36,32 @@ impl Out<u64> for Source {
 struct WorkerA {}
 impl InOut<u64, u64> for WorkerA {
     fn run(&mut self, input: u64) -> Option<u64> {
+        Some(input)
+    }
+    fn number_of_replicas(&self) -> usize {
+        2
+    }
+}
+
+#[derive(Clone)]
+struct WorkerB {}
+impl InOut<u64, u64> for WorkerB {
+    fn run(&mut self, input: u64) -> Option<u64> {
         Some(fibonacci_recursive(input))
     }
     fn number_of_replicas(&self) -> usize {
         8
+    }
+}
+
+#[derive(Clone)]
+struct WorkerC {}
+impl InOut<u64, u64> for WorkerC {
+    fn run(&mut self, input: u64) -> Option<u64> {
+        Some(input - 1)
+    }
+    fn number_of_replicas(&self) -> usize {
+        2
     }
 }
 
@@ -60,11 +81,18 @@ impl In<u64, usize> for Sink {
 }
 
 #[test]
-fn test_farm() {
+fn test_long_farm() {
     env_logger::init();
 
-    let mut p = parallel![Source { streamlen: 45 }, WorkerA {}, Sink { counter: 0 }];
+    let mut p = parallel!(
+        Source { streamlen: 500000 },
+        WorkerA {},
+        WorkerB {},
+        WorkerC {},
+        Sink { counter: 0 }
+    );
+
     p.start();
     let res = p.wait_and_collect();
-    assert_eq!(res.unwrap(), 45);
+    assert_eq!(res.unwrap(), 500000);
 }

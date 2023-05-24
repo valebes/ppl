@@ -9,15 +9,15 @@ use std::{
 use log::{trace, warn};
 
 use crate::{
-    channel::{
-        channel::{Channel, InputChannel, OutputChannel},
-        err::ChannelError,
-    },
     core::orchestrator::{JobInfo, Orchestrator},
+    mpsc::{
+        channel::{Channel, InputChannel, OutputChannel},
+        err::SenderError,
+    },
     task::{Message, Task},
 };
 
-use super::node::Node;
+use super::Node;
 
 /// Trait defining a node that receive data.
 ///
@@ -26,7 +26,7 @@ use super::node::Node;
 /// A node that increment an internal counter each time an input is received
 /// and return the total count of input received:
 /// ```
-/// use pspp::node::{in_node::{In, InNode}};
+/// use pspp::prelude::*;
 /// struct Sink {
 /// counter: usize,
 /// }
@@ -42,12 +42,15 @@ use super::node::Node;
 ///   }
 /// }
 /// ```
-pub trait In<TIn: 'static + Send, TOut> {
+pub trait In<TIn, TCollected>
+where
+    TIn: 'static + Send,
+{
     /// This method is called each time the node receive an input.
     fn run(&mut self, input: TIn);
     /// This method is called before the node terminates. Is useful to take out data
     /// at the end of the computation.
-    fn finalize(self) -> Option<TOut>;
+    fn finalize(self) -> Option<TCollected>;
     /// This method return a boolean that represent if the node receive the input in an ordered way.
     /// Overload this method allow to choose if the node is ordered or not.
     fn is_ordered(&self) -> bool {
@@ -55,24 +58,43 @@ pub trait In<TIn: 'static + Send, TOut> {
     }
 }
 
-pub struct InNode<TIn: Send, TCollected> {
-    job_info: JobInfo,
+// Implement the In trait for a closure
+impl<TIn, TCollected, F> In<TIn, TCollected> for F
+where
+    F: FnMut(TIn) -> TCollected,
+    TIn: 'static + Send,
+{
+    fn run(&mut self, input: TIn) {
+        self(input);
+    }
+
+    fn finalize(self) -> Option<TCollected> {
+        None
+    }
+}
+
+pub struct InNode<TIn, TCollected>
+where
+    TIn: Send,
+{
     channel: OutputChannel<Message<TIn>>,
     ordered: bool,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     counter: AtomicUsize,
     result: Arc<Mutex<Option<TCollected>>>,
+    job_info: JobInfo,
 }
 
-impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
-    for InNode<TIn, TCollected>
+impl<TIn, TCollected> Node<TIn, TCollected> for InNode<TIn, TCollected>
+where
+    TIn: Send + 'static,
+    TCollected: Send + 'static,
 {
-    fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), ChannelError> {
+    fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), SenderError> {
         let Message { op, order } = input;
         match &op {
-            Task::NewTask(_e) => {
-                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
-                    //change to acquire ordering
+            Task::New(_e) => {
+                if self.ordered && order != self.counter.load(Ordering::Acquire) {
                     self.save_to_storage(Message::new(op, rec_id), order);
                     self.send_pending();
                 } else {
@@ -80,21 +102,19 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
                     if res.is_err() {
                         panic!("Error: Cannot send message!");
                     }
-                    let old_c = self.counter.load(Ordering::SeqCst);
-                    self.counter.store(old_c + 1, Ordering::SeqCst);
+                    self.counter.fetch_add(1, Ordering::AcqRel);
                 }
             }
             Task::Dropped => {
-                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                if self.ordered && order != self.counter.load(Ordering::Acquire) {
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else if self.ordered {
-                    let old_c = self.counter.load(Ordering::SeqCst);
-                    self.counter.store(old_c + 1, Ordering::SeqCst);
+                    self.counter.fetch_add(1, Ordering::AcqRel);
                 }
             }
             Task::Terminate => {
-                if self.ordered && order != self.counter.load(Ordering::SeqCst) {
+                if self.ordered && order != self.counter.load(Ordering::Acquire) {
                     self.save_to_storage(Message::new(op, order), order);
                     self.send_pending();
                 } else {
@@ -128,37 +148,36 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> Node<TIn, TCollected>
     }
 }
 
-impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
+impl<TIn, TCollected> InNode<TIn, TCollected>
+where
+    TIn: Send + 'static,
+    TCollected: Send + 'static,
+{
     /// Create a new input Node.
     /// The `handler` is the  struct that implement the trait `In` and defines
     /// the behavior of the node we're creating.
     /// `next_node` contains the stage that follows the node.
-    /// If `blocking` is true the node will perform blocking operation on receive.
-    /// If `pinning` is `true` the node will be pinned to the thread in position `id`.
-    ///
     pub fn new(
         id: usize,
         handler: Box<dyn In<TIn, TCollected> + Send + Sync>,
-        blocking: bool,
         orchestrator: Arc<Orchestrator>,
     ) -> InNode<TIn, TCollected> {
         trace!("Created a new Sink! Id: {}", id);
 
-        let (channel_in, channel_out) = Channel::channel(blocking);
+        let (channel_in, channel_out) =
+            Channel::channel(orchestrator.get_configuration().get_blocking_channel());
         let result = Arc::new(Mutex::new(None));
         let ordered = handler.is_ordered();
 
         let bucket = Arc::clone(&result);
 
         let job_info = orchestrator.push(move || {
-            let res = InNode::rts(handler, channel_in);
-            if res.is_some() {
-                let err = bucket.lock();
-                if err.is_ok() {
-                    let mut lock_bucket = err.unwrap();
-                    *lock_bucket = res;
-                } else if err.is_err() {
-                    panic!("Error: Cannot collect results.")
+            if let Some(res) = InNode::rts(handler, channel_in) {
+                match bucket.lock() {
+                    Ok(mut lock_bucket) => {
+                        *lock_bucket = Some(res);
+                    }
+                    Err(_) => panic!("Error: Cannot collect results."),
                 }
             }
         });
@@ -182,7 +201,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
             match input {
                 Ok(Some(Message { op, order: _ })) => {
                     match op {
-                        Task::NewTask(arg) => {
+                        Task::New(arg) => {
                             node.run(arg);
                         }
                         Task::Dropped => {
@@ -223,12 +242,12 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
 
         match mtx {
             Ok(mut queue) => {
-                let mut c = self.counter.load(Ordering::SeqCst);
+                let mut c = self.counter.load(Ordering::Acquire);
                 while queue.contains_key(&c) {
                     let msg = queue.remove(&c).unwrap();
                     let Message { op, order } = msg;
                     match &op {
-                        Task::NewTask(_e) => {
+                        Task::New(_e) => {
                             let err = self.send(Message::new(op, c), order);
                             if err.is_err() {
                                 panic!("Error: Cannot send message!");
@@ -247,7 +266,7 @@ impl<TIn: Send + 'static, TCollected: Send + 'static> InNode<TIn, TCollected> {
                             }
                         }
                     }
-                    c = self.counter.load(Ordering::SeqCst);
+                    c = self.counter.load(Ordering::Acquire);
                 }
             }
             Err(_) => panic!("Error: Cannot lock the storage!"),

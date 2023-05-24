@@ -1,16 +1,9 @@
 /*
   Ordered FlatMap example.
 */
-use pspp::core::orchestrator::get_global_orchestrator;
-use pspp::{
-    node::{
-        in_node::{In, InNode},
-        inout_node::{InOut, InOutNode},
-        out_node::{Out, OutNode},
-    },
-    parallel, propagate,
-    pspp::Parallel,
-};
+// With the produce method we can create nodes that produce new messages for each input message received.
+
+use pspp::prelude::*;
 
 struct Source {
     strings: Vec<String>,
@@ -72,7 +65,7 @@ impl In<String, Vec<String>> for Sink {
 }
 
 #[test]
-fn test_ordered_splitter() {
+fn test_ordered_producer() {
     env_logger::init();
 
     let mut p = parallel![

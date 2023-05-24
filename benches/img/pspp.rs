@@ -1,17 +1,6 @@
-use pspp::core::orchestrator::get_global_orchestrator;
-use pspp::core::orchestrator::Orchestrator;
+use pspp::prelude::*;
 use raster::filter;
 use raster::Image;
-
-use pspp::{
-    node::{
-        in_node::{In, InNode},
-        inout_node::{InOut, InOutNode},
-        out_node::{Out, OutNode},
-    },
-    parallel, propagate,
-    pspp::Parallel,
-};
 
 struct Source {
     all_images: Vec<Image>,

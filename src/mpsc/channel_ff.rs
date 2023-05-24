@@ -3,17 +3,26 @@ use std::sync::Mutex;
 
 use super::{
     channel::{Receiver, Sender},
-    err::ChannelError,
+    err::{ReceiverError, SenderError},
 };
 
 pub struct FFInputChannel<T> {
     rx: FFReceiver<T>,
 }
-impl<T: Send> Receiver<T> for FFInputChannel<T> {
-    fn receive(&self) -> Result<Option<T>, ChannelError> {
+impl<T> Receiver<T> for FFInputChannel<T>
+where
+    T: Send,
+{
+    fn receive(&self) -> Result<Option<T>, ReceiverError> {
         match self.rx.try_pop() {
             Some(boxed) => Ok(Some(Box::into_inner(boxed))),
-            None => Ok(None),
+            None => {
+                if self.rx.is_disconnected() {
+                    Err(ReceiverError)
+                } else {
+                    Ok(None)
+                }
+            }
         }
     }
 
@@ -25,9 +34,15 @@ impl<T: Send> Receiver<T> for FFInputChannel<T> {
 pub struct FFBlockingInputChannel<T> {
     rx: FFReceiver<T>,
 }
-impl<T: Send> Receiver<T> for FFBlockingInputChannel<T> {
-    fn receive(&self) -> Result<Option<T>, ChannelError> {
-        Ok(Some(Box::into_inner(self.rx.pop())))
+impl<T> Receiver<T> for FFBlockingInputChannel<T>
+where
+    T: Send,
+{
+    fn receive(&self) -> Result<Option<T>, ReceiverError> {
+        match self.rx.pop() {
+            Some(boxed) => Ok(Some(Box::into_inner(boxed))),
+            None => Err(ReceiverError),
+        }
     }
 
     fn is_empty(&self) -> bool {
@@ -39,14 +54,17 @@ pub struct FFOutputChannel<T> {
     tx: Mutex<FFSender<T>>,
 }
 
-impl<T: Send> Sender<T> for FFOutputChannel<T> {
-    fn send(&self, msg: T) -> Result<(), ChannelError> {
+impl<T> Sender<T> for FFOutputChannel<T>
+where
+    T: Send,
+{
+    fn send(&self, msg: T) -> Result<(), SenderError> {
         let mtx = self.tx.lock();
         match mtx {
             Ok(ch) => {
                 let err = ch.push(Box::new(msg));
                 match err {
-                    Some(_) => Err(ChannelError::new("Can't send the msg.")),
+                    Some(_) => Err(SenderError),
                     None => Ok(()),
                 }
             }
@@ -55,15 +73,20 @@ impl<T: Send> Sender<T> for FFOutputChannel<T> {
     }
 }
 
+/// Channel is a factory for creating channels.
+///  It is a wrapper around the fastflow channel implementation.
 pub struct Channel;
 
 impl Channel {
-    pub fn channel<T: Send + 'static>(
+    pub fn channel<T>(
         blocking: bool,
     ) -> (
         Box<dyn Receiver<T> + Sync + Send>,
         Box<dyn Sender<T> + Sync + Send>,
-    ) {
+    )
+    where
+        T: Send + 'static,
+    {
         let (tx, rx) = ff_buffer::build::<T>();
         if blocking {
             (

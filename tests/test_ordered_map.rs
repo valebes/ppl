@@ -1,4 +1,6 @@
-use pspp::{collections::map::Map, prelude::*};
+/*  An ordered pipeline with a map */
+
+use pspp::{collections::map::OrderedMap, prelude::*};
 
 struct Source {
     streamlen: usize,
@@ -24,36 +26,35 @@ impl In<Vec<String>, Vec<Vec<String>>> for Sink {
     }
 
     fn finalize(self) -> Option<Vec<Vec<String>>> {
-        println!("End");
         Some(self.res)
     }
 }
 
 #[test]
-fn test_map() {
+fn test_ordered_map() {
     env_logger::init();
 
-    let mut p = parallel![
+    let mut p = parallel!(
         Source {
             streamlen: 100,
             counter: 0
         },
-        Map::build(6, |el: i32| -> String {
-            "Hello from: ".to_string() + &el.to_string()
-        }),
+        OrderedMap::build_with_replicas(
+            6,
+            |el: i32| -> String { "Hello from: ".to_string() + &el.to_string() },
+            6
+        ),
         Sink { res: Vec::new() }
-    ];
+    );
 
     p.start();
     let res = p.wait_and_collect().unwrap();
 
-    let mut check = true;
-    for sub_res in res {
-        for (i, str) in sub_res.into_iter().enumerate() {
-            if str != ("Hello from: ".to_string() + &i.to_string()) {
-                check = false;
-            }
+    assert_eq!(res.len(), 100);
+    (0..100).for_each(|i| {
+        assert_eq!(res[i].len(), 10000);
+        for j in 0..10000 {
+            assert_eq!(res[i][j], "Hello from: ".to_string() + &j.to_string());
         }
-    }
-    assert!(check)
+    });
 }
