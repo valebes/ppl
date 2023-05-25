@@ -338,17 +338,17 @@ More complex examples are available in *benches/*, *examples/*, and in *tests/*.
 
 The configuration of Parallelo Parallel Library (PPL) can be customized by setting environment variables. The following environment variables are available:
 
-- **PPL_MAX_CORES**: Specifies the maximum number of cores allowed. This configuration is only valid when pinning is active.
+- **PPL_MAX_CORES**: Specifies the maximum number of cores were pinning is allowed. This configuration is only valid when pinning is active.
 
-- **PPL_PINNING**: Enables or disables the pinning of partitions to the cores. By default, pinning is disabled (`false`).
+- **PPL_PINNING**: Enables or disables the threads pinning. By default, pinning is disabled (`false`).
 
 - **PPL_SCHEDULE**: Specifies the scheduling method used in the pipeline. The available options are:
-  - `static`: Static scheduling (default).
-  - `dynamic`: Dynamic scheduling.
+  - `static`: Static scheduling (Round-robin).
+  - `dynamic`: Dynamic scheduling (Work-stealing between replicas enabled).
 
-- **PPL_WAIT_POLICY**: Enables or disables the blocking channel. By default, the blocking channel is disabled (`false`).
+- **PPL_WAIT_POLICY**: If set to `true`, the threads will try to give up their time to other threads when waiting for a communication or unused. This is particularly useful when we are using SMT and can improve performances. If is set to `false`, the threads wil do busy waiting. By default, this option is set to `false`.
 
-- **PPL_THREAD_MAPPING**: Specifies the core mapping. By default, the threads are mapped in the order in which the cores are found.
+- **PPL_THREAD_MAPPING**: Specifies the cores mapping. By default, the threads are mapped in the order in which the cores are found.
 
 To customize the configuration, set the desired environment variables before running your Rust program that uses PPL. For example, you can set the environment variables in your shell script or use a tool like `env_file` to load them from a file.
 
@@ -364,10 +364,10 @@ Crossbeam is a highly performant channel implementation that provides efficient 
 
 The available channel implementations are:
 
-- **crossbeam**: Uses the crossbeam channel.
-- **flume**: Uses the flume channel.
-- **kanal**: Uses the kanal channel.
-- **ff**: Uses a channel based on fastflow spsc queues (**EXP**).
+- **crossbeam**: Uses the [Crossbeam](https://github.com/crossbeam-rs/crossbeam) channel.
+- **flume**: Uses the [Flume](https://github.com/zesterer/flume) channel.
+- **kanal**: Uses the [Kanal](https://github.com/fereidani/kanal) channel.
+- **ff**: Uses a channel based on [FastFlow](http://calvados.di.unipi.it/) queues (**Experimental**).
 
 To select a specific channel implementation, enable the corresponding feature flag during the build process. For example, to use the crossbeam channel implementation, add the following to your Cargo.toml file:
 
