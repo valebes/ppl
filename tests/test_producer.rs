@@ -2,8 +2,9 @@
   FlatMap example.
 */
 
-use pspp::prelude::*;
+use ppl::prelude::*;
 
+// Source
 struct Source {
     streamlen: usize,
     counter: usize,
@@ -19,6 +20,7 @@ impl Out<usize> for Source {
     }
 }
 
+// Given an input, it produces 5 copies of it.
 #[derive(Clone)]
 struct WorkerA {
     number_of_messages: usize,
@@ -29,6 +31,7 @@ impl InOut<usize, usize> for WorkerA {
         self.counter = 0;
         None
     }
+    // Here we write the rts of the producer.
     fn produce(&mut self) -> Option<usize> {
         if self.counter < self.number_of_messages {
             self.counter += 1;
@@ -37,6 +40,7 @@ impl InOut<usize, usize> for WorkerA {
             None
         }
     }
+    // Here we state that this stage is a producer.
     fn is_producer(&self) -> bool {
         true
     }
@@ -45,6 +49,7 @@ impl InOut<usize, usize> for WorkerA {
     }
 }
 
+// Sink
 struct Sink {
     counter: usize,
 }

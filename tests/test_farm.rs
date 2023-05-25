@@ -5,8 +5,9 @@
    Fibonacci number.
 */
 
-use pspp::prelude::*;
+use ppl::prelude::*;
 
+// Fibonacci function
 pub fn fibonacci_recursive(n: u64) -> u64 {
     match n {
         0 => panic!("zero is not a right argument to fibonacci_recursive()!"),
@@ -19,6 +20,8 @@ pub fn fibonacci_recursive(n: u64) -> u64 {
     }
 }
 
+// Source of the farm, it generates a sequence of i from 1 to 45.
+// When the stream equals to 0, the source returns None and the farm ends.
 struct Source {
     streamlen: usize,
 }
@@ -33,6 +36,7 @@ impl Out<u64> for Source {
     }
 }
 
+// Worker of the farm, it computes the i-th Fibonacci number.
 #[derive(Clone)]
 struct WorkerA {}
 impl InOut<u64, u64> for WorkerA {
@@ -44,6 +48,7 @@ impl InOut<u64, u64> for WorkerA {
     }
 }
 
+// Sink of the farm, it prints the i-th Fibonacci number.
 struct Sink {
     counter: usize,
 }

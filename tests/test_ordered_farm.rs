@@ -1,9 +1,10 @@
 /*
-  Farm of pipeline.
+  Ordered pipeline of farm.
 */
 
-use pspp::prelude::*;
+use ppl::prelude::*;
 
+// Source node.
 struct Source {
     streamlen: usize,
     counter: usize,
@@ -19,6 +20,7 @@ impl Out<usize> for Source {
     }
 }
 
+// Stage that return simply the i-th number received.
 #[derive(Clone)]
 struct WorkerA {}
 impl InOut<usize, usize> for WorkerA {
@@ -33,6 +35,8 @@ impl InOut<usize, usize> for WorkerA {
     }
 }
 
+// Filter stage that keeps only even numbers.
+// Here it is possible to use a OrderedFilter Template instead of this custom stage.
 #[derive(Clone)]
 struct WorkerB {}
 impl InOut<usize, usize> for WorkerB {
@@ -51,6 +55,7 @@ impl InOut<usize, usize> for WorkerB {
     }
 }
 
+// Stage that divide by 2 the input.
 #[derive(Clone)]
 struct WorkerC {}
 impl InOut<usize, usize> for WorkerC {
@@ -65,6 +70,7 @@ impl InOut<usize, usize> for WorkerC {
     }
 }
 
+// Sink of the pipeline, it checks if the input is ordered.
 struct Sink {
     counter: usize,
     check: bool,

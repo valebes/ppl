@@ -30,7 +30,7 @@ use super::Node;
 ///
 /// A node that receive an integer and increment it by one:
 /// ```
-/// use pspp::prelude::*;
+/// use ppl::prelude::*;
 /// #[derive(Clone)]
 /// struct Worker {}
 /// impl InOut<i32, i32> for Worker {

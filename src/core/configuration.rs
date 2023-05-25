@@ -6,11 +6,11 @@ use core_affinity::CoreId;
 /// 
 /// The configuration is set by the user through environment variables.
 /// The environment variables are:
-/// - PSPP_MAX_CORES: maximum number of cores allowed. Only valid when pinning is active.
-/// - PSPP_PINNING: enable pinning of the partitions to the cores. Default is false.
-/// - PSPP_SCHEDULING: scheduling method used in the pipeline. Default is static.
-/// - PSPP_BLOCKING_CHANNEL: enable blocking channel. Default is false.
-/// - PSPP_THREAD_MAPPING: core mapping. Default is the order in which the cores are found.
+/// - PPL_MAX_CORES: maximum number of cores allowed. Only valid when pinning is active.
+/// - PPL_PINNING: enable pinning of the partitions to the cores. Default is false.
+/// - PPL_SCHEDULE: scheduling method used in the pipeline. Default is static.
+/// - PPL_WAIT_POLICY: enable blocking channel. Default is false.
+/// - PPL_THREAD_MAPPING: core mapping. Default is the order in which the cores are found.
 pub struct Configuration {
     max_cores: usize,
     thread_mapping: Vec<CoreId>,
@@ -19,7 +19,7 @@ pub struct Configuration {
     blocking_channel: bool,
 }
 
-/// Parse the core mapping from the environment variable PSPP_THREAD_MAPPING.
+/// Parse the core mapping from the environment variable PPL_THREAD_MAPPING.
 /// The core mapping is a string of comma separated integers.
 /// Each integer represents a core. The order of the integers
 /// in the string is the order in which the cores are used.
@@ -31,7 +31,7 @@ pub struct Configuration {
 /// in the order in which they are found by the framework.
 fn parse_core_mapping() -> Vec<CoreId> {
     let mut thread_mapping = Vec::new();
-    match env::var("PSPP_THREAD_MAPPING") {
+    match env::var("PPL_THREAD_MAPPING") {
         Ok(val) => {
             let mapping: Vec<&str> = val.split(',').collect();
             (0..mapping.len()).for_each(|i| {
@@ -90,15 +90,15 @@ impl Configuration {
     /// - scheduling: static.
     /// - blocking_channel: false.
     pub fn new_default() -> Configuration {
-        let max_threads = match env::var("PSPP_MAX_CORES") {
+        let max_threads = match env::var("PPL_MAX_CORES") {
             Ok(val) => val.parse::<usize>().unwrap(),
             Err(_) => num_cpus::get(),
         };
-        let pinning = match env::var("PSPP_PINNING") {
+        let pinning = match env::var("PPL_PINNING") {
             Ok(val) => val.parse::<bool>().unwrap(),
             Err(_) => false,
         };
-        let scheduling = match env::var("PSPP_SCHEDULING") {
+        let scheduling = match env::var("PPL_SCHEDULE") {
             Ok(val) => {
                 if val == "static" {
                     false
@@ -110,7 +110,7 @@ impl Configuration {
             }
             Err(_) => false,
         };
-        let blocking_channel = match env::var("PSPP_BLOCKING_CHANNEL") {
+        let blocking_channel = match env::var("PPL_WAIT_POLICY") {
             Ok(val) => val.parse::<bool>().unwrap(),
             Err(_) => false,
         };
@@ -176,11 +176,11 @@ mod tests {
     use ::serial_test::serial;
 
     fn reset_env() {
-        env::remove_var("PSPP_MAX_CORES");
-        env::remove_var("PSPP_PINNING");
-        env::remove_var("PSPP_BLOCKING_CHANNEL");
-        env::remove_var("PSPP_THREAD_MAPPING");
-        env::remove_var("PSPP_SCHEDULING");
+        env::remove_var("PPL_MAX_CORES");
+        env::remove_var("PPL_PINNING");
+        env::remove_var("PPL_WAIT_POLICY");
+        env::remove_var("PPL_THREAD_MAPPING");
+        env::remove_var("PPL_SCHEDULE");
     }
 
     #[test]
@@ -195,10 +195,10 @@ mod tests {
     #[test]
     #[serial]
     fn test_configuration_with_env() {
-        env::set_var("PSPP_MAX_CORES", "4");
-        env::set_var("PSPP_PINNING", "true");
-        env::set_var("PSPP_BLOCKING_CHANNEL", "true");
-        env::set_var("PSPP_SCHEDULING", "dynamic");
+        env::set_var("PPL_MAX_CORES", "4");
+        env::set_var("PPL_PINNING", "true");
+        env::set_var("PPL_WAIT_POLICY", "true");
+        env::set_var("PPL_SCHEDULE", "dynamic");
 
         let conf = Configuration::new_default();
         assert_eq!(conf.max_cores, 4);

@@ -1,11 +1,11 @@
 /*
    Fibonacci pipeline.
-   Is generated a sequence of i from 1 to 45.
+   Is generated a sequence of i from 1 to 20.
    Each worker of the farm compute the i-th
    Fibonacci number.
 */
 
-use pspp::{prelude::*, collections::misc::{SourceIter, Sequential, SinkVec}};
+use ppl::{prelude::*, collections::misc::{SourceIter, Sequential, SinkVec}};
 
 struct Source {
     streamlen: usize,

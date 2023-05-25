@@ -1,7 +1,11 @@
-/*  An ordered pipeline with a map */
+/*  
+    An ordered pipeline with a map 
+    It is similar to tests/test_map.rs, but it uses an ordered map.
+*/
 
-use pspp::{collections::map::OrderedMap, prelude::*};
+use ppl::{collections::map::OrderedMap, prelude::*};
 
+// Source node.
 struct Source {
     streamlen: usize,
     counter: usize,
@@ -17,6 +21,7 @@ impl Out<Vec<i32>> for Source {
     }
 }
 
+// Sink node.
 struct Sink {
     res: Vec<Vec<String>>,
 }
@@ -39,6 +44,7 @@ fn test_ordered_map() {
             streamlen: 100,
             counter: 0
         },
+        // Create an OrderedMap node with the build_with_replicas method.
         OrderedMap::build_with_replicas(
             6,
             |el: i32| -> String { "Hello from: ".to_string() + &el.to_string() },

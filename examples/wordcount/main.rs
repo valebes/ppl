@@ -1,5 +1,5 @@
 use std::env;
-mod pspp;
+mod ppl;
 
 // Take a function and calculate its execution time
 fn timeit<F>(f: F)
@@ -34,11 +34,11 @@ fn main() {
         //"rust-ssp" => rust_ssp::rust_ssp(dir_name, threads),
         //"rayon" => rayon::rayon(dir_name, threads),
         //"std-threads" => std_threads::std_threads(dir_name, threads),
-        "pspp" => {
-            timeit(|| pspp::pspp(dataset, threads));
-            timeit(|| pspp::pspp_combined_map_reduce(dataset, threads));
-            timeit(|| pspp::pspp_map(dataset, threads));
+        "ppl" => {
+            timeit(|| ppl::ppl(dataset, threads));
+            timeit(|| ppl::ppl_combined_map_reduce(dataset, threads));
+            timeit(|| ppl::ppl_map(dataset, threads));
         }
-        _ => println!("Invalid run_mode, use: sequential | rust-ssp | std-threads | rayon | pspp "),
+        _ => println!("Invalid run_mode, use: ppl "),
     }
 }

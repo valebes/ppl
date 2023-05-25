@@ -1,12 +1,14 @@
 /*
-   Fibonacci farm
-   Is generated a sequence of i from 1 to 45.
-   Each worker of the farm compute the i-th
-   Fibonacci number.
+    A pipeline of farm.
+    There are generated multiple sequence of i from 1 to 20.
+    The first stage is a farm that return simply the i-th number received.
+    The second stage is a farm that compute the i-th Fibonacci number.
+    The third stage is a farm that subtract 1 to the i-th Fibonacci number.
 */
 
-use pspp::prelude::*;
+use ppl::prelude::*;
 
+// Fibonacci function
 pub fn fibonacci_recursive(n: u64) -> u64 {
     match n {
         0 => panic!("zero is not a right argument to fibonacci_recursive()!"),
@@ -18,6 +20,8 @@ pub fn fibonacci_recursive(n: u64) -> u64 {
         _ => fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2),
     }
 }
+
+// Source of the farm, it generates multiple sequence of i from 1 to 20.
 struct Source {
     streamlen: usize,
 }
@@ -32,6 +36,7 @@ impl Out<u64> for Source {
     }
 }
 
+// Stage that return simply the i-th number received.
 #[derive(Clone)]
 struct WorkerA {}
 impl InOut<u64, u64> for WorkerA {
@@ -43,6 +48,7 @@ impl InOut<u64, u64> for WorkerA {
     }
 }
 
+// Stage that computes the i-th Fibonacci number.
 #[derive(Clone)]
 struct WorkerB {}
 impl InOut<u64, u64> for WorkerB {
@@ -54,6 +60,7 @@ impl InOut<u64, u64> for WorkerB {
     }
 }
 
+// Stage that subtract 1 to the i-th Fibonacci number.
 #[derive(Clone)]
 struct WorkerC {}
 impl InOut<u64, u64> for WorkerC {
@@ -65,6 +72,7 @@ impl InOut<u64, u64> for WorkerC {
     }
 }
 
+// Sink of the farm, it prints the i-th Fibonacci number.
 struct Sink {
     counter: usize,
 }
@@ -84,6 +92,7 @@ impl In<u64, usize> for Sink {
 fn test_long_farm() {
     env_logger::init();
 
+    // Create a pipeline of farm.
     let mut p = parallel!(
         Source { streamlen: 500000 },
         WorkerA {},

@@ -243,7 +243,7 @@ impl ThreadPool {
         let mut start = range.start;
         let mut end = start + chunk_size;
 
-        self.scoped(|s| {
+        self.scope(|s| {
             while start < range.end {
                 if end > range.end {
                     end = range.end;
@@ -269,7 +269,7 @@ impl ThreadPool {
     /// Increment of 1 all the elements in a vector concurrently:
     ///
     /// ```
-    /// use pspp::thread_pool::ThreadPool;
+    /// use ppl::thread_pool::ThreadPool;
     ///
     /// let mut pool = ThreadPool::new_with_global_registry(8);
     /// let mut vec = vec![0; 100];
@@ -282,7 +282,7 @@ impl ThreadPool {
         <Iter as IntoIterator>::Item: Send,
         Iter: IntoIterator,
     {
-        self.scoped(|s| {
+        self.scope(|s| {
             iter.into_iter().for_each(|el| s.execute(move || (f)(el)));
         });
     }
@@ -295,7 +295,7 @@ impl ThreadPool {
     /// Produce a vec of `String` from the elements of a vector `vec` concurrently:
     ///
     /// ```
-    /// use pspp::thread_pool::ThreadPool;
+    /// use ppl::thread_pool::ThreadPool;
     ///
     /// let mut pool = ThreadPool::new_with_global_registry(8);
     /// let mut vec = vec![0i32; 100];
@@ -317,7 +317,7 @@ impl ThreadPool {
         let arc_tx = Arc::new(tx);
         let mut ordered_map = BTreeMap::<usize, R>::new();
 
-        self.scoped(|s| {
+        self.scope(|s| {
             iter.into_iter().enumerate().for_each(|el| {
                 let cp = Arc::clone(&arc_tx);
                 s.execute(move || {
@@ -363,6 +363,26 @@ impl ThreadPool {
     /// is the key and the second one is the value.
     /// This method return an iterator of tuples of two elements, the first one
     /// is the key and the second one is the value.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use ppl::thread_pool::ThreadPool;
+    ///     
+    /// let mut pool = ThreadPool::new_with_global_registry(8);
+    /// let mut vec = Vec::new();
+    /// 
+    /// for i in 0..100 {
+    ///    vec.push(i);
+    /// }
+    /// 
+    /// let res: Vec<(i32, i32)> = pool.par_map_reduce(&mut vec, |el| -> (i32, i32) {
+    ///           (*el % 10, *el)
+    ///      }, |k, v| -> (i32, i32) {
+    ///          (k, v.iter().sum())
+    ///     }).collect();
+    /// assert_eq!(res.len(), 10);
+    /// ```
     pub fn par_map_reduce<Iter, F, K, V, R, Reduce>(
         &mut self,
         iter: Iter,
@@ -389,6 +409,27 @@ impl ThreadPool {
     /// is the key and the second one is the value.
     /// This method take in input an iterator, it groups the elements by key and then
     /// reduces them by the function `f`.
+    /// This method return an iterator of tuples of two elements, the first one
+    /// is the key and the second one is the value obtained by the function `f`.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use ppl::thread_pool::ThreadPool;
+    /// 
+    /// let mut pool = ThreadPool::new_with_global_registry(8);
+    /// 
+    /// let mut vec = Vec::new();
+    /// 
+    /// for i in 0..100 {
+    ///   vec.push((i % 10, i));
+    /// }
+    /// 
+    /// let res: Vec<(i32, i32)> = pool.par_reduce(vec, |k, v| -> (i32, i32) {
+    ///          (k, v.iter().sum())
+    ///    }).collect();
+    /// assert_eq!(res.len(), 10);
+    /// ```
     pub fn par_reduce<Iter, K, V, R, F>(&mut self, iter: Iter, f: F) -> impl Iterator<Item = (K, R)>
     where
         <Iter as IntoIterator>::Item: Send,
@@ -412,7 +453,26 @@ impl ThreadPool {
     /// which can be used to spawn new jobs through the [`Scope::execute`] method.
     /// The scope will block the current thread until all jobs spawned from this scope
     /// have completed.
-    pub fn scoped<'pool, 'scope, F, R>(&'pool mut self, f: F) -> R
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use ppl::thread_pool::ThreadPool;
+    /// 
+    /// let mut pool = ThreadPool::new_with_global_registry(8);
+    /// 
+    /// let mut vec = vec![0; 100];
+    /// 
+    /// pool.scope(|scope| {
+    ///    for el in &mut vec {
+    ///       scope.execute(move || {
+    ///          *el += 1;
+    ///      });
+    ///   }
+    /// });
+    /// 
+    /// assert_eq!(vec.iter().sum::<i32>(), 100);
+    pub fn scope<'pool, 'scope, F, R>(&'pool mut self, f: F) -> R
     where
         F: FnOnce(&Scope<'pool, 'scope>) -> R,
     {

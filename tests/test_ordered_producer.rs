@@ -1,10 +1,10 @@
 /*
   Ordered FlatMap example.
 */
-// With the produce method we can create nodes that produce new messages for each input message received.
 
-use pspp::prelude::*;
+use ppl::prelude::*;
 
+// Source produces strings.
 struct Source {
     strings: Vec<String>,
 }
@@ -18,6 +18,7 @@ impl Out<String> for Source {
     }
 }
 
+// Stage that produces 5 replicas of each input.
 #[derive(Clone)]
 struct WorkerA {
     number_of_messages: usize,
@@ -30,6 +31,8 @@ impl InOut<String, String> for WorkerA {
         }
         None
     }
+    // This stage is a producer.
+    // In this method we produce the messages that will be sent to the next stage.
     fn produce(&mut self) -> Option<String> {
         if !self.queue.is_empty() {
             Some(self.queue.pop().unwrap())
@@ -37,6 +40,9 @@ impl InOut<String, String> for WorkerA {
             None
         }
     }
+    // This stage is a producer.
+    // Here we specify that, after run the run method, 
+    // the framework must also call the produce method.
     fn is_producer(&self) -> bool {
         true
     }
@@ -48,6 +54,7 @@ impl InOut<String, String> for WorkerA {
     }
 }
 
+// Sink receives strings.
 struct Sink {
     queue: Vec<String>,
 }

@@ -5,7 +5,7 @@ use std::{
     usize,
 };
 
-use pspp::{
+use ppl::{
     collections::map::{Map, MapReduce, Reduce},
     prelude::*,
 };
@@ -56,7 +56,7 @@ impl In<Vec<(String, usize)>, Vec<(String, usize)>> for Sink {
     }
 }
 
-pub fn pspp(dataset: &str, threads: usize) {
+pub fn ppl(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
     let reader = BufReader::new(file);
 
@@ -88,7 +88,7 @@ pub fn pspp(dataset: &str, threads: usize) {
 }
 
 // Version that use a node that combine map and reduce
-pub fn pspp_combined_map_reduce(dataset: &str, threads: usize) {
+pub fn ppl_combined_map_reduce(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
     let reader = BufReader::new(file);
 
@@ -124,7 +124,7 @@ pub fn pspp_combined_map_reduce(dataset: &str, threads: usize) {
     );
 }
 // Version that use par_map_reduce instead of the pipeline
-pub fn pspp_map(dataset: &str, threads: usize) {
+pub fn ppl_map(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
     let reader = BufReader::new(file);
 

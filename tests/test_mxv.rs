@@ -1,12 +1,12 @@
-use pspp::prelude::*;
-
 /**
     Matrix * Vector multiplication
     A: n*n matrix
     b: n vector
 */
+use ppl::prelude::*;
 use rand::Rng;
 
+// Taken a matrix, this source emit a row of the matrix at a time.
 struct Source {
     matrix: Vec<Vec<i64>>,
 }
@@ -19,6 +19,7 @@ impl Out<Vec<i64>> for Source {
     }
 }
 
+// Given a vector, this stage multiply it by the vector stored in its state.
 #[derive(Clone)]
 struct Multiplication {
     vec: Vec<i64>,
@@ -27,6 +28,7 @@ impl InOut<Vec<i64>, i64> for Multiplication {
     fn run(&mut self, input: Vec<i64>) -> Option<i64> {
         Some(mult(input, &self.vec))
     }
+    // This stage is ordered because the multiplication is done in order.
     fn is_ordered(&self) -> bool {
         true
     }
@@ -35,6 +37,8 @@ impl InOut<Vec<i64>, i64> for Multiplication {
     }
 }
 
+// This sink collect the results of the multiplication.
+// It is possible to use a SinkVec instead of this custom sink.
 struct Sink {
     res: Vec<i64>,
 }

@@ -137,8 +137,8 @@ macro_rules! propagate {
 /// # Example
 /// 
 /// ```
-/// use pspp::prelude::*;
-/// use pspp::collections::misc::*;
+/// use ppl::prelude::*;
+/// use ppl::collections::misc::*;
 /// 
 /// let mut pipeline = parallel![
 ///      SourceIter::build(0..10),

@@ -2,8 +2,9 @@
     Pipeline with a filter node.
 */
 
-use pspp::{prelude::*, collections::misc::{Filter, SinkVec}};
+use ppl::{prelude::*, collections::misc::{Filter, SinkVec}};
 
+// Source node.
 struct Source {
     streamlen: usize,
     counter: usize,
@@ -19,6 +20,7 @@ impl Out<usize> for Source {
     }
 }
 
+// Filter function.
 fn is_even(input: &usize) -> bool {
     input % 2 == 0
 }
@@ -32,10 +34,14 @@ fn test_filter() {
             streamlen: 100,
             counter: 0
         },
+        // We can create a filter node with the filter template.
         Filter::build(|el: &usize| -> bool { is_even(el) }),
+        // Also here we can use templates. In this case we use the SinkVec template.
         SinkVec::build()
     ];
+    // Start the pipeline.
     p.start();
+    // Wait for the pipeline to finish and collect the results.
     let res = p.wait_and_collect().unwrap();
     assert_eq!(res.len(), 50);
 }

@@ -1,9 +1,9 @@
-use pspp::core::orchestrator::Orchestrator;
-use pspp::thread_pool::ThreadPool;
+use ppl::core::orchestrator::Orchestrator;
+use ppl::thread_pool::ThreadPool;
 use raster::filter;
 use raster::Image;
 
-pub fn pspp_map(images: Vec<Image>, threads: usize) {
+pub fn ppl_map(images: Vec<Image>, threads: usize) {
     let mut pool = ThreadPool::new_with_global_registry(threads * 5);
 
     let _res: Vec<Image> = pool
