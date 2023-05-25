@@ -204,6 +204,8 @@ impl ThreadPool {
         }
     }
 
+    /// Create a new thread pool with `num_threads` threads.
+    /// The thread pool will use the global orchestrator.
     pub fn new_with_global_registry(num_threads: usize) -> Self {
         let orchestrator = get_global_orchestrator();
         Self::new(num_threads, orchestrator)
