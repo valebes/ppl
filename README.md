@@ -10,6 +10,21 @@
 
 PPL empowers your Rust programs by unlocking the immense potential of parallelism, making your computations faster and more efficient. Whether you're working on large-scale data processing, simulations, or any computationally intensive task, PPL has got you covered.
 
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [A Simple (but Long) Example](#a-simple-but-long-example)
+- [Configuration](#configuration)
+- [Channel Implementation](#channel-implementation)
+- [Contributing](#contributing)
+  - [Code of Conduct](#code-of-conduct)
+  - [How to Contribute](#how-to-contribute)
+  - [Reporting Issues](#reporting-issues)
+- [License](#license)
+
+
 ## Features
 
 - **Parallel Computing**: Unlock the power of parallelism in Rust with the Parallelo Parallel Library (PPL). Harness the potential of multiple cores to make your computations faster and more efficient.
@@ -58,7 +73,7 @@ fn main() {
 }
 ```
 
-In this example We're building a simple pipelin, so why not use clousure instead than the library templates?
+In this example We're building a simple pipeline, so why not use clousure instead than the library templates?
 ```rust
 use ppl::prelude::*;
     let mut p = parallel![
