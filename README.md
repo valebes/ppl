@@ -88,7 +88,7 @@ use ppl::prelude::*;
                 }
             }
         },
-        |input| Some(fibonacci_recursive(input)),
+        |input| Some(fib(input)),
         {
             move |input| {
                 println!("{}", input);
