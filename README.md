@@ -15,7 +15,8 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 - [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
-  - [A Simple (but Long) Example](#a-simple-but-long-example)
+  - [A Simple (but Long) Example: Fibonacci pipeline](#a-simple-but-long-example-fibonacci-pipeline)
+  - [A More Complex Example: Word Counter](#a-more-complex-example-word-counter)
 - [Configuration](#configuration)
 - [Channel Implementation](#channel-implementation)
 - [Contributing](#contributing)
@@ -48,7 +49,7 @@ $ git clone https://github.com/valebes/ppl.git
 ```
 
 ## Usage
-### A simple (but long) example
+### A simple (but long) example: Fibonacci pipeline
 Here a simple example that show how create a pipeline that computes the first 20 numbers of Fibonacci.
 
 This pipeline is composed by:
@@ -201,6 +202,133 @@ fn main() {
         });
     }
     tp.wait(); // Wait till al worker have finished
+}
+```
+### A more complex example: Word Counter
+
+To demonstrate the capabilities of Parallelo Parallel Library (PPL), let's consider a common problem: counting the occurrences of words in a text dataset. This example showcases how PPL can significantly speed up computations by leveraging parallelism.
+
+#### Problem
+
+The task is to count the occurrences of each word in a given text dataset. This involves reading the dataset, splitting it into individual words, normalizing the words (e.g., converting to lowercase and removing non-alphabetic characters), and finally, counting the occurrences of each word.
+
+#### Approach 1: Pipeline
+
+The pipeline approach in PPL provides an intuitive and flexible way to express complex parallel computations. In this approach, we construct a pipeline consisting of multiple stages, each performing a specific operation on the data. The data flows through the stages, with parallelism automatically applied at each stage.
+
+In the word counter example, the pipeline involves the following stages:
+- **Source**: Reads the dataset and emits lines of text.
+- **Map**: Converts each line of text into a list of words, where each word is paired with a count of 1.
+- **Reduce**: Aggregates the counts of words by summing them for each unique word.
+- **Sink**: Stores the final word counts in a hashmap.
+
+By breaking down the computation into stages and leveraging parallelism, PPL's pipeline approach allows for efficient distribution of work across multiple threads or cores, leading to faster execution.
+
+Here's the Rust code for the word counter using the pipeline approach:
+
+```rust
+use ppl::{
+    collections::map::{Map, MapReduce, Reduce},
+    prelude::*,
+};
+
+struct Source {
+    reader: BufReader<File>,
+}
+
+impl Out<Vec<String>> for Source {
+    // Implementation details...
+}
+
+struct Sink {
+    counter: HashMap<String, usize>,
+}
+impl In<Vec<(String, usize)>, Vec<(String, usize)>> for Sink {
+    fn run(&mut self, input: Vec<(String, usize)>) {
+        // Increment value for key in hashmap
+        // If key does not exist, insert it with value 1
+        for (key, value) in input {
+            let counter = self.counter.entry(key).or_insert(0);
+            *counter += value;
+        }
+    }
+    fn finalize(self) -> Option<Vec<(String, usize)>> {
+        Some(self.counter.into_iter().collect())
+    }
+}
+
+pub fn ppl(dataset: &str, threads: usize) {
+    // Initialization and configuration...
+
+    let mut p = parallel![
+        Source { reader },
+        Map::build::<Vec<String>, Vec<(String, usize)>>(threads / 2, |str| -> (String, usize) {
+            (str, 1)
+        }),
+        Reduce::build(threads / 2, |str, count| {
+            let mut sum = 0;
+            for c in count {
+                sum += c;
+            }
+            (str, sum)
+        }),
+        Sink {
+            counter: HashMap::new(),
+        },
+    ];
+
+    p.start();
+    let res = p.wait_and_collect();
+}
+```
+#### Approach 2: Thread Pool
+
+Alternatively, PPL also provides a thread pool for parallel computations. In this approach, we utilize the `par_map_reduce` function of the thread pool to perform the word counting task.
+
+The thread pool approach in PPL involves the following steps:
+- Create a thread pool with the desired number of threads.
+- Read the dataset and collect all the lines into a vector.
+- Use the `par_map_reduce` function to parallelize the mapping and reducing operations on the vector of words.
+- The mapping operation converts each word into a tuple with a count of 1.
+- The reducing operation aggregates the counts of words by summing them for each unique word.
+
+Using the thread pool, PPL efficiently distributes the work across the available threads, automatically managing the parallel execution and resource allocation.
+
+```rust
+use ppl::prelude::*;
+
+pub fn ppl_map(dataset: &str, threads: usize) {
+    // Initialization and configuration...
+
+    let file = File::open(dataset).expect("no such file");
+    let reader = BufReader::new(file);
+
+    let mut tp = ThreadPool::new_with_global_registry(threads);
+
+    let mut words = Vec::new();
+
+    reader.lines().map(|s| s.unwrap()).for_each(|s| words.push(s));
+
+    let res = tp.par_map_reduce(
+        words
+            .iter()
+            .flat_map(|s| s.split_whitespace())
+            .map(|s| {
+                s.to_lowercase()
+                    .chars()
+                    .filter(|c| c.is_alphabetic())
+                    .collect::<String>()
+            })
+            .collect::<Vec<String>>(),
+        |str| -> (String, usize) { (str, 1) },
+        |str, count| {
+            let mut sum = 0;
+            for c in count {
+                sum += c;
+            }
+            (str, sum)
+        },
+    );
 }
 ```
 
