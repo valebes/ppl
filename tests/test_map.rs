@@ -1,6 +1,6 @@
 /*
-    Pipeline with a Map node.
- */
+   Pipeline with a Map node.
+*/
 
 use ppl::{collections::map::Map, prelude::*};
 

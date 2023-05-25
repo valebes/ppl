@@ -38,7 +38,7 @@ impl InOut<Vec<i64>, i64> for Multiplication {
 }
 
 // This sink collect the results of the multiplication.
-// It is possible to use a SinkVec instead of this custom sink.
+// It is possible to use an OrderedSinkVec instead of this custom sink.
 struct Sink {
     res: Vec<i64>,
 }

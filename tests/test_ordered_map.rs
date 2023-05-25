@@ -1,5 +1,5 @@
-/*  
-    An ordered pipeline with a map 
+/*
+    An ordered pipeline with a map
     It is similar to tests/test_map.rs, but it uses an ordered map.
 */
 

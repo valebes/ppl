@@ -1,5 +1,5 @@
 //! Work-stealing based thread pool.
-//! 
+//!
 //! This module contains the implementation of a work-stealing based thread pool.
 //! This implementation of the thread pool supports scoped jobs.
 //! This module offers struct as [`ThreadPool`] that allows to create a thread pool.
@@ -365,19 +365,19 @@ impl ThreadPool {
     /// is the key and the second one is the value.
     /// This method return an iterator of tuples of two elements, the first one
     /// is the key and the second one is the value.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use ppl::thread_pool::ThreadPool;
     ///     
     /// let mut pool = ThreadPool::new_with_global_registry(8);
     /// let mut vec = Vec::new();
-    /// 
+    ///
     /// for i in 0..100 {
     ///    vec.push(i);
     /// }
-    /// 
+    ///
     /// let res: Vec<(i32, i32)> = pool.par_map_reduce(&mut vec, |el| -> (i32, i32) {
     ///           (*el % 10, *el)
     ///      }, |k, v| -> (i32, i32) {
@@ -413,20 +413,20 @@ impl ThreadPool {
     /// reduces them by the function `f`.
     /// This method return an iterator of tuples of two elements, the first one
     /// is the key and the second one is the value obtained by the function `f`.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use ppl::thread_pool::ThreadPool;
-    /// 
+    ///
     /// let mut pool = ThreadPool::new_with_global_registry(8);
-    /// 
+    ///
     /// let mut vec = Vec::new();
-    /// 
+    ///
     /// for i in 0..100 {
     ///   vec.push((i % 10, i));
     /// }
-    /// 
+    ///
     /// let res: Vec<(i32, i32)> = pool.par_reduce(vec, |k, v| -> (i32, i32) {
     ///          (k, v.iter().sum())
     ///    }).collect();
@@ -455,16 +455,16 @@ impl ThreadPool {
     /// which can be used to spawn new jobs through the [`Scope::execute`] method.
     /// The scope will block the current thread until all jobs spawned from this scope
     /// have completed.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use ppl::thread_pool::ThreadPool;
-    /// 
+    ///
     /// let mut pool = ThreadPool::new_with_global_registry(8);
-    /// 
+    ///
     /// let mut vec = vec![0; 100];
-    /// 
+    ///
     /// pool.scope(|scope| {
     ///    for el in &mut vec {
     ///       scope.execute(move || {
@@ -472,7 +472,7 @@ impl ThreadPool {
     ///      });
     ///   }
     /// });
-    /// 
+    ///
     /// assert_eq!(vec.iter().sum::<i32>(), 100);
     pub fn scope<'pool, 'scope, F, R>(&'pool mut self, f: F) -> R
     where

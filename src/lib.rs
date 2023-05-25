@@ -7,10 +7,10 @@
 #![feature(once_cell)]
 #![feature(let_chains)]
 
+pub mod collections;
 pub mod core;
 pub mod mpsc;
 pub mod pipeline;
-pub mod collections;
 mod task;
 pub mod thread_pool;
 

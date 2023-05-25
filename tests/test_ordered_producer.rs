@@ -41,7 +41,7 @@ impl InOut<String, String> for WorkerA {
         }
     }
     // This stage is a producer.
-    // Here we specify that, after run the run method, 
+    // Here we specify that, after run the run method,
     // the framework must also call the produce method.
     fn is_producer(&self) -> bool {
         true

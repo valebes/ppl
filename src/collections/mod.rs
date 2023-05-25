@@ -1,5 +1,5 @@
 //! Collection of templates that can be used to create a pipeline.
-//! 
+//!
 //! This module contains a collection of templates that can be used to create a pipeline.
 //! These templates provide a more high level interface, offering a more simple way to
 //! create a pipeline.

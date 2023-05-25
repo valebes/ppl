@@ -5,27 +5,27 @@
    Fibonacci number.
 */
 
-use ppl::{prelude::*, collections::misc::{SourceIter, Sequential, SinkVec}};
+use ppl::{
+    collections::misc::{Sequential, SinkVec, SourceIter},
+    prelude::*,
+};
 
 struct Source {
     streamlen: usize,
     counter: usize,
 }
-impl Out<i32> for Source {
-    fn run(&mut self) -> Option<i32> {
+impl Out<usize> for Source {
+    fn run(&mut self) -> Option<usize> {
         if self.counter < self.streamlen {
             self.counter += 1;
-            Some((self.counter).try_into().unwrap())
+            Some(self.counter)
         } else {
             None
         }
     }
 }
 
-pub fn fibonacci_recursive(n: i32) -> u64 {
-    if n < 0 {
-        panic!("{} is negative!", n);
-    }
+pub fn fibonacci_recursive(n: usize) -> usize {
     match n {
         0 => panic!("zero is not a right argument to fibonacci_reccursive()!"),
         1 | 2 => 1,
@@ -39,8 +39,8 @@ pub fn fibonacci_recursive(n: i32) -> u64 {
 
 #[derive(Clone)]
 struct Worker {}
-impl InOut<i32, u64> for Worker {
-    fn run(&mut self, input: i32) -> Option<u64> {
+impl InOut<usize, usize> for Worker {
+    fn run(&mut self, input: usize) -> Option<usize> {
         Some(fibonacci_recursive(input))
     }
 }
@@ -48,8 +48,8 @@ impl InOut<i32, u64> for Worker {
 struct Sink {
     counter: usize,
 }
-impl In<u64, usize> for Sink {
-    fn run(&mut self, input: u64) {
+impl In<usize, usize> for Sink {
+    fn run(&mut self, input: usize) {
         println!("{}", input);
         self.counter += 1;
     }
@@ -64,6 +64,7 @@ impl In<u64, usize> for Sink {
 fn fibonacci_pipe() {
     env_logger::init();
 
+    // Fibonacci pipeline by using custom structs
     let mut p = parallel![
         Source {
             streamlen: 20,
@@ -77,17 +78,36 @@ fn fibonacci_pipe() {
     let res = p.wait_and_collect();
     assert_eq!(res.unwrap(), 20);
 
-
-    // Another way to write the same pipeline
+    // Another way to write the same pipeline, but here using templates instead
     let mut p = parallel![
         SourceIter::build(1..21),
         Sequential::build(fibonacci_recursive),
         SinkVec::build()
     ];
     p.start();
-    let res = p.wait_and_collect()
-        .unwrap().len();
+    let res = p.wait_and_collect().unwrap().len();
     assert_eq!(res, 20);
-        
 
+    // Also here another way to write the same pipeline, but here we use closures
+    let mut p = parallel![
+        {
+            let mut counter = 0;
+            move || {
+                if counter < 20 {
+                    counter += 1;
+                    Some(counter)
+                } else {
+                    None
+                }
+            }
+        },
+        |input| Some(fibonacci_recursive(input)),
+        {
+            move |input| {
+                println!("{}", input);
+            }
+        }
+    ];
+    p.start();
+    p.wait_and_collect();
 }

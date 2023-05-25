@@ -1,7 +1,11 @@
 [package]
 edition = "2021"
 name = "ppl"
+description = "Parallel programming library"
 version = "0.1.0"
+authors = ["Valerio Besozzi"]
+license = "MIT OR Apache-2.0"
+
 
 [features]
 default = ["crossbeam"]

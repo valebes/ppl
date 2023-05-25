@@ -2,7 +2,10 @@
     Pipeline with a filter node.
 */
 
-use ppl::{prelude::*, collections::misc::{Filter, SinkVec}};
+use ppl::{
+    collections::misc::{Filter, SinkVec},
+    prelude::*,
+};
 
 // Source node.
 struct Source {

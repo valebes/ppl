@@ -84,7 +84,7 @@ where
 }
 
 /// Ordered Map
-/// 
+///
 /// In this Map, the elements are processed in the same order as they are received.
 #[derive(Clone)]
 pub struct OrderedMap<TIn, TOut, F>
@@ -167,7 +167,7 @@ where
 }
 
 /// Reduce
-/// 
+///
 /// In this Reduce, the elements are grouped by key and then reduced.
 #[derive(Clone)]
 pub struct Reduce<TIn, TKey, TReduce, F>
@@ -186,8 +186,8 @@ impl<TIn, TKey, TReduce, F> Reduce<TIn, TKey, TReduce, F>
 where
     TIn: Send + Clone + 'static,
     TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static ,
-    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy ,
+    TReduce: Send + Clone + 'static,
+    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
 {
     /// Create a new Reduce node.
     /// # Arguments
@@ -251,7 +251,7 @@ where
 }
 
 /// Ordered Reduce
-/// 
+///
 /// In this Reduce, the elements are processed in the same order as they are received.
 /// The order of the output is the same as the order of the input.
 #[derive(Clone)]
@@ -271,7 +271,7 @@ impl<TIn, TKey, TReduce, F> OrderedReduce<TIn, TKey, TReduce, F>
 where
     TIn: Send + Clone + 'static,
     TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static ,
+    TReduce: Send + Clone + 'static,
     F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
 {
     /// Create a new OrderedReduce node.
@@ -339,7 +339,7 @@ where
 }
 
 /// Map Reduce
-/// 
+///
 /// Nodes of this type are composed of a Map and a Reduce.
 /// The Map is applied to each element of the input, and the Reduce is applied to the output of the Map.
 #[derive(Clone)]
@@ -426,7 +426,7 @@ where
     TMapOut: Send + Clone + 'static,
     TInIter: IntoIterator<Item = TIn>,
     TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static ,
+    TReduce: Send + Clone + 'static,
     TOutIter: FromIterator<(TKey, TReduce)>,
     FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
     FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
@@ -444,7 +444,7 @@ where
 }
 
 /// Ordered Map Reduce
-/// 
+///
 /// Nodes of this type are composed of a Map and a Reduce.
 /// The Map is applied to each element of the input, and the Reduce is applied to the output of the Map.
 /// The order of the input is preserved in the output.
@@ -472,7 +472,7 @@ where
     TIn: Send + Clone + 'static,
     TMapOut: Send + Clone + 'static,
     TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static ,
+    TReduce: Send + Clone + 'static,
     FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
     FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
 {
