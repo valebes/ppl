@@ -76,6 +76,8 @@ fn main() {
 In this example We're building a simple pipeline, so why not use clousure instead than the library templates?
 ```rust
 use ppl::prelude::*;
+
+fn main() {
     let mut p = parallel![
         {
             let mut counter = 0;
@@ -97,6 +99,7 @@ use ppl::prelude::*;
     ];
     p.start();
     p.wait_and_collect();
+}
 ```
 
 If We want to parallelize the computation We must find a part of this algorithm that can be parallelized.
