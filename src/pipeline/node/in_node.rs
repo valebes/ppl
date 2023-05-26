@@ -165,7 +165,7 @@ where
         trace!("Created a new Sink! Id: {}", id);
 
         let (channel_in, channel_out) =
-            Channel::channel(orchestrator.get_configuration().get_blocking_channel());
+            Channel::channel(orchestrator.get_configuration().get_wait_policy());
         let result = Arc::new(Mutex::new(None));
         let ordered = handler.is_ordered();
 

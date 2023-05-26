@@ -199,7 +199,7 @@ impl Partition {
     fn new(core_id: usize, configuration: Arc<Configuration>) -> Partition {
         let global = Arc::new(Injector::new());
         let workers = Vec::new();
-        let core_id = configuration.get_thread_mapping()[core_id];
+        let core_id = configuration.get_threads_mapping()[core_id];
         Partition {
             core_id,
             workers: Mutex::new(workers),

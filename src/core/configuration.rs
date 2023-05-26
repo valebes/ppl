@@ -6,32 +6,32 @@ use core_affinity::CoreId;
 ///
 /// The configuration is set by the user through environment variables.
 /// The environment variables are:
-/// - PPL_MAX_CORES: maximum number of cores allowed. Only valid when pinning is active.
-/// - PPL_PINNING: enable pinning of the partitions to the cores. Default is false.
-/// - PPL_SCHEDULE: scheduling method used in the pipeline. Default is static.
-/// - PPL_WAIT_POLICY: enable blocking channel. Default is false.
-/// - PPL_THREAD_MAPPING: core mapping. Default is the order in which the cores are found.
+/// - PPL_MAX_CORES: Maximum number of cores were pinning is allowed. Only valid when pinning is active.
+/// - PPL_PINNING: Enable threads pinning. Default is false.
+/// - PPL_SCHEDULE: Scheduling method used in the pipeline. Default is static.
+/// - PPL_WAIT_POLICY: Enable blocking in threads communications. Default is false.
+/// - PPL_THREADS_MAPPING: Custom threads mapping to cores. Default is the order in which the cores are found.
 pub struct Configuration {
     max_cores: usize,
-    thread_mapping: Vec<CoreId>,
+    threads_mapping: Vec<CoreId>,
     pinning: bool,
     scheduling: bool,
-    blocking_channel: bool,
+    wait_policy: bool,
 }
 
-/// Parse the core mapping from the environment variable PPL_THREAD_MAPPING.
-/// The core mapping is a string of comma separated integers.
+/// Parse the threads mapping from the environment variable PPL_THREAD_MAPPING.
+/// The threads mapping is a string of comma separated integers.
 /// Each integer represents a core. The order of the integers
-/// in the string is the order in which the cores are used.
+/// in the string is the order in which the cores are used for pinning.
 /// For example, if the string is "0,1,2,3", the first core
 /// is used first, then the second core, and so on.
 ///
-/// If the environment variable is not set, the core mapping
+/// If the environment variable is not set, the threads mapping
 /// is set to the default mapping, i.e., the cores are used
 /// in the order in which they are found by the framework.
-fn parse_core_mapping() -> Vec<CoreId> {
+fn parse_threads_mapping() -> Vec<CoreId> {
     let mut thread_mapping = Vec::new();
-    match env::var("PPL_THREAD_MAPPING") {
+    match env::var("PPL_THREADS_MAPPING") {
         Ok(val) => {
             let mapping: Vec<&str> = val.split(',').collect();
             (0..mapping.len()).for_each(|i| {
@@ -47,16 +47,16 @@ fn parse_core_mapping() -> Vec<CoreId> {
 
     let core_ids = core_affinity::get_core_ids().unwrap();
 
-    let mut core_mapping = Vec::new();
+    let mut threads_mapping = Vec::new();
 
     for thread in thread_mapping {
         if thread >= core_ids.len() {
-            panic!("Error: The thread {} is not a valid core", thread);
+            panic!("Error: The thread mapping is invalid");
         }
-        core_mapping.push(core_ids[thread]);
+        threads_mapping.push(core_ids[thread]);
     }
 
-    core_mapping
+    threads_mapping
 }
 
 impl Configuration {
@@ -65,21 +65,21 @@ impl Configuration {
     /// - max_cores: maximum number of cores allowed. Only valid when pinning is active.
     /// - pinning: enable pinning of the partitions to the cores.
     /// - scheduling: scheduling method used in the pipeline.
-    /// - blocking_channel: enable blocking channel.
+    /// - wait_policy: enable blocking in channels.
     pub fn new(
         max_cores: usize,
         pinning: bool,
         scheduling: bool,
-        blocking_channel: bool,
+        wait_policy: bool,
     ) -> Configuration {
-        let thread_mapping = parse_core_mapping();
+        let threads_mapping = parse_threads_mapping();
 
         Configuration {
             max_cores,
-            thread_mapping,
+            threads_mapping,
             pinning,
             scheduling,
-            blocking_channel,
+            wait_policy,
         }
     }
 
@@ -88,7 +88,7 @@ impl Configuration {
     /// - max_cores: the number of cores found by the framework.
     /// - pinning: false.
     /// - scheduling: static.
-    /// - blocking_channel: false.
+    /// - wait_policy: false.
     pub fn new_default() -> Configuration {
         let max_threads = match env::var("PPL_MAX_CORES") {
             Ok(val) => val.parse::<usize>().unwrap(),
@@ -110,11 +110,11 @@ impl Configuration {
             }
             Err(_) => false,
         };
-        let blocking_channel = match env::var("PPL_WAIT_POLICY") {
+        let wait_policy = match env::var("PPL_WAIT_POLICY") {
             Ok(val) => val.parse::<bool>().unwrap(),
             Err(_) => false,
         };
-        Configuration::new(max_threads, pinning, scheduling, blocking_channel)
+        Configuration::new(max_threads, pinning, scheduling, wait_policy)
     }
 
     /// Get the maximum number of cores allowed.
@@ -126,7 +126,7 @@ impl Configuration {
         self.max_cores
     }
 
-    /// Get the thread mapping.
+    /// Get the threads mapping.
     /// The thread mapping is a vector of usize who specifies the
     /// order in which the partitions are pinned to the cores.
     /// Basically, when pinning is active, is created a partition
@@ -138,8 +138,8 @@ impl Configuration {
     /// of a threadpool, or the replicas of a stage of a pipeline, in
     /// a subset of neighboring cores. This is done to reduce the
     /// communication overhead between the workers.
-    pub(crate) fn get_thread_mapping(&self) -> &Vec<CoreId> {
-        &self.thread_mapping
+    pub(crate) fn get_threads_mapping(&self) -> &Vec<CoreId> {
+        &self.threads_mapping
     }
 
     /// Get the pinning flag.
@@ -159,14 +159,14 @@ impl Configuration {
         self.scheduling
     }
 
-    /// Get the blocking channel flag.
-    /// If the blocking channel flag is set, the channel used to
-    /// communicate between the workers is blocking.
-    /// Otherwise, the channel is non-blocking.
+    /// Get the wait policy flag.
+    /// If the wait policy flag is set, the channels used to
+    /// communicate between the workers are blocking.
+    /// Otherwise, the channels are non-blocking.
     /// This choice is enforced both in the pipeline and in the
     /// parallel map.
-    pub(crate) fn get_blocking_channel(&self) -> bool {
-        self.blocking_channel
+    pub(crate) fn get_wait_policy(&self) -> bool {
+        self.wait_policy
     }
 }
 
@@ -179,7 +179,7 @@ mod tests {
         env::remove_var("PPL_MAX_CORES");
         env::remove_var("PPL_PINNING");
         env::remove_var("PPL_WAIT_POLICY");
-        env::remove_var("PPL_THREAD_MAPPING");
+        env::remove_var("PPL_THREADS_MAPPING");
         env::remove_var("PPL_SCHEDULE");
     }
 
@@ -203,7 +203,7 @@ mod tests {
         let conf = Configuration::new_default();
         assert_eq!(conf.max_cores, 4);
         assert!(conf.pinning);
-        assert!(conf.blocking_channel);
+        assert!(conf.wait_policy);
         assert!(conf.scheduling);
         reset_env();
     }

@@ -614,7 +614,7 @@ where
         let next_node = Arc::new(next_node);
         let replicas = handler.number_of_replicas();
 
-        let blocking = orchestrator.get_configuration().get_blocking_channel();
+        let blocking = orchestrator.get_configuration().get_wait_policy();
 
         let ordered = handler.is_ordered();
         let producer = handler.is_producer();

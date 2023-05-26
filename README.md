@@ -19,6 +19,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
   - [A More Complex Example: Word Counter](#a-more-complex-example-word-counter)
 - [Configuration](#configuration)
 - [Channel Implementation](#channel-implementation)
+  - [FastFlow Channel](#fastflow-channel)
 - [Contributing](#contributing)
   - [Code of Conduct](#code-of-conduct)
   - [How to Contribute](#how-to-contribute)
@@ -74,7 +75,7 @@ fn main() {
 }
 ```
 
-In this example We're building a simple pipeline, so why not use clousure instead than the library templates?
+In this example we're building a simple pipeline, so why not use clousure instead than the library templates?
 ```rust
 use ppl::prelude::*;
 
@@ -103,8 +104,10 @@ fn main() {
 }
 ```
 
-If We want to parallelize the computation We must find a part of this algorithm that can be parallelized.
-In this case the stage in the middle is a good candidate, We replicate that stage introducing a Farm.
+The RTS of the library will call the clousure representing the Source till it returns `None`, when the Source returns `None` then a termination message will be propagated to the other stages of the pipeline.
+
+If we want to parallelize the computation we must find a part of this algorithm that can be parallelized.
+In this case the stage in the middle is a good candidate, we replicate that stage introducing a Farm.
 
 Now the code is as follows:
 ```rust
@@ -123,8 +126,8 @@ fn main() {
 }
 ```
 
-If We don't want to use the templates offered by the library, there is the possibility to create custom stage.
-By creating custom stages It is possible to add state and create more complicate nodes for our pipeline.
+If we don't want to use the templates offered by the library, there is the possibility to create custom stage.
+By creating custom stages it is possible to build stateful and more complex nodes for our pipeline.
 
 Here the same example but using custom defined stages:
 ```rust
@@ -375,6 +378,29 @@ To select a specific channel implementation, enable the corresponding feature fl
 [dependencies.ppl]
 features = ["crossbeam"]
 ```
+
+### FastFlow Channel
+In addition to the standard channel implementations, PPL also provides an experimental channel implementation based on FastFlow queues. This channel implementation is available using the `ff` feature flag.
+This implementation can be found [here](https://github.com/valebes/ff_buffer) and is substantially based on the [FF Buffer](https://github.com/lucarin91/ff_buffer) by [Luca Rinaldi](https://github.com/lucarin91).
+
+This implementation is built around a wrapper for the FastFlow queues that provides a channel-like interface.
+
+In order to use this implementation you must download and install the FastFlow library in the home directory. The library can be downloaded from [here](http://calvados.di.unipi.it/) or as follows:
+
+```bash
+cd ~
+git clone https://github.com/fastflow/fastflow.git
+```
+
+## Benchmarks
+The benchmarks are available in the *benches/* directory. To run the benchmarks, use the following command:
+
+```bash
+cargo bench
+```
+
+For now there is only one benchmark called *image_processing*. This benchmark is based on the [RustStreamBench](https://github.com/GMAP/RustStreamBench/) Image Processing benchmark
+that can be found [here](https://github.com/GMAP/RustStreamBench/tree/main/image-processing).
 
 ## Contributing
 

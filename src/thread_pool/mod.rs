@@ -313,7 +313,7 @@ impl ThreadPool {
         R: Send + 'static,
         Iter: IntoIterator,
     {
-        let blocking = self.orchestrator.get_configuration().get_blocking_channel();
+        let blocking = self.orchestrator.get_configuration().get_wait_policy();
 
         let (rx, tx) = Channel::channel(blocking);
         let arc_tx = Arc::new(tx);
