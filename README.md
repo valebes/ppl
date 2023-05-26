@@ -341,7 +341,7 @@ More complex examples are available in *benches/*, *examples/*, and in *tests/*.
 
 The configuration of Parallelo Parallel Library (PPL) can be customized by setting environment variables. The following environment variables are available:
 
-- **PPL_MAX_CORES**: Specifies the maximum number of cores were pinning is allowed. This configuration is only valid when pinning is active.
+- **PPL_MAX_CORES**: Specifies the maximum number of cores to use. This configuration is only valid when pinning is active.
 
 - **PPL_PINNING**: Enables or disables the threads pinning. By default, pinning is disabled (`false`).
 
@@ -351,7 +351,8 @@ The configuration of Parallelo Parallel Library (PPL) can be customized by setti
 
 - **PPL_WAIT_POLICY**: If set to `true`, the threads will try to give up their time to other threads when waiting for a communication or unused. This is particularly useful when we are using SMT and can improve performances. If is set to `false`, the threads wil do busy waiting. By default, this option is set to `false`.
 
-- **PPL_THREADS_MAPPING**: Specifies the threads mapping. By default, the threads are mapped in the order in which the cores are found.
+- **PPL_THREADS_MAPPING**: Specifies the threads mapping. By default, the threads are mapped in the order in which the cores are found. This option is only valid when pinning is active. (Note that this environment variable is kinda similar to the `OMP_PLACES` environment variable in OpenMP). 
+Example: `PPL_THREADS_MAPPING=0,2,1,3` will map the threads in the following order: `0 -> core 0`, `1 -> core 2`, `2 -> core 1`, `3 -> core 3`.
 
 To customize the configuration, set the desired environment variables before running your Rust program that uses PPL. For example, you can set the environment variables in your shell script or use a tool like `env_file` to load them from a file.
 
