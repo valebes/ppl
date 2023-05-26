@@ -17,7 +17,7 @@ where
         match self.rx.try_pop() {
             Some(boxed) => Ok(Some(Box::into_inner(boxed))),
             None => {
-                if self.rx.is_disconnected() {
+                if self.rx.is_disconnected() && self.rx.is_empty() {
                     Err(ReceiverError)
                 } else {
                     Ok(None)

@@ -44,7 +44,7 @@ struct Sink {
 }
 impl In<Vec<(String, usize)>, Vec<(String, usize)>> for Sink {
     fn run(&mut self, input: Vec<(String, usize)>) {
-        // Incremment value for key in hashmap
+        // Increment value for key in hashmap
         // If key does not exist, insert it with value 1
         for (key, value) in input {
             let counter = self.counter.entry(key).or_insert(0);
