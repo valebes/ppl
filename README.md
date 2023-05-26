@@ -157,6 +157,10 @@ impl InOut<usize, usize> for Worker {
     fn run(&mut self, input: usize) -> Option<usize> {
         Some(fib(input))
     }
+    // We can override this method to specify the number of replicas of the stage
+    fn number_of_replicas(&self) -> usize {
+        8
+    }
 }
 
 struct Sink {
@@ -191,7 +195,7 @@ fn main() {
 }
 ```
 
-Surely is more verbose, but allows to express a more variety of parallel computations in which each node can be stateful.
+Surely is more verbose, but allows to express a more variety of parallel computations in which each node can be stateful. Also, thanks to this approach, it is possible to build templates for stages that can be reused in different pipelines and/or projects.
 
 Parallelo also offers a powerful work-stealing threadpool. Using that instead, we can express the same parallel computation as following:
 
