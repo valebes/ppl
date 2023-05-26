@@ -24,6 +24,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
   - [Code of Conduct](#code-of-conduct)
   - [How to Contribute](#how-to-contribute)
   - [Reporting Issues](#reporting-issues)
+- [Warning](#warning)
 - [License](#license)
 
 
@@ -343,7 +344,7 @@ The configuration of Parallelo Parallel Library (PPL) can be customized by setti
 
 - **PPL_MAX_CORES**: Specifies the maximum number of cores to use. This configuration is only valid when pinning is active.
 
-- **PPL_PINNING**: Enables or disables the threads pinning. By default, pinning is disabled (`false`).
+- **PPL_PINNING**: Enables or disables the threads pinning. By default, pinning is disabled (`false`). (Equivalent to `OMP_PROC_BIND` in OpenMP).
 
 - **PPL_SCHEDULE**: Specifies the scheduling method used in the pipeline. The available options are:
   - `static`: Static scheduling (Round-robin).
@@ -407,6 +408,8 @@ that can be found [here](https://github.com/GMAP/RustStreamBench/tree/main/image
 
 Thank you for considering contributing to Parallelo Parallel Library (PPL)!
 
+If you would like to fix a bug, propose a new feature, or create a new template, you are welcome to do so! Please follow the steps below to contribute to PPL.
+
 ### Code of Conduct
 
 Please review our [Code of Conduct](./CODE_OF_CONDUCT.md) before contributing.
@@ -434,6 +437,10 @@ Please review our [Code of Conduct](./CODE_OF_CONDUCT.md) before contributing.
 ### Reporting Issues
 
 To report bugs, ask questions, or suggest new ideas, [create an issue](https://github.com/valebes/ppl/issues).
+
+## Warning
+
+ This library is still in an early stage of development. The API is not stable and may change in the future.
 
 ## License
 
