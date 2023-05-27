@@ -99,12 +99,8 @@ impl ExecutorInfo {
     // Warn that the executor is busy.
     fn warn_busy(&self) {
         let _ = self.available_workers.fetch_update(Ordering::AcqRel, Ordering::Acquire, 
-        |n| -> Option<usize> {
-            if n > 0 {
-                Some(n - 1)
-            } else {
-                None
-            }
+        |x| -> Option<usize> {
+            Some(x.saturating_sub(1))
         });
     }
 
@@ -253,9 +249,12 @@ impl Partition {
     where
         F: FnOnce() + Send + 'static,
     {
-        if self.get_free_worker_count() == 0 {
+        let free_worker = self.get_free_worker_count();
+        if free_worker == 0 || (free_worker <= self.global.len()){ // CHANGE THIS
+            error!("Added worker");
             self.add_worker();
         } 
+        error!("THERE ARE WORKER FREE {}", free_worker);
 
         let job_info = JobInfo::new();
         let job_info_clone = Arc::clone(&job_info.status);
@@ -298,7 +297,7 @@ impl Drop for Partition {
 
 /// The orchestrator is the main structure of the library.
 /// Is composed by a list of partitions, each partition, if pinning is enabled, is a core.
-/// The orchestrator is responsible to create the partitions and to distribute the jobs to the partitions.
+/// The orchestrator is responsible to create the partitions and to dis;tribute the jobs to the partitions.
 /// The orchestractor is global, implemented as a singleton.
 /// The main idea is to have a central point that distribuite evenly the jobs to the partitions, exploiting
 /// the numa architecture of the system.
