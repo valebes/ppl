@@ -250,7 +250,7 @@ impl Partition {
         F: FnOnce() + Send + 'static,
     {
         let free_worker = self.get_free_worker_count();
-        if free_worker == 0 || !self.global.is_empty() { // CHANGE THIS
+        if free_worker == 0 || (free_worker != 0 && !self.global.is_empty()) { // CHANGE THIS
             self.add_worker();
         } 
 
