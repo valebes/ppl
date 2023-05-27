@@ -57,7 +57,7 @@ where
     /// # Panics
     ///
     /// This method panics if the pipeline is empty.
-    pub fn wait_and_collect(&mut self) -> Option<TCollected> {
+    pub fn wait_and_collect(mut self) -> Option<TCollected> {
         match &mut self.first_block {
             Some(_block) => {
                 let block = self.first_block.take();

@@ -255,7 +255,7 @@ impl Partition {
     {
         if self.get_free_worker_count() == 0 {
             self.add_worker();
-        }
+        } 
 
         let job_info = JobInfo::new();
         let job_info_clone = Arc::clone(&job_info.status);

@@ -509,8 +509,8 @@ where
 {
     fn send(&self, input: Message<TIn>, rec_id: usize) -> Result<(), SenderError> {
         let mut rec_id = rec_id;
-        if rec_id >= self.job_infos.len() {
-            rec_id %= self.job_infos.len();
+        if rec_id >= self.channels.len() {
+            rec_id %= self.channels.len();
         }
 
         let Message { op, order } = input;
@@ -584,7 +584,7 @@ where
     }
 
     fn get_num_of_replicas(&self) -> usize {
-        self.job_infos.len()
+        self.channels.len()
     }
 }
 
