@@ -93,14 +93,19 @@ impl ExecutorInfo {
 
     // Warn that the executor is available.
     fn warn_available(&self) {
-        self.available_workers.fetch_add(1, Ordering::Release);
+        self.available_workers.fetch_add(1, Ordering::AcqRel);
     }
 
     // Warn that the executor is busy.
     fn warn_busy(&self) {
-        if self.available_workers.load(Ordering::Acquire) > 0 {
-            self.available_workers.fetch_sub(1, Ordering::Release);
-        }
+        let _ = self.available_workers.fetch_update(Ordering::AcqRel, Ordering::Acquire, 
+        |n| -> Option<usize> {
+            if n > 0 {
+                Some(n - 1)
+            } else {
+                None
+            }
+        });
     }
 
     /// Run the executor.
@@ -120,8 +125,6 @@ impl ExecutorInfo {
                         break;
                     }
                 }
-            } else {
-                thread::yield_now();
             }
         }
     }
@@ -131,7 +134,7 @@ impl ExecutorInfo {
         loop {
             match self.global.steal() {
                 Steal::Success(job) => return Some(job),
-                Steal::Empty => return None,
+                Steal::Empty => thread::yield_now(),
                 Steal::Retry => continue,
             };
         }
@@ -225,7 +228,7 @@ impl Partition {
         workers.push(worker);
 
         // Update the number of executor in the partition.
-        self.total_workers.fetch_add(1, Ordering::Release);
+        self.total_workers.fetch_add(1, Ordering::AcqRel);
     }
 
     /// Get the number of executor in the partition.
@@ -293,30 +296,6 @@ impl Drop for Partition {
     }
 }
 
-/*
-#[derive(Debug)]
-pub struct OrchestratorError {
-    details: String,
-}
-impl OrchestratorError {
-    fn new(msg: &str) -> OrchestratorError {
-        OrchestratorError {
-            details: msg.to_string(),
-        }
-    }
-}
-impl std::fmt::Display for OrchestratorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-impl std::error::Error for OrchestratorError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
-*/
-
 /// The orchestrator is the main structure of the library.
 /// Is composed by a list of partitions, each partition, if pinning is enabled, is a core.
 /// The orchestrator is responsible to create the partitions and to distribute the jobs to the partitions.
@@ -330,16 +309,6 @@ pub struct Orchestrator {
 
 /// OnceCell is a structure that allow to create a safe global singleton.
 static mut ORCHESTRATOR: OnceCell<Arc<Orchestrator>> = OnceCell::new();
-
-/*
-pub(crate) fn new_global_orchestrator(
-    configuration: Arc<Configuration>,
-) -> Result<Arc<Orchestrator>, OrchestratorError> {
-    let orchestrator = Orchestrator::new(configuration);
-    set_global_orchestrator(orchestrator)
-}
-}
-*/
 
 /// Create a new orchestrator with the default configuration.
 pub(crate) fn new_default_orchestrator() -> Arc<Orchestrator> {
@@ -355,19 +324,6 @@ pub fn get_global_orchestrator() -> Arc<Orchestrator> {
             .clone()
     }
 }
-
-/*
-fn set_global_orchestrator(
-    orchestrator: Orchestrator,
-) -> Result<Arc<Orchestrator>, OrchestratorError> {
-    unsafe {
-        ORCHESTRATOR
-            .set(Arc::new(orchestrator))
-            .map_err(|_| OrchestratorError::new("Error setting global orchestrator"))?;
-        Ok(get_global_orchestrator())
-    }
-}
-*/
 
 impl Orchestrator {
     // Create a new orchestrator.
