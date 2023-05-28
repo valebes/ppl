@@ -61,7 +61,7 @@ impl In<usize, usize> for Sink {
 }
 
 #[test]
-fn fibonacci_pipe() {
+fn test_pipeline() {
     env_logger::init();
 
     // Fibonacci pipeline by using custom structs
@@ -77,6 +77,7 @@ fn fibonacci_pipe() {
     p.start();
     let res = p.wait_and_collect();
     assert_eq!(res.unwrap(), 20);
+
 
     // Another way to write the same pipeline, but here using templates instead
     let mut p = parallel![

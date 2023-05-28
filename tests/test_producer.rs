@@ -49,7 +49,7 @@ impl InOut<usize, usize> for WorkerA {
         true
     }
     fn number_of_replicas(&self) -> usize {
-        2
+        6
     }
 }
 
@@ -59,7 +59,7 @@ fn test_producer() {
 
 
     let tp = ThreadPool::new_with_global_registry(4);
-    for i in 0..100000
+    for i in 0..1000
     {
         tp.execute(move || {
             println!("Hello from thread {}", i);
@@ -86,10 +86,10 @@ fn test_producer() {
     // Check that the number of messages is correct.
     assert_eq!(res.len(), 50000);
     
-    let mut tp = ThreadPool::new_with_global_registry(5);
+    let mut tp2 = ThreadPool::new_with_global_registry(5);
 
     // Count the occurrences of each number.
-    let check = tp.par_map_reduce(
+    let check = tp2.par_map_reduce(
         res,
         |el| -> (usize, usize) { (el, 1) },
         |k, v| -> (usize, usize) { (k, v.iter().sum()) },
