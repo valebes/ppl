@@ -65,52 +65,51 @@ fn test_pipeline() {
     env_logger::init();
 
     for _i in 0..100 {
-            // Fibonacci pipeline by using custom structs
-    let mut p = parallel![
-        Source {
-            streamlen: 20,
-            counter: 0
-        },
-        Worker {},
-        Sink { counter: 0 }
-    ];
+        // Fibonacci pipeline by using custom structs
+        let mut p = parallel![
+            Source {
+                streamlen: 20,
+                counter: 0
+            },
+            Worker {},
+            Sink { counter: 0 }
+        ];
 
-    p.start();
-    let res = p.wait_and_collect();
-    assert_eq!(res.unwrap(), 20);
+        p.start();
+        let res = p.wait_and_collect();
+        assert_eq!(res.unwrap(), 20);
 
+        // Another way to write the same pipeline, but here using templates instead
+        let mut p = parallel![
+            SourceIter::build(1..21),
+            Sequential::build(fibonacci_recursive),
+            SinkVec::build()
+        ];
+        p.start();
+        let res = p.wait_and_collect().unwrap().len();
+        assert_eq!(res, 20);
 
-    // Another way to write the same pipeline, but here using templates instead
-    let mut p = parallel![
-        SourceIter::build(1..21),
-        Sequential::build(fibonacci_recursive),
-        SinkVec::build()
-    ];
-    p.start();
-    let res = p.wait_and_collect().unwrap().len();
-    assert_eq!(res, 20);
-
-    // Also here another way to write the same pipeline, but here we use closures
-    let mut p = parallel![
-        {
-            let mut counter = 0;
-            move || {
-                if counter < 20 {
-                    counter += 1;
-                    Some(counter)
-                } else {
-                    None
+        // Also here another way to write the same pipeline, but here we use closures
+        let mut p = parallel![
+            {
+                let mut counter = 0;
+                move || {
+                    if counter < 20 {
+                        counter += 1;
+                        Some(counter)
+                    } else {
+                        None
+                    }
+                }
+            },
+            |input| Some(fibonacci_recursive(input)),
+            {
+                move |input| {
+                    println!("{}", input);
                 }
             }
-        },
-        |input| Some(fibonacci_recursive(input)),
-        {
-            move |input| {
-                println!("{}", input);
-            }
-        }
-    ];
-    p.start();
-    p.wait_and_collect();
+        ];
+        p.start();
+        p.wait_and_collect();
     }
 }

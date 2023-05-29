@@ -1,8 +1,7 @@
 use std::marker::PhantomData;
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
 
-use log::{trace, error};
+use log::trace;
 
 use crate::core::orchestrator::{JobInfo, Orchestrator};
 use crate::mpsc::err::SenderError;
@@ -114,9 +113,11 @@ where
 
         let nn = Arc::clone(&next_node);
 
-        let job_info = orchestrator.push_multiple(vec![move || {
-            Self::rts(handler, &nn, &stop_copy, &cvar_copy);
-        }]).remove(0);
+        let job_info = orchestrator
+            .push_multiple(vec![move || {
+                Self::rts(handler, &nn, &stop_copy, &cvar_copy);
+            }])
+            .remove(0);
 
         OutNode {
             next_node,

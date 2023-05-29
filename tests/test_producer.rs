@@ -1,11 +1,7 @@
 /*
   FlatMap example.
 */
-
-
-
-use log::error;
-use ppl::{prelude::*, collections::misc::SinkVec};
+use ppl::{collections::misc::SinkVec, prelude::*};
 
 // Source
 struct Source {
@@ -60,7 +56,7 @@ fn test_producer() {
 
     let mut tp = ThreadPool::new_with_global_registry(5);
 
-    for _i in 0..100 {       
+    for _i in 0..100 {
         let mut p = parallel![
             Source {
                 streamlen: 1000,
@@ -73,24 +69,23 @@ fn test_producer() {
             },
             SinkVec::build()
         ];
-    
+
         p.start();
         let res = p.wait_and_collect().unwrap();
 
         // Check that the number of messages is correct.
         assert_eq!(res.len(), 5000);
-            
+
         // Count the occurrences of each number.
         let check = tp.par_map_reduce(
             res,
             |el| -> (usize, usize) { (el, 1) },
             |k, v| -> (usize, usize) { (k, v.iter().sum()) },
         );
-    
+
         // Check that the number of occurrences is correct.
         for (_, v) in check {
             assert_eq!(v, 5);
         }
     }
-    
 }
