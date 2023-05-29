@@ -64,7 +64,8 @@ impl In<usize, usize> for Sink {
 fn test_pipeline() {
     env_logger::init();
 
-    // Fibonacci pipeline by using custom structs
+    for _i in 0..100 {
+            // Fibonacci pipeline by using custom structs
     let mut p = parallel![
         Source {
             streamlen: 20,
@@ -111,4 +112,5 @@ fn test_pipeline() {
     ];
     p.start();
     p.wait_and_collect();
+    }
 }

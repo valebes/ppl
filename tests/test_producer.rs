@@ -4,6 +4,7 @@
 
 
 
+use log::error;
 use ppl::{prelude::*, collections::misc::SinkVec};
 
 // Source
@@ -49,7 +50,7 @@ impl InOut<usize, usize> for WorkerA {
         true
     }
     fn number_of_replicas(&self) -> usize {
-        6
+        8
     }
 }
 
@@ -57,47 +58,39 @@ impl InOut<usize, usize> for WorkerA {
 fn test_producer() {
     env_logger::init();
 
+    let mut tp = ThreadPool::new_with_global_registry(5);
 
-    let tp = ThreadPool::new_with_global_registry(4);
-    for i in 0..1000
-    {
-        tp.execute(move || {
-            println!("Hello from thread {}", i);
-        });
-    }
-    tp.wait();
+    for _i in 0..100 {       
+        let mut p = parallel![
+            Source {
+                streamlen: 1000,
+                counter: 0
+            },
+            WorkerA {
+                number_of_messages: 5,
+                counter: 0,
+                input: 0
+            },
+            SinkVec::build()
+        ];
     
-    let mut p = parallel![
-        Source {
-            streamlen: 10000,
-            counter: 0
-        },
-        WorkerA {
-            number_of_messages: 5,
-            counter: 0,
-            input: 0
-        },
-        SinkVec::build()
-    ];
+        p.start();
+        let res = p.wait_and_collect().unwrap();
 
-    p.start();
-    let res = p.wait_and_collect().unwrap();
+        // Check that the number of messages is correct.
+        assert_eq!(res.len(), 5000);
+            
+        // Count the occurrences of each number.
+        let check = tp.par_map_reduce(
+            res,
+            |el| -> (usize, usize) { (el, 1) },
+            |k, v| -> (usize, usize) { (k, v.iter().sum()) },
+        );
     
-    // Check that the number of messages is correct.
-    assert_eq!(res.len(), 50000);
-    
-    let mut tp2 = ThreadPool::new_with_global_registry(5);
-
-    // Count the occurrences of each number.
-    let check = tp2.par_map_reduce(
-        res,
-        |el| -> (usize, usize) { (el, 1) },
-        |k, v| -> (usize, usize) { (k, v.iter().sum()) },
-    );
-
-    // Check that the number of occurrences is correct.
-    for (_, v) in check {
-        assert_eq!(v, 5);
+        // Check that the number of occurrences is correct.
+        for (_, v) in check {
+            assert_eq!(v, 5);
+        }
     }
     
 }

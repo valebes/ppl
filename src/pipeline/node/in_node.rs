@@ -171,7 +171,7 @@ where
 
         let bucket = Arc::clone(&result);
 
-        let job_info = orchestrator.push(move || {
+        let job_info = orchestrator.push_multiple(vec![move || {
             if let Some(res) = InNode::rts(handler, channel_in) {
                 match bucket.lock() {
                     Ok(mut lock_bucket) => {
@@ -180,7 +180,7 @@ where
                     Err(_) => panic!("Error: Cannot collect results."),
                 }
             }
-        });
+        }]).remove(0);
 
         InNode {
             job_info,
