@@ -45,7 +45,7 @@ impl JobInfo {
 
 /// An executor.
 /// It is a thread that execute jobs.
-/// It will fetch jobs from the global queue of the partition.
+/// It will fetch jobs from it's local queue.
 struct Executor {
     thread: Thread,
     status: Arc<AtomicBool>,
@@ -85,6 +85,7 @@ impl Executor {
     /// Push a job in the executor queue
     fn push(&self, job: Job) {
         let mut queue = self.queue.lock().unwrap();
+        assert!(queue.is_empty());
         queue.push_back(job);
         self.cvar.notify_one();
     }
@@ -138,7 +139,7 @@ impl ExecutorInfo {
     }
 
     /// Run the executor.
-    /// It will fetch jobs from the global queue.
+    /// It will fetch jobs from the local queue.
     /// It will terminate when it receives a terminate message.
     fn run(&self) {
         loop {
@@ -156,7 +157,7 @@ impl ExecutorInfo {
         }
     }
 
-    /// Fetch a job from the global queue.
+    /// Fetch a job from the local queue.
     fn fetch_job(&self) -> Option<Job> {
         let mut queue = self.queue.lock().unwrap();
         let mut job = queue.pop_front();
@@ -212,7 +213,6 @@ impl Thread {
 
 /// Struct that represent a partition.
 /// It contains the list of workers (executors) and the number of available workers.
-/// Executors from the same partition share the same global queue.
 /// A partition, if pinning is enabled, will be pinned to a specific core.
 /// Basically a partition represent a core, the executors are the threads pinned on that core.
 pub struct Partition {
@@ -225,7 +225,7 @@ pub struct Partition {
 
 impl Partition {
     /// Create a new partition.
-    /// It will create the global queue and the list of workers (executors).
+    /// It will create the list of workers (executors).
     /// If pinning is enabled, it will pin the partition to the specified core.
     fn new(core_id: usize, configuration: Arc<Configuration>) -> Partition {
         let workers = Vec::new();
@@ -282,12 +282,10 @@ impl Partition {
         let worker = Self::find_executor(&mut workers);
         match worker {
             Some(executor) => {
-                error!("Using existing worker");
                 executor.push(job);
                 workers.push(executor);
             }
             None => {
-                error!("adding worker");
                 let executor = Executor::new(self.core_id, self.configuration.clone(), self.available_workers.clone());
                 executor.push(job);
                 workers.push(executor);
@@ -318,7 +316,7 @@ impl Drop for Partition {
 
 /// The orchestrator is the main structure of the library.
 /// Is composed by a list of partitions, each partition, if pinning is enabled, is a core.
-/// The orchestrator is responsible to create the partitions and to dis;tribute the jobs to the partitions.
+/// The orchestrator is responsible to create the partitions and to distribute the jobs to the partitions.
 /// The orchestractor is global, implemented as a singleton.
 /// The main idea is to have a central point that distribuite evenly the jobs to the partitions, exploiting
 /// the numa architecture of the system.
@@ -401,7 +399,6 @@ impl Orchestrator {
         if count > partitions.len() {
             return None;
         } 
-        
         let mut min = None;
         let mut min_busy = usize::MAX;
         let mut busy = 0;
