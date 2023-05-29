@@ -3,7 +3,7 @@ use std::{
     collections::VecDeque,
     hint,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, Ordering, AtomicUsize},
         Arc, Condvar, Mutex,
     },
     thread::{self},
@@ -56,12 +56,12 @@ impl Executor {
     /// Create a executor.
     /// It will start executing jobs immediately.
     /// It will terminate when it receives a terminate message.
-    fn new(core_id: CoreId, config: Arc<Configuration>) -> Executor {
+    fn new(core_id: CoreId, config: Arc<Configuration>, available_worker: Arc<AtomicUsize>) -> Executor {
         let status = Arc::new(AtomicBool::new(false));
         let cvar = Arc::new(Condvar::new());
         let queue = Arc::new(Mutex::new(VecDeque::new()));
 
-        let worker = ExecutorInfo::new(status.clone(), queue.clone(), cvar.clone());
+        let worker = ExecutorInfo::new(status.clone(), available_worker, queue.clone(), cvar.clone());
         let thread = Thread::new(
             core_id,
             move || {
@@ -103,6 +103,7 @@ impl Executor {
 /// It contains the queue of jobs and the number of available executors in it's partition.
 struct ExecutorInfo {
     status: Arc<AtomicBool>,
+    available_worker: Arc<AtomicUsize>,
     queue: Arc<Mutex<VecDeque<Job>>>,
     cvar: Arc<Condvar>,
 }
@@ -110,11 +111,13 @@ impl ExecutorInfo {
     /// Create a new executor info.
     fn new(
         status: Arc<AtomicBool>,
+        available_worker: Arc<AtomicUsize>,
         queue: Arc<Mutex<VecDeque<Job>>>,
         cvar: Arc<Condvar>,
     ) -> ExecutorInfo {
         ExecutorInfo {
             status,
+            available_worker,
             queue,
             cvar,
         }
@@ -122,12 +125,16 @@ impl ExecutorInfo {
 
     // Warn that the executor is available.
     fn warn_available(&self) {
-        self.status.store(true, Ordering::Release)
+        self.status.store(true, Ordering::Release);
+        self.available_worker.fetch_add(1, Ordering::AcqRel);
     }
 
     // Warn that the executor is busy.
     fn warn_busy(&self) {
-        self.status.store(false, Ordering::Release)
+        self.status.store(false, Ordering::Release);
+        let _ = self.available_worker.fetch_update(Ordering::AcqRel, Ordering::Acquire,|x| -> Option<usize> {
+            Some(x.saturating_sub(1))
+        } );
     }
 
     /// Run the executor.
@@ -211,6 +218,8 @@ impl Thread {
 pub struct Partition {
     core_id: CoreId,
     workers: Mutex<Vec<Executor>>,
+    total_workers: Arc<AtomicUsize>, 
+    available_workers: Arc<AtomicUsize>,
     configuration: Arc<Configuration>,
 }
 
@@ -224,29 +233,25 @@ impl Partition {
         Partition {
             core_id,
             workers: Mutex::new(workers),
+            total_workers: Arc::new(AtomicUsize::new(0)),
+            available_workers: Arc::new(AtomicUsize::new(0)),
             configuration,
         }
     }
 
     /// Get the number of executor in the partition.
-    fn get_worker_count(workers: &Vec<Executor>) -> usize {
-        workers.len()
+    fn get_worker_count(&self) -> usize {
+        self.total_workers.load(Ordering::Acquire)
     }
 
     /// Get the number of busy executors (in this instant) in the partition.
-    fn get_busy_worker_count(workers: &Vec<Executor>) -> usize {
-        Self::get_worker_count(workers) - Self::get_free_worker_count(workers)
+    fn get_busy_worker_count(&self) -> usize {
+        self.get_worker_count() - self.get_free_worker_count()
     }
 
     /// Get the number of free executors (in this instant) in the partition.
-    fn get_free_worker_count(workers: &[Executor]) -> usize {
-        let mut free_workers = 0;
-        workers.iter().for_each(|worker| {
-            if worker.get_status() && worker.is_empty() {
-                free_workers += 1;
-            }
-        });
-        free_workers
+    fn get_free_worker_count(&self) -> usize {
+        self.available_workers.load(Ordering::Acquire)
     }
 
     /// Find executor
@@ -283,9 +288,10 @@ impl Partition {
             }
             None => {
                 error!("adding worker");
-                let executor = Executor::new(self.core_id, self.configuration.clone());
+                let executor = Executor::new(self.core_id, self.configuration.clone(), self.available_workers.clone());
                 executor.push(job);
                 workers.push(executor);
+                self.total_workers.fetch_add(1, Ordering::AcqRel);
             }
         }
 
@@ -368,9 +374,9 @@ impl Orchestrator {
             return Some(partitions.first().unwrap());
         }
         let mut min = partitions.first();
-        let mut min_busy = Partition::get_busy_worker_count(&min.unwrap().workers.lock().unwrap());
+        let mut min_busy = min.unwrap().get_busy_worker_count();
         for partition in partitions.iter() {
-            let busy = Partition::get_busy_worker_count(&partition.workers.lock().unwrap());
+            let busy = partition.get_busy_worker_count();
             if busy == 0 {
                 return Some(partition);
             }
@@ -400,7 +406,7 @@ impl Orchestrator {
         let mut min_busy = usize::MAX;
         let mut busy = 0;
         (0..count).for_each(|i| {
-            busy += Partition::get_busy_worker_count(&partitions[i].workers.lock().unwrap());
+            busy += partitions[i].get_busy_worker_count();
         });
         if busy == 0 {
             return Some(partitions[0..count].iter().collect());
@@ -411,8 +417,8 @@ impl Orchestrator {
         }
         for i in count..partitions.len() {
             busy -=
-                Partition::get_busy_worker_count(&partitions[i - count].workers.lock().unwrap());
-            busy += Partition::get_busy_worker_count(&partitions[i].workers.lock().unwrap());
+            partitions[i - count].get_busy_worker_count();
+            busy +=  partitions[i].get_busy_worker_count();
             if busy == 0 {
                 return Some(partitions[i - count + 1..i + 1].iter().collect());
             }
