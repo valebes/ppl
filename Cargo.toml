@@ -22,7 +22,7 @@ core_affinity = "0.8.0"
 crossbeam-channel = { version = "0.5.8", optional = true }
 crossbeam-deque = "0.8.3"
 dyn-clone = "1.0.11"
-log = "0.4.17"
+log = "0.4.18"
 num_cpus = "1.15.0"
 ff_buffer = { git = "https://github.com/valebes/ff_buffer.git", optional = true }
 kanal = { git = "https://github.com/fereidani/kanal.git", optional = true }
