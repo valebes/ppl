@@ -29,7 +29,7 @@ kanal = { git = "https://github.com/fereidani/kanal.git", optional = true }
 flume = { version = "0.10.14", optional = true }
 
 [dev-dependencies]
-criterion = {version = "0.4", features = ["html_reports"]}
+criterion = {version = "0.5", features = ["html_reports"]}
 crossbeam-channel = { version = "0.5.8"}
 env_logger = "0.10.0"
 rand = "*"
