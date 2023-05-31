@@ -53,34 +53,34 @@ fn test_producer() {
 
     let mut tp = ThreadPool::new_with_global_registry(5);
 
-        let mut p = parallel![
-            Source {
-                streamlen: 1000,
-                counter: 0
-            },
-            Worker {
-                number_of_messages: 5,
-                counter: 0,
-                input: 0
-            },
-            SinkVec::build()
-        ];
+    let mut p = parallel![
+        Source {
+            streamlen: 1000,
+            counter: 0
+        },
+        Worker {
+            number_of_messages: 5,
+            counter: 0,
+            input: 0
+        },
+        SinkVec::build()
+    ];
 
-        p.start();
-        let res = p.wait_and_collect().unwrap();
+    p.start();
+    let res = p.wait_and_collect().unwrap();
 
-        // Check that the number of messages is correct.
-        assert_eq!(res.len(), 5000);
+    // Check that the number of messages is correct.
+    assert_eq!(res.len(), 5000);
 
-        // Count the occurrences of each number.
-        let check = tp.par_map_reduce(
-            res,
-            |el| -> (usize, usize) { (el, 1) },
-            |k, v| -> (usize, usize) { (k, v.iter().sum()) },
-        );
+    // Count the occurrences of each number.
+    let check = tp.par_map_reduce(
+        res,
+        |el| -> (usize, usize) { (el, 1) },
+        |k, v| -> (usize, usize) { (k, v.iter().sum()) },
+    );
 
-        // Check that the number of occurrences is correct.
-        for (_, v) in check {
-            assert_eq!(v, 5);
-        }
+    // Check that the number of occurrences is correct.
+    for (_, v) in check {
+        assert_eq!(v, 5);
+    }
 }

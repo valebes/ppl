@@ -13,9 +13,6 @@ pub fn fibonacci_recursive(n: u64) -> u64 {
         0 => panic!("zero is not a right argument to fibonacci_recursive()!"),
         1 | 2 => 1,
         3 => 2,
-        /*
-        50    => 12586269025,
-        */
         _ => fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2),
     }
 }

@@ -30,17 +30,18 @@ pub struct Configuration {
 /// is set to the default mapping, i.e., the cores are used
 /// in the order in which they are found by the framework.
 fn parse_threads_mapping() -> Vec<CoreId> {
-    let mut thread_mapping = Vec::new();
+    let mut env_mapping = Vec::new();
     match env::var("PPL_THREADS_MAPPING") {
         Ok(val) => {
             let mapping: Vec<&str> = val.split(',').collect();
-            (0..mapping.len()).for_each(|i| {
-                thread_mapping.push(mapping[i].parse::<usize>().unwrap());
-            });
+
+            for core in mapping {
+                env_mapping.push(core.parse::<usize>().unwrap())
+            }
         }
         Err(_) => {
             for i in 0..num_cpus::get() {
-                thread_mapping.push(i);
+                env_mapping.push(i);
             }
         }
     }
@@ -49,7 +50,7 @@ fn parse_threads_mapping() -> Vec<CoreId> {
 
     let mut threads_mapping = Vec::new();
 
-    for thread in thread_mapping {
+    for thread in env_mapping {
         if thread >= core_ids.len() {
             panic!("Error: The thread mapping is invalid");
         }
