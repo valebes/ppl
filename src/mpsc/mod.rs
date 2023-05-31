@@ -11,10 +11,10 @@
 //! - [`channel::OutputChannel<T>`]: defines the sender side of a channel.
 //!
 //! The channel implementations available are:
-//! - 'crossbeam': uses the crossbeam channel.
-//! - 'flume': uses the flume channel.
-//! - 'kanal': uses the kanal channel.
-//! - 'ff': uses a channel based on fastflow spsc queues.
+//! - **crossbeam**: uses the crossbeam channel.
+//! - **flume**: uses the flume channel.
+//! - **kanal**: uses the kanal channel.
+//! - **ff**: uses a channel based on fastflow spsc queues.
 //!
 //! The channel implementation is selected at compile time by the feature flag.
 

@@ -1,18 +1,10 @@
 use std::{error, fmt};
 
-/// An error returned from the [`receive`] method.
-///
 /// A message could not be received because the channel is empty and disconnected.
-///
-/// [`receive`]: super::InputChannel::receive
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct ReceiverError;
 
-/// An error returned from the [`send`] method.
-///
 /// A message could not be sent because the channel is disconnected or is full.
-///
-/// [`send`]: super::OutputChannel::send
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct SenderError;
 

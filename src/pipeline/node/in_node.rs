@@ -207,7 +207,7 @@ where
                             node.run(arg);
                         }
                         Task::Dropped => {
-                            //TODO: Manage dropped
+                            // Don't do anything
                         }
                         Task::Terminate => {
                             break;

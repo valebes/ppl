@@ -56,9 +56,9 @@ $ git clone https://github.com/valebes/ppl.git
 Here a simple example that show how create a pipeline that computes the first 20 numbers of Fibonacci.
 
 This pipeline is composed by:
-* A Source, that emits number from 1 to 20.
-* A Stage that computes the i-th number of Fibonacci.
-* A Sink that accumulates and return a Vec with the results.
+- **Source**: emits number from 1 to 20.
+- **Stage**: computes the i-th number of Fibonacci.
+- **Sink**: accumulates and return a Vec with the results.
 
 Here a snipped of code to show how build this pipeline:
 ```rust
