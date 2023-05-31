@@ -17,6 +17,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 - [Usage](#usage)
   - [A Simple (but Long) Example: Fibonacci pipeline](#a-simple-but-long-example-fibonacci-pipeline)
   - [A More Complex Example: Word Counter](#a-more-complex-example-word-counter)
+  - [Advanced Example: Single-Input Multi-Output stage](#advanced-example-single-input-multi-output-stage)
 - [Configuration](#configuration)
 - [Channel Implementation](#channel-implementation)
   - [FastFlow Channel](#fastflow-channel)
@@ -342,7 +343,7 @@ pub fn ppl_map(dataset: &str, threads: usize) {
 
 ### Advanced Example: Single-Input Multi-Output stage
 
-In this example, we demonstrate how to model a data processing pipeline using the `ppl` crate, where a stage produces multiple outputs for each input received.
+In this example, we demonstrate how to model a data processing pipeline using PPL, where a stage produces multiple outputs for each input received.
 
 This pipeline involves the following stages:
 - **Source**: Generates a stream of 1000 numbers.
