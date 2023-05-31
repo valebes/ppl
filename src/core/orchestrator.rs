@@ -1,5 +1,4 @@
 use std::{
-    collections::VecDeque,
     hint,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -48,7 +47,7 @@ impl JobInfo {
 struct Executor {
     thread: Thread,
     status: Arc<AtomicBool>,
-    queue: Arc<Mutex<VecDeque<Job>>>,
+    queue: Arc<Mutex<Vec<Job>>>,
     cvar: Arc<Condvar>,
 }
 impl Executor {
@@ -62,7 +61,7 @@ impl Executor {
     ) -> Executor {
         let status = Arc::new(AtomicBool::new(false));
         let cvar = Arc::new(Condvar::new());
-        let queue = Arc::new(Mutex::new(VecDeque::new()));
+        let queue = Arc::new(Mutex::new(Vec::with_capacity(1)));
 
         let worker = ExecutorInfo::new(
             status.clone(),
@@ -93,7 +92,7 @@ impl Executor {
     /// Push a job in the executor queue
     fn push(&self, job: Job) {
         let mut queue = self.queue.lock().unwrap();
-        queue.push_back(job);
+        queue.push(job);
         self.cvar.notify_one();
     }
 
@@ -112,7 +111,7 @@ impl Executor {
 struct ExecutorInfo {
     status: Arc<AtomicBool>,
     available_worker: Arc<AtomicUsize>,
-    queue: Arc<Mutex<VecDeque<Job>>>,
+    queue: Arc<Mutex<Vec<Job>>>,
     cvar: Arc<Condvar>,
 }
 impl ExecutorInfo {
@@ -120,7 +119,7 @@ impl ExecutorInfo {
     fn new(
         status: Arc<AtomicBool>,
         available_worker: Arc<AtomicUsize>,
-        queue: Arc<Mutex<VecDeque<Job>>>,
+        queue: Arc<Mutex<Vec<Job>>>,
         cvar: Arc<Condvar>,
     ) -> ExecutorInfo {
         ExecutorInfo {
@@ -169,11 +168,11 @@ impl ExecutorInfo {
     /// Fetch a job from the local queue.
     fn fetch_job(&self) -> Option<Job> {
         let mut queue = self.queue.lock().unwrap();
-        let mut job = queue.pop_front();
+        let mut job = queue.pop();
 
         while job.is_none() {
             queue = self.cvar.wait(queue).unwrap();
-            job = queue.pop_front();
+            job = queue.pop();
         }
         self.warn_busy();
         job
