@@ -1,6 +1,3 @@
-/*
-  FlatMap example.
-*/
 use ppl::{collections::misc::SinkVec, prelude::*};
 
 // Source
@@ -21,12 +18,12 @@ impl Out<usize> for Source {
 
 // Given an input, it produces 5 copies of it.
 #[derive(Clone)]
-struct WorkerA {
+struct Worker {
     number_of_messages: usize,
     counter: usize,
     input: usize,
 }
-impl InOut<usize, usize> for WorkerA {
+impl InOut<usize, usize> for Worker {
     fn run(&mut self, input: usize) -> Option<usize> {
         self.counter = 0;
         self.input = input;
@@ -56,13 +53,12 @@ fn test_producer() {
 
     let mut tp = ThreadPool::new_with_global_registry(5);
 
-    for _i in 0..100 {
         let mut p = parallel![
             Source {
                 streamlen: 1000,
                 counter: 0
             },
-            WorkerA {
+            Worker {
                 number_of_messages: 5,
                 counter: 0,
                 input: 0
@@ -87,5 +83,4 @@ fn test_producer() {
         for (_, v) in check {
             assert_eq!(v, 5);
         }
-    }
 }

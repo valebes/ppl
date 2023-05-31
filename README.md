@@ -340,6 +340,88 @@ pub fn ppl_map(dataset: &str, threads: usize) {
 }
 ```
 
+### Advanced Example: Single-Input Multi-Output stage
+
+In this example, we demonstrate how to model a data processing pipeline using the `ppl` crate, where a stage produces multiple outputs for each input received.
+
+This pipeline involves the following stages:
+- **Source**: Generates a stream of 1000 numbers.
+- **Worker**: Given a number, it produces multiple copies of that number.
+- **Sink**: The `SinkVec` struct acts as a sink stage in the pipeline. It collects the output from the worker stage and stores the results in a vector.
+
+The implementation of the `InOut<usize, usize>` trait overrides the `run` method to process the input received from the source and prepare the worker for producing multiple copies. The `produce` method generates the specified number of copies of the input. By implementing the `is_producer` method and returning `true`, this stage is marked as a producer. Additionally, the `number_of_replicas` method specifies the number of replicas of this worker to create for parallel processing.
+
+```rust
+use ppl::{collections::misc::SinkVec, prelude::*};
+
+// Source
+struct Source {
+    streamlen: usize,
+    counter: usize,
+}
+impl Out<usize> for Source {
+    fn run(&mut self) -> Option<usize> {
+        if self.counter < self.streamlen {
+            self.counter += 1;
+            Some(self.counter)
+        } else {
+            None
+        }
+    }
+}
+
+// Given an input, it produces 5 copies of it.
+#[derive(Clone)]
+struct Worker {
+    number_of_messages: usize,
+    counter: usize,
+    input: usize,
+}
+impl InOut<usize, usize> for Worker {
+    fn run(&mut self, input: usize) -> Option<usize> {
+        self.counter = 0;
+        self.input = input;
+        None
+    }
+    fn produce(&mut self) -> Option<usize> {
+        if self.counter < self.number_of_messages {
+            self.counter += 1;
+            Some(self.input)
+        } else {
+            None
+        }
+    }
+    fn is_producer(&self) -> bool {
+        true
+    }
+    fn number_of_replicas(&self) -> usize {
+        8
+    }
+}
+
+fn main() {
+    // Create the pipeline using the parallel! macro
+    let mut p = parallel![
+        Source {
+            streamlen: 1000,
+            counter: 0
+        },
+        Worker {
+            number_of_messages: 5,
+            counter: 0,
+            input: 0
+        },
+        SinkVec::build()
+    ];
+
+    // Start the processing
+    p.start();
+
+    // Wait for the processing to finish and collect the results
+    let res = p.wait_and_collect().unwrap();
+}
+```
+
 More complex examples are available in *benches/*, *examples/*, and in *tests/*.
 
 ## Configuration

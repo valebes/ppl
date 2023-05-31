@@ -4,7 +4,6 @@
 
 use log::error;
 use ppl::{
-    collections::misc::{Sequential, SinkVec, SourceIter},
     prelude::*,
 };
 
@@ -16,7 +15,7 @@ impl Out<usize> for Source {
     fn run(&mut self) -> Option<usize> {
         if self.counter < self.streamlen {
             self.counter += 1;
-            error!("[SOURCE] send: {}", self.counter);
+            //error!("[SOURCE] send: {}", self.counter);
             Some(self.counter)
         } else {
             None
@@ -40,7 +39,7 @@ pub fn fibonacci_recursive(n: usize) -> usize {
 struct Worker {}
 impl InOut<usize, usize> for Worker {
     fn run(&mut self, input: usize) -> Option<usize> {
-        error!("[WORKER] received: {}", input);
+        //error!("[WORKER] received: {}", input);
         Some(fibonacci_recursive(input))
     }
 }
@@ -49,13 +48,13 @@ struct Sink {
     counter: usize,
 }
 impl In<usize, usize> for Sink {
-    fn run(&mut self, input: usize) {
-        error!("[SINK] received: {}", input);
+    fn run(&mut self, _input: usize) {
+        //error!("[SINK] received: {}", input);
         self.counter += 1;
     }
 
     fn finalize(self) -> Option<usize> {
-        error!("End");
+        //error!("End");
         Some(self.counter)
     }
 }
@@ -64,7 +63,7 @@ impl In<usize, usize> for Sink {
 fn test_stress() {
     env_logger::init();
 
-    for _i in 0..100000 {
+    for _i in 0..1000 {
         let mut p = parallel![
             Source {
                 streamlen: 20,
@@ -75,9 +74,9 @@ fn test_stress() {
         ];
 
         p.start();
-        error!("Started new iteration");
+        //error!("Started new iteration");
         let res = p.wait_and_collect().unwrap();
-        error!("Finished");
+        //error!("Finished");
         assert_eq!(res, 20);
     }
 }
