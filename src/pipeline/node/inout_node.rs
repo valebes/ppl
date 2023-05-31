@@ -691,7 +691,7 @@ where
             ordered_splitter: splitter,
             storage: Mutex::new(BTreeMap::new()),
             next_msg: AtomicUsize::new(0),
-            job_infos: orchestrator.push_multiple(funcs), // Push the workers into the orchestrator
+            job_infos: orchestrator.push_jobs(funcs), // Push the workers into the orchestrator
             phantom: PhantomData,
         }
     }

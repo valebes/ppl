@@ -193,7 +193,7 @@ impl ThreadPool {
             funcs.push(Box::new(func));
         }
 
-        jobs_info = orchestrator.push_multiple(funcs);
+        jobs_info = orchestrator.push_jobs(funcs);
 
         Self {
             num_workers: num_threads,

@@ -114,7 +114,7 @@ where
         let nn = Arc::clone(&next_node);
 
         let job_info = orchestrator
-            .push_multiple(vec![move || {
+            .push_jobs(vec![move || {
                 Self::rts(handler, &nn, &stop_copy, &cvar_copy);
             }])
             .remove(0);
