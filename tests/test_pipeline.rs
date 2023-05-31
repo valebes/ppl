@@ -61,7 +61,7 @@ impl In<usize, usize> for Sink {
 }
 
 #[test]
-fn fibonacci_pipe() {
+fn test_pipeline() {
     env_logger::init();
 
     // Fibonacci pipeline by using custom structs
@@ -109,5 +109,5 @@ fn fibonacci_pipe() {
         }
     ];
     p.start();
-    p.wait_and_collect();
+    let _ = p.wait_and_collect();
 }

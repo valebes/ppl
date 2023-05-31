@@ -80,7 +80,6 @@ where
     ///     
     /// This method terminates the pipeline by terminating the first stage.
     /// After this the termination is propagated to the next stages and so on.
-
     fn drop(&mut self) {
         match &mut self.first_block {
             Some(_block) => {

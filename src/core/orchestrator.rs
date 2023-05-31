@@ -1,15 +1,14 @@
 use std::{
-    cell::OnceCell,
+    collections::VecDeque,
     hint,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Mutex,
+        Arc, Condvar, Mutex, OnceLock,
     },
     thread::{self},
 };
 
 use core_affinity::CoreId;
-use crossbeam_deque::{Injector, Steal};
 use log::{error, trace};
 
 use super::configuration::Configuration;
@@ -45,9 +44,12 @@ impl JobInfo {
 
 /// An executor.
 /// It is a thread that execute jobs.
-/// It will fetch jobs from the global queue of the partition.
+/// It will fetch jobs from it's local queue.
 struct Executor {
     thread: Thread,
+    status: Arc<AtomicBool>,
+    queue: Arc<Mutex<VecDeque<Job>>>,
+    cvar: Arc<Condvar>,
 }
 impl Executor {
     /// Create a executor.
@@ -56,10 +58,18 @@ impl Executor {
     fn new(
         core_id: CoreId,
         config: Arc<Configuration>,
-        available_workers: Arc<AtomicUsize>,
-        global: Arc<Injector<Job>>,
+        available_worker: Arc<AtomicUsize>,
     ) -> Executor {
-        let worker = ExecutorInfo::new(available_workers, global);
+        let status = Arc::new(AtomicBool::new(false));
+        let cvar = Arc::new(Condvar::new());
+        let queue = Arc::new(Mutex::new(VecDeque::new()));
+
+        let worker = ExecutorInfo::new(
+            status.clone(),
+            available_worker,
+            queue.clone(),
+            cvar.clone(),
+        );
         let thread = Thread::new(
             core_id,
             move || {
@@ -67,7 +77,29 @@ impl Executor {
             },
             config,
         );
-        Executor { thread }
+        Executor {
+            thread,
+            status,
+            queue,
+            cvar,
+        }
+    }
+
+    /// Get the status of this executor
+    fn get_status(&self) -> bool {
+        self.status.load(Ordering::Acquire)
+    }
+
+    /// Push a job in the executor queue
+    fn push(&self, job: Job) {
+        let mut queue = self.queue.lock().unwrap();
+        assert!(queue.is_empty());
+        queue.push_back(job);
+        self.cvar.notify_one();
+    }
+
+    fn is_empty(&self) -> bool {
+        self.queue.lock().unwrap().is_empty()
     }
 
     /// Join the thread running the executor.
@@ -79,45 +111,55 @@ impl Executor {
 /// Information about the executor.
 /// It contains the queue of jobs and the number of available executors in it's partition.
 struct ExecutorInfo {
-    available_workers: Arc<AtomicUsize>,
-    global: Arc<Injector<Job>>,
+    status: Arc<AtomicBool>,
+    available_worker: Arc<AtomicUsize>,
+    queue: Arc<Mutex<VecDeque<Job>>>,
+    cvar: Arc<Condvar>,
 }
 impl ExecutorInfo {
     /// Create a new executor info.
-    fn new(available_workers: Arc<AtomicUsize>, global: Arc<Injector<Job>>) -> ExecutorInfo {
+    fn new(
+        status: Arc<AtomicBool>,
+        available_worker: Arc<AtomicUsize>,
+        queue: Arc<Mutex<VecDeque<Job>>>,
+        cvar: Arc<Condvar>,
+    ) -> ExecutorInfo {
         ExecutorInfo {
-            available_workers,
-            global,
+            status,
+            available_worker,
+            queue,
+            cvar,
         }
     }
 
     // Warn that the executor is available.
     fn warn_available(&self) {
-        self.available_workers.fetch_add(1, Ordering::AcqRel);
+        self.status.store(true, Ordering::Release);
+        self.available_worker.fetch_add(1, Ordering::AcqRel);
     }
 
     // Warn that the executor is busy.
     fn warn_busy(&self) {
-        let _ = self.available_workers.fetch_update(Ordering::AcqRel, Ordering::Acquire, 
-        |x| -> Option<usize> {
-            Some(x.saturating_sub(1))
-        });
+        self.status.store(false, Ordering::Release);
+        let _ = self.available_worker.fetch_update(
+            Ordering::AcqRel,
+            Ordering::Acquire,
+            |x| -> Option<usize> { Some(x.saturating_sub(1)) },
+        );
     }
 
     /// Run the executor.
-    /// It will fetch jobs from the global queue.
+    /// It will fetch jobs from the local queue.
     /// It will terminate when it receives a terminate message.
     fn run(&self) {
         loop {
             if let Some(job) = self.fetch_job() {
                 match job {
                     Job::NewJob(f) => {
-                        self.warn_busy();
                         f();
                         self.warn_available();
                     }
                     Job::Terminate => {
-                        self.warn_busy();
                         break;
                     }
                 }
@@ -125,15 +167,17 @@ impl ExecutorInfo {
         }
     }
 
-    /// Fetch a job from the global queue.
+    /// Fetch a job from the local queue.
     fn fetch_job(&self) -> Option<Job> {
-        loop {
-            match self.global.steal() {
-                Steal::Success(job) => return Some(job),
-                Steal::Empty => thread::yield_now(),
-                Steal::Retry => continue,
-            };
+        let mut queue = self.queue.lock().unwrap();
+        let mut job = queue.pop_front();
+
+        while job.is_none() {
+            queue = self.cvar.wait(queue).unwrap();
+            job = queue.pop_front();
         }
+        self.warn_busy();
+        job
     }
 }
 
@@ -179,24 +223,21 @@ impl Thread {
 
 /// Struct that represent a partition.
 /// It contains the list of workers (executors) and the number of available workers.
-/// Executors from the same partition share the same global queue.
 /// A partition, if pinning is enabled, will be pinned to a specific core.
 /// Basically a partition represent a core, the executors are the threads pinned on that core.
 pub struct Partition {
     core_id: CoreId,
     workers: Mutex<Vec<Executor>>,
-    total_workers: Arc<AtomicUsize>, // total number of workers in the partition
-    available_workers: Arc<AtomicUsize>, // number of available workers in the partition
-    global: Arc<Injector<Job>>,
+    total_workers: Arc<AtomicUsize>,
+    available_workers: Arc<AtomicUsize>,
     configuration: Arc<Configuration>,
 }
 
 impl Partition {
     /// Create a new partition.
-    /// It will create the global queue and the list of workers (executors).
+    /// It will create the list of workers (executors).
     /// If pinning is enabled, it will pin the partition to the specified core.
     fn new(core_id: usize, configuration: Arc<Configuration>) -> Partition {
-        let global = Arc::new(Injector::new());
         let workers = Vec::new();
         let core_id = configuration.get_threads_mapping()[core_id];
         Partition {
@@ -204,27 +245,8 @@ impl Partition {
             workers: Mutex::new(workers),
             total_workers: Arc::new(AtomicUsize::new(0)),
             available_workers: Arc::new(AtomicUsize::new(0)),
-            global,
             configuration,
         }
-    }
-
-    /// Add a worker (executor) to the partition.
-    /// The executor will be created and pushed to the partition.
-    fn add_worker(&self) {
-        let worker = Executor::new(
-            self.core_id,
-            self.configuration.clone(),
-            Arc::clone(&self.available_workers),
-            self.global.clone(),
-        );
-
-        // Take lock and push the new executor to the partition.
-        let mut workers = self.workers.lock().unwrap();
-        workers.push(worker);
-
-        // Update the number of executor in the partition.
-        self.total_workers.fetch_add(1, Ordering::AcqRel);
     }
 
     /// Get the number of executor in the partition.
@@ -242,6 +264,15 @@ impl Partition {
         self.available_workers.load(Ordering::Acquire)
     }
 
+    /// Find executor
+    fn find_executor(workers: &mut Vec<Executor>) -> Option<Executor> {
+        for i in 0..workers.len() {
+            if workers[i].get_status() && workers[i].is_empty() {
+                return Some(workers.remove(i));
+            }
+        }
+        None
+    }
     /// Push a new job to the partition.
     /// This method return a JobInfo that can be used to wait for the Job to finish.
     /// If there aren't executors in the partition or all the existing executors are busy, a new executor is created.
@@ -249,11 +280,6 @@ impl Partition {
     where
         F: FnOnce() + Send + 'static,
     {
-        let free_worker = self.get_free_worker_count();
-        if free_worker == 0 || (free_worker != 0 && !self.global.is_empty()) { // CHANGE THIS
-            self.add_worker();
-        } 
-
         let job_info = JobInfo::new();
         let job_info_clone = Arc::clone(&job_info.status);
 
@@ -262,7 +288,24 @@ impl Partition {
             job_info_clone.store(true, Ordering::Release);
         }));
 
-        self.global.push(job);
+        let mut workers = self.workers.lock().unwrap();
+        let worker = Self::find_executor(&mut workers);
+        match worker {
+            Some(executor) => {
+                executor.push(job);
+                workers.push(executor);
+            }
+            None => {
+                let executor = Executor::new(
+                    self.core_id,
+                    self.configuration.clone(),
+                    self.available_workers.clone(),
+                );
+                executor.push(job);
+                workers.push(executor);
+                self.total_workers.fetch_add(1, Ordering::AcqRel);
+            }
+        }
 
         job_info
     }
@@ -272,21 +315,13 @@ impl Drop for Partition {
     /// Drop the partition.
     /// It will terminate all the executors and join them.
     fn drop(&mut self) {
-        trace!(
-            "Dropping partition on core {}, total worker: {}.",
-            self.core_id.id,
-            self.get_worker_count()
-        );
-
-        // Push terminate messages to the global queue.
-        // This will terminate all the executors.
-        for _ in 0..self.get_worker_count() {
-            self.global.push(Job::Terminate);
-        }
-
         let mut workers = self.workers.lock().unwrap();
 
         // Join all the workers.
+        for worker in workers.iter_mut() {
+            worker.push(Job::Terminate);
+        }
+
         for worker in workers.iter_mut() {
             worker.join();
         }
@@ -295,7 +330,7 @@ impl Drop for Partition {
 
 /// The orchestrator is the main structure of the library.
 /// Is composed by a list of partitions, each partition, if pinning is enabled, is a core.
-/// The orchestrator is responsible to create the partitions and to dis;tribute the jobs to the partitions.
+/// The orchestrator is responsible to create the partitions and to distribute the jobs to the partitions.
 /// The orchestractor is global, implemented as a singleton.
 /// The main idea is to have a central point that distribuite evenly the jobs to the partitions, exploiting
 /// the numa architecture of the system.
@@ -304,8 +339,8 @@ pub struct Orchestrator {
     configuration: Arc<Configuration>,
 }
 
-/// OnceCell is a structure that allow to create a safe global singleton.
-static mut ORCHESTRATOR: OnceCell<Arc<Orchestrator>> = OnceCell::new();
+/// OnceLock is a structure that allow to create a safe global singleton.
+static mut ORCHESTRATOR: OnceLock<Arc<Orchestrator>> = OnceLock::new();
 
 /// Create a new orchestrator with the default configuration.
 pub(crate) fn new_default_orchestrator() -> Arc<Orchestrator> {
@@ -344,25 +379,8 @@ impl Orchestrator {
     /// Find the partition with the less busy executors.
     /// If there are more than one partition with the same number of executors, the first one is returned.
     /// If there are no executors in any partition, the first partition is returned.
-    fn find_partition(&self) -> Option<&Partition> {
-        if self.partitions.is_empty() {
-            return None;
-        } else if self.partitions.len() == 1 {
-            return Some(self.partitions.first().unwrap());
-        }
-        let mut min = self.partitions.first();
-        let mut min_busy = min.unwrap().get_busy_worker_count();
-        for partition in self.partitions.iter() {
-            let busy = partition.get_busy_worker_count();
-            if busy == 0 {
-                return Some(partition);
-            }
-            if busy < min_busy {
-                min = Some(partition);
-                min_busy = busy;
-            }
-        }
-        min
+    fn find_partition(partitions: &[Partition]) -> Option<&Partition> {
+        partitions.iter().min_by_key(|p| p.get_busy_worker_count())
     }
 
     /// Find the subarray of size count of partition that minimize the number of busy executors contained in each partition of the subarray.
@@ -371,51 +389,52 @@ impl Orchestrator {
     /// This will reduce the complexity from O(n^2) to O(n).
     /// If there are no executors in any partition, the first sequence of 'count' partitions is returned.
     /// This method is used to find the best sequence of partitions to pin a set jobs.
-    fn find_partition_sequence(&self, count: usize) -> Option<Vec<&Partition>> {
-        if count > self.partitions.len() {
+    fn find_partition_sequence(partitions: &[Partition], count: usize) -> Option<&[Partition]> {
+        if count > partitions.len() {
             return None;
         }
 
         let mut min = None;
         let mut min_busy = usize::MAX;
-        let mut busy = 0;
-        for i in 0..count {
-            busy += self.partitions[i].get_busy_worker_count();
-        }
+        let mut busy = partitions
+            .iter()
+            .take(count)
+            .map(|p| p.get_busy_worker_count())
+            .sum();
+
         if busy == 0 {
-            return Some(self.partitions[0..count].iter().collect());
+            return Some(&partitions[0..count]);
         }
+
         if busy < min_busy {
-            min = Some(self.partitions[0..count].iter().collect());
+            min = Some(&partitions[0..count]);
             min_busy = busy;
         }
-        for i in count..self.partitions.len() {
-            busy -= self.partitions[i - count].get_busy_worker_count();
-            busy += self.partitions[i].get_busy_worker_count();
+
+        for i in count..partitions.len() {
+            busy -= partitions[i - count].get_busy_worker_count();
+            busy += partitions[i].get_busy_worker_count();
+
             if busy == 0 {
-                return Some(self.partitions[i - count + 1..i + 1].iter().collect());
+                return Some(&partitions[i - count + 1..=i]);
             }
+
             if busy < min_busy {
-                min = Some(self.partitions[i - count + 1..i + 1].iter().collect());
+                min = Some(&partitions[i - count + 1..=i]);
                 min_busy = busy;
             }
         }
+
         min
     }
-
-    /// Get the number of partitions of the orchestrator.
-    pub fn get_partition_count(&self) -> usize {
-        self.partitions.len()
-    }
-
     /// Push a function into the orchestrator.
     /// This method return a JobInfo that can be used to wait for the Job to finish.
     /// If there aren't executors in the partitions of the orchestrator or all the existing executors are busy, a new executor is created.
-    pub(crate) fn push<F>(&self, f: F) -> JobInfo
+    fn push_single<F>(partitions: &[Partition], f: F) -> JobInfo
     where
         F: FnOnce() + Send + 'static,
     {
-        let partition = self.find_partition();
+        let partition = Self::find_partition(partitions);
         match partition {
             Some(p) => p.push(f),
             None => panic!("No partition found!"), // This should never happen.
@@ -427,14 +446,17 @@ impl Orchestrator {
     /// If the number of functions is lower than the number of partitions, this method will try to push all the functions in partitions that are contiguous in the vector.
     /// If the number of functions is greater than the number of partitions, this method will distribute evenly the functions in the sequence of partitions found.
     /// If there aren't executors in the partitions of the orchestrator or all the existing executors are busy, new executor are created.
-    pub(crate) fn push_multiple<F>(&self, mut f: Vec<F>) -> Vec<JobInfo>
+    pub(crate) fn push_jobs<F>(&self, mut f: Vec<F>) -> Vec<JobInfo>
     where
         F: FnOnce() + Send + 'static,
     {
         let mut job_info = Vec::with_capacity(f.len());
 
-        let partitions = self.find_partition_sequence(f.len());
+        let mut partitions = None;
 
+        if f.len() > 1 {
+            partitions = Self::find_partition_sequence(&self.partitions, f.len());
+        }
         match partitions {
             Some(p) => {
                 for partition in p {
@@ -447,7 +469,7 @@ impl Orchestrator {
             None => {
                 for _i in 0..f.len() {
                     let func = f.remove(0);
-                    job_info.push(self.push(move || {
+                    job_info.push(Self::push_single(&self.partitions, move || {
                         func();
                     }));
                 }
@@ -479,7 +501,7 @@ impl Drop for Orchestrator {
 mod tests {
     use super::*;
     use serial_test::serial;
-    use std::sync::Arc;
+    use std::sync::{atomic::AtomicUsize, Arc};
 
     #[test]
     #[serial]
@@ -492,10 +514,10 @@ mod tests {
 
         (0..1000).for_each(|_| {
             let counter_clone = counter.clone();
-            let job_info = orchestrator.push(move || {
+            let mut job_info = orchestrator.push_jobs(vec![move || {
                 counter_clone.fetch_add(1, Ordering::AcqRel);
-            });
-            jobs_info.push(job_info);
+            }]);
+            jobs_info.push(job_info.remove(0));
         });
 
         for job_info in jobs_info {
@@ -515,10 +537,10 @@ mod tests {
 
         (0..1000).for_each(|_| {
             let counter_clone = counter.clone();
-            let job_info = orchestrator.push(move || {
+            let mut job_info = orchestrator.push_jobs(vec![move || {
                 counter_clone.fetch_add(1, Ordering::AcqRel);
-            });
-            jobs_info.push(job_info);
+            }]);
+            jobs_info.push(job_info.remove(0));
         });
 
         for job_info in jobs_info {
