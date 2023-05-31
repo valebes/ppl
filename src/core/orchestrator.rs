@@ -93,7 +93,6 @@ impl Executor {
     /// Push a job in the executor queue
     fn push(&self, job: Job) {
         let mut queue = self.queue.lock().unwrap();
-        assert!(queue.is_empty());
         queue.push_back(job);
         self.cvar.notify_one();
     }
