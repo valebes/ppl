@@ -488,8 +488,9 @@ The benchmarks are available in the *benches/* directory. To run the benchmarks,
 cargo bench
 ```
 
-For now there is only one benchmark called *image_processing*. This benchmark is based on the [RustStreamBench](https://github.com/GMAP/RustStreamBench/) Image Processing benchmark
-that can be found [here](https://github.com/GMAP/RustStreamBench/tree/main/image-processing).
+For now there are only two benchmarks.
+The first, called *image_processing*, is based on the [RustStreamBench](https://github.com/GMAP/RustStreamBench/) Image Processing benchmark that can be found [here](https://github.com/GMAP/RustStreamBench/tree/main/image-processing).
+The second is a basic parallel implementation of the well known iterative algorithm to compute the Mandelbrot Set, is called *mandelbrot_set*.
 
 ## Contributing
 
