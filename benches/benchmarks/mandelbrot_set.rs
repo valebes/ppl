@@ -16,7 +16,7 @@ pub fn mandelbrot_set(criterion: &mut Criterion) {
     for replicas in replicas_for_stage {
         let mut threads = 1;
         if replicas > 1 {
-            threads *= 2;
+            threads = replicas * 2;
         }
 
         group.bench_function(BenchmarkId::new("rust_ssp", threads), |b| {
