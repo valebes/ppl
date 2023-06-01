@@ -15,15 +15,21 @@ pub fn mandelbrot_set(criterion: &mut Criterion) {
     for replicas in replicas_for_stage {
         let threads = replicas;
 
+        group.bench_function(BenchmarkId::new("rust_ssp", threads), |b| {
+            b.iter(|| mandelbrot::rust_ssp::rust_ssp(threads))
+        });
+
         group.bench_function(BenchmarkId::new("ppl", threads), |b| {
             b.iter(|| mandelbrot::ppl::ppl(threads))
         });
 
-
-        group.bench_function(BenchmarkId::new("ppl_map", threads), |b| {
-            b.iter(|| mandelbrot::ppl_map::ppl_map(threads))
+        group.bench_function(BenchmarkId::new("ppl_tp", threads), |b| {
+            b.iter(|| mandelbrot::ppl_tp::ppl_tp(threads))
         });
-        
+
+        group.bench_function(BenchmarkId::new("rayon", threads), |b| {
+            b.iter(|| mandelbrot::rayon::rayon(threads))
+        });
     }
 }
 
