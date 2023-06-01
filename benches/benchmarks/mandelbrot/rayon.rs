@@ -2,7 +2,7 @@ use num_complex::Complex;
 use rayon::prelude::*;
 
 pub fn rayon(threads: usize) {
-    let max_iterations = 5000u16;
+    let max_iterations = 10000u16;
     let img_side = 1000u32;
     let cxmin = -2f32;
     let cxmax = 1f32;
@@ -12,7 +12,7 @@ pub fn rayon(threads: usize) {
     let scaley = (cymax - cymin) / img_side as f32;
 
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(threads * 5)
+        .num_threads(threads)
         .build()
         .unwrap();
 

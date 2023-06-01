@@ -7,7 +7,7 @@ use ppl::{prelude::*, collections::misc::{SourceIter, OrderedParallel, OrderedSi
 use num_complex::Complex;
 
 pub fn ppl(buf: Vec<(u32, u32)>, threads: usize) {
-    let max_iterations = 5000u16;
+    let max_iterations = 10000u16;
     let img_side = 1000u32;
     let cxmin = -2f32;
     let cxmax = 1f32;
