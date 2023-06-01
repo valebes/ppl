@@ -6,7 +6,7 @@ use image::{Luma};
 use ppl::{prelude::*, collections::misc::{SourceIter, OrderedParallel, OrderedSinkVec}};
 use num_complex::Complex;
 
-pub fn ppl(buf: Vec<(u32, u32)>, threads: usize) {
+pub fn ppl(threads: usize) {
     let max_iterations = 10000u16;
     let img_side = 1000u32;
     let cxmin = -2f32;
@@ -16,6 +16,14 @@ pub fn ppl(buf: Vec<(u32, u32)>, threads: usize) {
     let scalex = (cxmax - cxmin) / img_side as f32;
     let scaley = (cymax - cymin) / img_side as f32;
 
+    // Create the coordinates
+    let mut buf = Vec::new();
+    for y in 0..1000u32 {
+        for x in 0..1000u32 {
+            buf.push((x, y));
+        }
+    }
+    
     let mut pipeline = parallel![
         SourceIter::build(buf.into_iter()),
         OrderedParallel::build(threads, move |(x, y)| -> Luma<u8> {

@@ -3,7 +3,7 @@ use num_complex::Complex;
 
 use rust_spp::*;
 
-pub fn rust_ssp(buf: Vec<(u32, u32)>, threads: usize) {
+pub fn rust_ssp(threads: usize) {
     let max_iterations = 10000u16;
     let img_side = 1000u32;
     let cxmin = -2f32;
@@ -13,6 +13,14 @@ pub fn rust_ssp(buf: Vec<(u32, u32)>, threads: usize) {
     let scalex = (cxmax - cxmin) / img_side as f32;
     let scaley = (cymax - cymin) / img_side as f32;
 
+    // Create the coordinates
+    let mut buf = Vec::new();
+    for y in 0..1000u32 {
+        for x in 0..1000u32 {
+            buf.push((x, y));
+        }
+    }
+    
     let pipeline = pipeline![
         parallel!(
             move |(x, y)| -> Option<Luma<u8>> {
