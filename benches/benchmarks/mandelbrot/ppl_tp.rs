@@ -8,8 +8,8 @@ use ppl::prelude::*;
 pub fn ppl_tp(threads: usize) {
     let mut pool = ThreadPool::new_with_global_registry(threads);
 
-    let max_iterations = 500u16;
-    let img_side = 10000u32;
+    let max_iterations = 5000u16;
+    let img_side = 1000u32;
     let cxmin = -2f32;
     let cxmax = 1f32;
     let cymin = -1.5f32;
