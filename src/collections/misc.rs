@@ -524,7 +524,7 @@ where
     /// Creates a new parallel node
     /// The node will terminate when the upstream terminates.
     /// The node will produce data in the same order as it is received from the upstream.
-    pub fn build(f: F, n_replicas: usize) -> impl InOut<T, U> {
+    pub fn build(n_replicas: usize, f: F,) -> impl InOut<T, U> {
         Self {
             f,
             n_replicas,

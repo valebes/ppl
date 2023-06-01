@@ -6,11 +6,11 @@ use core_affinity::CoreId;
 ///
 /// The configuration is set by the user through environment variables.
 /// The environment variables are:
-/// - PPL_MAX_CORES: Maximum number of cores were pinning is allowed. Only valid when pinning is active.
-/// - PPL_PINNING: Enable threads pinning. Default is false.
-/// - PPL_SCHEDULE: Scheduling method used in the pipeline. Default is static.
-/// - PPL_WAIT_POLICY: Enable blocking in threads communications. Default is false.
-/// - PPL_THREADS_MAPPING: Custom threads mapping to cores. Default is the order in which the cores are found.
+/// * `PPL_MAX_CORES`: Maximum number of cores were pinning is allowed. Only valid when pinning is active.
+/// * `PPL_PINNING`: Enable threads pinning. Default is false.
+/// * `PPL_SCHEDULE`: Scheduling method used in the pipeline. Default is static.
+/// * `PPL_WAIT_POLICY`: Enable blocking in threads communications. Default is false.
+/// * `PPL_THREADS_MAPPING`: Custom threads mapping to cores. Default is the order in which the cores are found.
 pub struct Configuration {
     max_cores: usize,
     threads_mapping: Vec<CoreId>,
@@ -62,11 +62,11 @@ fn parse_threads_mapping() -> Vec<CoreId> {
 
 impl Configuration {
     /// Create a new configuration.
-    /// The parameters are:
-    /// - max_cores: maximum number of cores allowed. Only valid when pinning is active.
-    /// - pinning: enable pinning of the partitions to the cores.
-    /// - scheduling: scheduling method used in the pipeline.
-    /// - wait_policy: enable blocking in channels.
+    /// # Arguments
+    /// * `max_cores`: maximum number of cores allowed. Only valid when pinning is active.
+    /// * `pinning`: enable pinning of the partitions to the cores.
+    /// * `scheduling`: scheduling method used in the pipeline.
+    /// * `wait_policy`: enable blocking in channels.
     pub fn new(
         max_cores: usize,
         pinning: bool,
@@ -85,11 +85,11 @@ impl Configuration {
     }
 
     /// Create a new configuration with the default values.
-    /// The default values are:
-    /// - max_cores: the number of cores found by the framework.
-    /// - pinning: false.
-    /// - scheduling: static.
-    /// - wait_policy: false.
+    /// # Default values
+    /// * `max_cores`: the number of cores found by the framework.
+    /// * `pinning`: false.
+    /// * `scheduling`: static.
+    /// * `wait_policy`: false.
     pub fn new_default() -> Configuration {
         let max_threads = match env::var("PPL_MAX_CORES") {
             Ok(val) => val.parse::<usize>().unwrap(),

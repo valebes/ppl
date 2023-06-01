@@ -39,7 +39,9 @@ rust-spp = {git = "https://github.com/GMAP/rust-ssp.git"}
 num_cpus = "1.15.0"
 serial_test = "2.0.0"
 scopeguard = "1.1.0"
+image = "0.24.6"
+num-complex = "0.4.3"
 
 [[bench]]
 harness = false
-name = "image_processing"
+name = "main"

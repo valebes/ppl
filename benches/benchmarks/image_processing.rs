@@ -1,18 +1,18 @@
-mod img;
-
 use criterion::{AxisScale, BatchSize, BenchmarkId, Criterion, PlotConfiguration, SamplingMode};
 
-fn image_processing(criterion: &mut Criterion) {
+use super::img;
+
+pub fn image_processing(criterion: &mut Criterion) {
     // Sets up criterion.
     let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
-    let mut group = criterion.benchmark_group("Processing time");
+    let mut group = criterion.benchmark_group("Image processing processing time");
     group
         .sampling_mode(SamplingMode::Auto)
         .plot_config(plot_cfg)
         .sample_size(20);
 
     // Parses the images.
-    let images = std::fs::read_dir("benches/img/images")
+    let images = std::fs::read_dir("benches/benchmarks/img/images/")
         .map(|dir| {
             dir.into_iter()
                 .flatten()
@@ -73,4 +73,3 @@ fn image_processing(criterion: &mut Criterion) {
 }
 
 criterion::criterion_group!(benches, image_processing);
-criterion::criterion_main!(benches);
