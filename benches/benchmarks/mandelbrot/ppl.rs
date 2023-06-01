@@ -1,4 +1,4 @@
-use image::{Luma, ImageBuffer};
+use image::{Luma};
 /* 
     Mandelbrot set
     https://rosettacode.org/wiki/Mandelbrot_set#Rust
@@ -40,13 +40,6 @@ pub fn ppl(buf: Vec<(u32, u32)>, threads: usize) {
     ];
     
     pipeline.start();
-    let mut res = pipeline.wait_and_collect().unwrap();
-    
-    // Save image
-    let mut image: image::ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(img_side, img_side);
-    for (_, _, pixel) in image.enumerate_pixels_mut() {
-        *pixel = res.remove(0);
-    }
-    image.save("benches/benchmarks/mandelbrot/fractal_ppl.png").unwrap();
+    let _res = pipeline.wait_and_collect().unwrap();
     Orchestrator::delete_global_orchestrator();
 }

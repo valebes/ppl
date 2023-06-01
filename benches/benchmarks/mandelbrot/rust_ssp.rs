@@ -1,4 +1,3 @@
-use image::ImageBuffer;
 use image::Luma;
 use num_complex::Complex;
 
@@ -43,14 +42,5 @@ pub fn rust_ssp(buf: Vec<(u32, u32)>, threads: usize) {
         pipeline.post(coord).unwrap();
     }
 
-    let mut res = pipeline.collect();
-
-    // Save image
-    let mut image: image::ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(img_side, img_side);
-    for (_, _, pixel) in image.enumerate_pixels_mut() {
-        *pixel = res.remove(0);
-    }
-    image
-        .save("benches/benchmarks/mandelbrot/fractal_rust_ssp.png")
-        .unwrap();
+    let mut _res = pipeline.collect();
 }

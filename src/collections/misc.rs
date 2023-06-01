@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::pipeline::node::{In, InOut, Out};
 
 /// SourceIter
-/// This source node produces data from a iterator
+/// This source node produces data from a iterator.
 pub struct SourceIter<I, T>
 where
     I: Iterator<Item = T>,
@@ -16,8 +16,8 @@ where
     I: Iterator<Item = T>,
     T: Send + 'static,
 {
-    /// Creates a new source from a iterator
-    /// The source will terminate when the iterator is exhausted
+    /// Creates a new source from a iterator.
+    /// The source will terminate when the iterator is exhausted.
     pub fn build(iterator: I) -> impl Out<T> {
         Self {
             iterator,
@@ -36,8 +36,8 @@ where
 }
 
 /// SinkVec
-/// Sink node that accumulates data into a vector
-/// The sink will terminate when the upstream terminates
+/// Sink node that accumulates data into a vector.
+/// The sink will terminate when the upstream terminates.
 /// The sink will produce a vector containing all the data received
 /// from the upstream.
 pub struct SinkVec<T> {
@@ -47,8 +47,8 @@ impl<T> SinkVec<T>
 where
     T: Send + 'static,
 {
-    /// Creates a new sink that accumulates data into a vector
-    /// The sink will terminate when the upstream terminates
+    /// Creates a new sink that accumulates data into a vector.
+    /// The sink will terminate when the upstream terminates.
     /// The sink will produce a vector containing all the data received.
     pub fn build() -> impl In<T, Vec<T>> {
         Self { data: Vec::new() }
@@ -79,7 +79,7 @@ impl<T> Splitter<T>
 where
     T: Send + 'static + Clone,
 {
-    /// Creates a new splitter node
+    /// Creates a new splitter node.
     /// The node will terminate when the upstream terminates.
     pub fn build(chunk_size: usize) -> impl InOut<Vec<T>, Vec<T>> {
         Self {
@@ -111,8 +111,8 @@ where
 }
 
 /// Aggregator
-/// This node receives elements and accumulates them into a vector
-/// When the vector reaches the size `chunk_size` it is sent to the next node
+/// This node receives elements and accumulates them into a vector.
+/// When the vector reaches the size `chunk_size` it is sent to the next node.
 /// The node will terminate when the upstream terminates.
 #[derive(Clone)]
 pub struct Aggregator<T> {
@@ -178,7 +178,7 @@ where
     U: Send + 'static + Clone,
     F: FnMut(T) -> U + Send + 'static + Clone,
 {
-    /// Creates a new sequential node
+    /// Creates a new sequential node.
     /// The node will terminate when the upstream terminates.
     pub fn build(f: F) -> impl InOut<T, U> {
         Self {
@@ -242,7 +242,7 @@ where
 }
 
 /// Filter
-/// This node receives elements and filters them according to the given predicate
+/// This node receives elements and filters them according to the given predicate.
 /// The node will terminate when the upstream terminates.
 #[derive(Clone)]
 pub struct Filter<T, F>
@@ -259,7 +259,7 @@ where
     T: Send + 'static + Clone,
     F: FnMut(&T) -> bool + Send + 'static + Clone,
 {
-    /// Creates a new filter node
+    /// Creates a new filter node.
     /// The node will terminate when the upstream terminates.
     pub fn build(f: F) -> impl InOut<T, T> {
         Self {
@@ -298,9 +298,9 @@ where
 // Ordered versions of the above
 
 /// OrderedSinkVec
-/// Sink node that accumulates data into a vector
-/// This is a ordered version of SinkVec
-/// The sink will terminate when the upstream terminates
+/// Sink node that accumulates data into a vector.
+/// This is a ordered version of SinkVec.
+/// The sink will terminate when the upstream terminates.
 /// The sink will produce a vector containing all the data received in the same order
 /// as it was received from the upstream.
 pub struct OrderedSinkVec<T> {
@@ -310,9 +310,9 @@ impl<T> OrderedSinkVec<T>
 where
     T: Send + 'static,
 {
-    /// Creates a new sink that accumulates data into a vector
-    /// This is a ordered version of SinkVec
-    /// The sink will terminate when the upstream terminates
+    /// Creates a new sink that accumulates data into a vector.
+    /// This is a ordered version of SinkVec.
+    /// The sink will terminate when the upstream terminates.
     /// The sink will produce a vector containing all the data received in the same order
     /// as it was received from the upstream.
     pub fn build() -> impl In<T, Vec<T>> {
@@ -337,7 +337,7 @@ where
 /// OrderedSplitter
 /// This node receives a vector, split it into chunks of size `chunk_size`
 /// and send each chunk into the next node.
-/// This is a ordered version of Splitter
+/// This is a ordered version of Splitter.
 /// The node will terminate when the upstream terminates.
 /// The node will produce data in the same order as it is received from the upstream.
 #[derive(Clone)]
@@ -350,7 +350,7 @@ impl<T> OrderedSplitter<T>
 where
     T: Send + 'static + Clone,
 {
-    /// Creates a new splitter node
+    /// Creates a new splitter node.
     /// The node will terminate when the upstream terminates.
     /// The node will produce data in the same order as it is received from the upstream.
     pub fn build(chunk_size: usize) -> impl InOut<Vec<T>, Vec<T>> {
@@ -397,9 +397,9 @@ where
 }
 
 /// OrderedAggregator
-/// This node receives elements and accumulates them into a vector
-/// When the vector reaches the size `chunk_size` it is sent to the next node
-/// This is a ordered version of Aggregator
+/// This node receives elements and accumulates them into a vector.
+/// When the vector reaches the size `chunk_size` it is sent to the next node.
+/// This is a ordered version of Aggregator.
 /// The node will terminate when the upstream terminates.
 /// The node will produce data in the same order as it is received from the upstream.
 #[derive(Clone)]
@@ -412,7 +412,7 @@ impl<T> OrderedAggregator<T>
 where
     T: Send + 'static + Clone,
 {
-    /// Creates a new aggregator node
+    /// Creates a new aggregator node.
     /// The node will terminate when the upstream terminates.
     /// The node will produce data in the same order as it is received from the upstream.
     pub fn build(chunk_size: usize) -> impl InOut<T, Vec<T>> {
@@ -465,8 +465,8 @@ where
 }
 
 /// OrderedSequential
-/// This node receives elements and applies a function to each element
-/// This is a ordered version of Sequential
+/// This node receives elements and applies a function to each element.
+/// This is a ordered version of Sequential.
 /// The node will terminate when the upstream terminates.
 /// The node will produce data in the same order as it is received from the upstream.
 #[derive(Clone)]
@@ -480,7 +480,7 @@ where
     U: Send + 'static + Clone,
     F: FnMut(T) -> U + Send + 'static + Clone,
 {
-    /// Creates a new sequential node
+    /// Creates a new sequential node.
     /// The node will terminate when the upstream terminates.
     /// The node will produce data in the same order as it is received from the upstream.
     pub fn build(f: F) -> impl InOut<T, U> {
@@ -505,8 +505,8 @@ where
 }
 
 /// OrderedParallel
-/// This node receives elements and applies a function to each element
-/// This is a ordered version of Parallel
+/// This node receives elements and applies a function to each element.
+/// This is a ordered version of Parallel.
 /// The node will terminate when the upstream terminates.
 /// The node will produce data in the same order as it is received from the upstream.
 #[derive(Clone)]
@@ -521,7 +521,7 @@ where
     U: Send + 'static + Clone,
     F: FnMut(T) -> U + Send + 'static + Clone,
 {
-    /// Creates a new parallel node
+    /// Creates a new parallel node.
     /// The node will terminate when the upstream terminates.
     /// The node will produce data in the same order as it is received from the upstream.
     pub fn build(n_replicas: usize, f: F) -> impl InOut<T, U> {
@@ -551,7 +551,7 @@ where
 
 /// OrderedFilter
 /// This node receives elements and filters them according to a predicate.
-/// This is a ordered version of Filter
+/// This is a ordered version of Filter.
 /// The node will terminate when the upstream terminates.
 #[derive(Clone)]
 pub struct OrderedFilter<T, F> {
@@ -564,7 +564,7 @@ where
     T: Send + 'static + Clone,
     F: FnMut(&T) -> bool + Send + 'static + Clone,
 {
-    /// Creates a new filter node
+    /// Creates a new filter node.
     /// The node will terminate when the upstream terminates.
     pub fn build(f: F) -> impl InOut<T, T> {
         Self {
@@ -573,7 +573,7 @@ where
             phantom: PhantomData,
         }
     }
-    /// Creates a new filter node
+    /// Creates a new filter node.
     /// The node will terminate when the upstream terminates.
     pub fn build_with_replicas(f: F, n_replicas: usize) -> impl InOut<T, T> {
         Self {

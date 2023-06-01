@@ -49,9 +49,5 @@ pub fn rayon(threads: usize) {
 
                 *pixel = image::Luma([i as u8]);
             });
-
-        imgbuf
-            .save("benches/benchmarks/mandelbrot/fractal_rayon.png")
-            .unwrap();
     });
 }
