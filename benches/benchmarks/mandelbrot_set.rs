@@ -12,12 +12,12 @@ pub fn mandelbrot_set(criterion: &mut Criterion) {
         .sample_size(10);
 
 
-    let replicas_for_stage = 1..(num_cpus::get() / 2) + 1;
+    let replicas_for_stage = 0..(num_cpus::get() / 2) + 1;
     for replicas in replicas_for_stage {
         let mut threads = 1;
-        if replicas > 1 {
+        if replicas > 0  {
             threads = replicas * 2;
-        }
+        }  
 
         group.bench_function(BenchmarkId::new("rust_ssp", threads), |b| {
             b.iter(|| mandelbrot::rust_ssp::rust_ssp(threads))
