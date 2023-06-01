@@ -3,7 +3,7 @@ use ppl::thread_pool::ThreadPool;
 use raster::filter;
 use raster::Image;
 
-pub fn ppl_map(images: Vec<Image>, threads: usize) {
+pub fn ppl_tp(images: Vec<Image>, threads: usize) {
     let mut pool = ThreadPool::new_with_global_registry(threads * 5);
 
     let _res: Vec<Image> = pool

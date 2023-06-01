@@ -23,7 +23,7 @@ pub fn mandelbrot_set(criterion: &mut Criterion) {
             b.iter(|| mandelbrot::ppl::ppl(threads))
         });
 
-        group.bench_function(BenchmarkId::new("ppl_tp", threads), |b| {
+        group.bench_function(BenchmarkId::new("ppl_map", threads), |b| {
             b.iter(|| mandelbrot::ppl_tp::ppl_tp(threads))
         });
 
