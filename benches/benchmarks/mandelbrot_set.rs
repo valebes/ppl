@@ -14,8 +14,8 @@ pub fn mandelbrot_set(criterion: &mut Criterion) {
 
     // Create the coordinates
     let mut buf = Vec::new();
-    for y in 0..1000u32 {
-        for x in 0..1000u32 {
+    for y in 0..10000u32 {
+        for x in 0..10000u32 {
             buf.push((x, y));
         }
     }
