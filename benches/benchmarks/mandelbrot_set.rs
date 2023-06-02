@@ -4,12 +4,12 @@ use super::mandelbrot;
 
 pub fn mandelbrot_set(criterion: &mut Criterion) {
     // Sets up criterion.
-    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
-    let mut group = criterion.benchmark_group("Mandelbrot set processing time");
+    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Linear);
+    let mut group = criterion.benchmark_group("Mandelbrot set");
     group
         .sampling_mode(SamplingMode::Auto)
         .plot_config(plot_cfg)
-        .sample_size(10);
+        .sample_size(20);
 
 
     let replicas_for_stage = 0..(num_cpus::get() / 2) + 1;

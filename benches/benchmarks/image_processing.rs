@@ -4,8 +4,8 @@ use super::img;
 
 pub fn image_processing(criterion: &mut Criterion) {
     // Sets up criterion.
-    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
-    let mut group = criterion.benchmark_group("Image processing processing time");
+    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Linear);
+    let mut group = criterion.benchmark_group("Image processing");
     group
         .sampling_mode(SamplingMode::Auto)
         .plot_config(plot_cfg)
