@@ -19,7 +19,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
   - [A More Complex Example: Word Counter](#a-more-complex-example-word-counter)
   - [Advanced Example: Single-Input Multi-Output stage](#advanced-example-single-input-multi-output-stage)
 - [Configuration](#configuration)
-- [Channel Implementation](#channel-implementation)
+- [Channel Backend](#channel-backend)
   - [FastFlow Channel](#fastflow-channel)
 - [Benchmarks](#benchmarks)
 - [Contributing](#contributing)
@@ -34,8 +34,8 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 
 - **Parallel Computing**: Unlock the power of parallelism in Rust with the Parallelo Parallel Library (PPL). Harness the potential of multiple cores to make your computations faster and more efficient.
 - **Essential Tools**: PPL offers a variety of essential tools for parallel computing, including a work-stealing thread pool, pipelines, farms, and other parallel skeletons. These tools allow you to express complex parallel computations with ease.
-- **NUMA Awareness**: Take advantage of PPL's NUMA awareness to optimize the utilization of your system's resources. Customize aspects such as maximum parallelism, thread wait policies, and mapping of threads to physical cores for enhanced performance and efficiency.
-- **Flexible Channel Implementations**: Choose from a range of flexible channel implementations in PPL to enable seamless communication and coordination between parallel tasks. Select the channel type that suits your application requirements, ensuring smooth data flow throughout your parallel computations.
+- **NUMA Awareness**: Take advantage of PPL's NUMA awareness to optimize the utilization of your system's resources. Customize aspects such as the maximum number of cores to use, thread wait policies, and mapping of threads to physical cores for enhanced performance and efficiency.
+- **Multiple Channel Backends**: Choose from a range of flexible channel implementations in PPL to enable seamless communication and coordination between parallel tasks. Select the channel backend that suits your application requirements, ensuring smooth data flow throughout your parallel computations.
 - **Customization and Stateful Nodes**: With PPL, you have the flexibility to create custom stages and nodes, allowing you to add state and express more complex parallel computations. Tailor your pipeline to specific needs and create highly customizable parallel workflows.
 - **Intuitive API**: Whether you're a seasoned parallel computing expert or new to parallelism, PPL simplifies parallel programming with its intuitive API. Developers of all levels of expertise can easily leverage the power of parallel computing in Rust.
 - **Work-Stealing Thread Pool**: PPL includes a powerful work-stealing thread pool that further enhances parallel execution. Utilize the thread pool to distribute work across multiple threads, maximizing the efficiency of your parallel computations.
@@ -443,26 +443,26 @@ The configuration of Parallelo Parallel Library (PPL) can be customized by setti
 - **PPL_THREADS_MAPPING**: Specifies the threads mapping. By default, the threads are mapped in the order in which the cores are found. This option is only valid when pinning is active. (Note that this environment variable is kinda similar to the `OMP_PLACES` environment variable in OpenMP). 
   - Example: `PPL_THREADS_MAPPING=0,2,1,3` will map the threads in the following order: `0 -> core 0`, `1 -> core 2`, `2 -> core 1`, `3 -> core 3`.
 
-To customize the configuration, set the desired environment variables before running your Rust program that uses PPL. For example, you can set the environment variables in your shell script or use a tool like `env_file` to load them from a file.
+To customize the configuration, set the desired environment variables before running your Rust program that uses PPL. For example, you can set the environment variables in your shell script or use a tool to load them from a file.
 
 Please note that changing these configuration options may have an impact on the performance and behavior of your parallel computations. Experiment with different settings to find the optimal configuration for your specific use case.
 
-## Channel Implementation
+## Channel Backend
 
-Parallelo Parallel Library (PPL) provides flexibility in choosing the channel implementation for multi-producer, single-consumer communication. Depending on your requirements and preferences, you can select the desired channel implementation at compile time using feature flags.
+Parallelo Parallel Library (PPL) provides flexibility in choosing the channel backend used for multi-producer, single-consumer communication in the framework. Depending on your requirements and preferences, you can select the desired channel backend at compile time using feature flags.
 
-The default channel implementation in PPL is **crossbeam**.
+The default backend in PPL is **crossbeam**.
 
-Crossbeam is a highly performant channel implementation that provides efficient and reliable communication differents threads. It is well-suited for a wide range of parallel computing scenarios.
+Crossbeam provides a highly performant channel implementation that provides efficient and reliable communication differents threads. It is well-suited for a wide range of parallel computing scenarios.
 
-The available channel implementations are:
+Overall, PPL supports the following backends:
 
 - **crossbeam**: Uses the [Crossbeam](https://github.com/crossbeam-rs/crossbeam) channel.
 - **flume**: Uses the [Flume](https://github.com/zesterer/flume) channel.
 - **kanal**: Uses the [Kanal](https://github.com/fereidani/kanal) channel.
 - **ff**: Uses a channel based on [FastFlow](http://calvados.di.unipi.it/) queues (**Experimental**).
 
-To select a specific channel implementation, enable the corresponding feature flag during the build process. For example, to use the crossbeam channel implementation, add the following to your Cargo.toml file:
+To select a specific channel backend, enable the corresponding feature flag during the build process. For example, to use the crossbeam channel, add the following to your Cargo.toml file:
 
 ```toml
 [dependencies.ppl]
@@ -470,10 +470,10 @@ features = ["crossbeam"]
 ```
 
 ### FastFlow Channel
-In addition to the standard channel implementations, PPL also provides an experimental channel implementation based on FastFlow queues. This channel implementation is available using the `ff` feature flag.
+In addition to the others channel backends, PPL also provides an experimental mpsc channel implementation based on FastFlow queues. This backend is available using the `ff` feature flag.
 This implementation can be found [here](https://github.com/valebes/ff_buffer) and is substantially based on the [FF Buffer](https://github.com/lucarin91/ff_buffer) by [Luca Rinaldi](https://github.com/lucarin91).
 
-This implementation is built around a wrapper for the FastFlow queues that provides a channel-like interface.
+This backend is built around a wrapper for the FastFlow queues that provides a channel-like interface.
 
 In order to use this implementation you must download and install the FastFlow library in the home directory. The library can be downloaded from [here](http://calvados.di.unipi.it/) or as follows:
 
