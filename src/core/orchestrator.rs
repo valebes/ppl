@@ -95,6 +95,7 @@ impl Executor {
     fn push(&self, job: Job) {
         self.warn_busy();
         let mut queue = self.queue.lock().unwrap();
+        assert!(queue.is_empty());
         queue.push(job);
         self.cvar.notify_one();
     }
@@ -107,10 +108,6 @@ impl Executor {
             Ordering::Acquire,
             |x| -> Option<usize> { Some(x.saturating_sub(1)) },
         );
-    }
-
-    fn is_empty(&self) -> bool {
-        self.queue.lock().unwrap().is_empty()
     }
 
     /// Join the thread running the executor.
@@ -267,7 +264,7 @@ impl Partition {
     /// Find executor
     fn find_executor(workers: &mut Vec<Executor>) -> Option<Executor> {
         for i in 0..workers.len() {
-            if workers[i].get_status() && workers[i].is_empty() {
+            if workers[i].get_status() {
                 return Some(workers.remove(i));
             }
         }
