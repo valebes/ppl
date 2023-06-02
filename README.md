@@ -455,7 +455,7 @@ The default backend in PPL is **crossbeam**.
 
 Crossbeam provides a highly performant channel implementation that provides efficient and reliable communication differents threads. It is well-suited for a wide range of parallel computing scenarios.
 
-Overall, PPL supports the following backends:
+Overall, PPL supports the followings backends:
 
 - **crossbeam**: Uses the [Crossbeam](https://github.com/crossbeam-rs/crossbeam) channel.
 - **flume**: Uses the [Flume](https://github.com/zesterer/flume) channel.
