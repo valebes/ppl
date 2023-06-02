@@ -47,6 +47,7 @@ impl JobInfo {
 struct Executor {
     thread: Thread,
     status: Arc<AtomicBool>,
+    available_workers: Arc<AtomicUsize>,
     queue: Arc<Mutex<Vec<Job>>>,
     cvar: Arc<Condvar>,
 }
@@ -57,7 +58,7 @@ impl Executor {
     fn new(
         core_id: CoreId,
         config: Arc<Configuration>,
-        available_worker: Arc<AtomicUsize>,
+        available_workers: Arc<AtomicUsize>,
     ) -> Executor {
         let status = Arc::new(AtomicBool::new(false));
         let cvar = Arc::new(Condvar::new());
@@ -65,7 +66,7 @@ impl Executor {
 
         let worker = ExecutorInfo::new(
             status.clone(),
-            available_worker,
+            available_workers.clone(),
             queue.clone(),
             cvar.clone(),
         );
@@ -79,6 +80,7 @@ impl Executor {
         Executor {
             thread,
             status,
+            available_workers,
             queue,
             cvar,
         }
@@ -91,9 +93,20 @@ impl Executor {
 
     /// Push a job in the executor queue
     fn push(&self, job: Job) {
+        self.warn_busy();
         let mut queue = self.queue.lock().unwrap();
         queue.push(job);
         self.cvar.notify_one();
+    }
+
+    // Warn that the executor is busy.
+    fn warn_busy(&self) {
+        self.status.store(false, Ordering::Release);
+        let _ = self.available_workers.fetch_update(
+            Ordering::AcqRel,
+            Ordering::Acquire,
+            |x| -> Option<usize> { Some(x.saturating_sub(1)) },
+        );
     }
 
     fn is_empty(&self) -> bool {
@@ -110,7 +123,7 @@ impl Executor {
 /// It contains the queue of jobs and the number of available executors in it's partition.
 struct ExecutorInfo {
     status: Arc<AtomicBool>,
-    available_worker: Arc<AtomicUsize>,
+    available_workers: Arc<AtomicUsize>,
     queue: Arc<Mutex<Vec<Job>>>,
     cvar: Arc<Condvar>,
 }
@@ -118,13 +131,13 @@ impl ExecutorInfo {
     /// Create a new executor info.
     fn new(
         status: Arc<AtomicBool>,
-        available_worker: Arc<AtomicUsize>,
+        available_workers: Arc<AtomicUsize>,
         queue: Arc<Mutex<Vec<Job>>>,
         cvar: Arc<Condvar>,
     ) -> ExecutorInfo {
         ExecutorInfo {
             status,
-            available_worker,
+            available_workers,
             queue,
             cvar,
         }
@@ -133,17 +146,7 @@ impl ExecutorInfo {
     // Warn that the executor is available.
     fn warn_available(&self) {
         self.status.store(true, Ordering::Release);
-        self.available_worker.fetch_add(1, Ordering::AcqRel);
-    }
-
-    // Warn that the executor is busy.
-    fn warn_busy(&self) {
-        self.status.store(false, Ordering::Release);
-        let _ = self.available_worker.fetch_update(
-            Ordering::AcqRel,
-            Ordering::Acquire,
-            |x| -> Option<usize> { Some(x.saturating_sub(1)) },
-        );
+        self.available_workers.fetch_add(1, Ordering::AcqRel);
     }
 
     /// Run the executor.
@@ -174,7 +177,6 @@ impl ExecutorInfo {
             queue = self.cvar.wait(queue).unwrap();
             job = queue.pop();
         }
-        self.warn_busy();
         job
     }
 }

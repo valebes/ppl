@@ -1,7 +1,6 @@
 /*
     Stress test
 */
-
 use ppl::prelude::*;
 
 struct Source {
