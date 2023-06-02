@@ -8,7 +8,7 @@ use log::{trace, warn};
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::ops::Range;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Barrier};
 use std::{hint, mem, thread};
 
@@ -126,7 +126,7 @@ impl ThreadPoolWorker {
     // Warn task done.
     fn task_done(&self) {
         self.total_tasks
-            .fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+            .fetch_sub(1, Ordering::AcqRel);
     }
 }
 ///Struct representing a thread pool.
@@ -219,12 +219,12 @@ impl ThreadPool {
     {
         self.injector.push(Job::NewJob(Box::new(task)));
         self.total_tasks
-            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+            .fetch_add(1, Ordering::AcqRel);
     }
 
     /// Check if there are jobs in the thread pool.
     pub fn is_empty(&self) -> bool {
-        self.total_tasks.load(std::sync::atomic::Ordering::Acquire) == 0 && self.injector.is_empty()
+        self.total_tasks.load(Ordering::Acquire) == 0 && self.injector.is_empty()
     }
 
     /// Block until all current jobs in the thread pool are finished.
