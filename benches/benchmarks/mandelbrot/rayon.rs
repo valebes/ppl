@@ -3,6 +3,7 @@ use num_complex::Complex;
 use rayon::prelude::*;
 
 pub fn rayon_unordered(threads: usize) {
+    // Rayon documentations says that par_bridge is not guaranteed to be ordered
     let max_iterations = 10000u16;
     let img_side = 1000u32;
     let cxmin = -2f32;
