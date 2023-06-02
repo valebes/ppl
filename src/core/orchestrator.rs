@@ -8,7 +8,7 @@ use std::{
 };
 
 use core_affinity::CoreId;
-use log::{error, trace};
+use log::{error, trace, warn};
 
 use super::configuration::Configuration;
 
@@ -364,6 +364,9 @@ impl Orchestrator {
         let mut max_cores = 1;
         if configuration.get_pinning() {
             max_cores = configuration.get_max_cores();
+            if cfg!(target_os = "macos") {
+                warn!("Thread pinning is not currently supported for Apple Silicon.");
+            }
         }
 
         for i in 0..max_cores {
