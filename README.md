@@ -15,7 +15,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 - [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
-  - [A Simple (but Long) Example: Fibonacci pipeline](#a-simple-but-long-example-fibonacci-pipeline)
+  - [A Simple (but long) Example: Fibonacci pipeline](#a-simple-but-long-example-fibonacci-pipeline)
   - [A More Complex Example: Word Counter](#a-more-complex-example-word-counter)
   - [An Advanced Example: Single-Input Multi-Output stage](#an-advanced-example-single-input-multi-output-stage)
 - [Configuration](#configuration)
@@ -53,7 +53,7 @@ $ git clone https://github.com/valebes/ppl.git
 ```
 
 ## Usage
-### A simple (but long) example: Fibonacci pipeline
+### A Simple (but long) Example: Fibonacci pipeline
 Here a simple example that show how create a pipeline that computes the first 20 numbers of Fibonacci.
 
 This pipeline is composed by:
@@ -214,7 +214,7 @@ fn main() {
     tp.wait(); // Wait till al worker have finished
 }
 ```
-### A more complex example: Word Counter
+### A More Complex Example: Word Counter
 
 To demonstrate the capabilities of Parallelo Parallel Library (PPL), let's consider a common problem: counting the occurrences of words in a text dataset. This example showcases how PPL can significantly speed up computations by leveraging parallelism.
 
