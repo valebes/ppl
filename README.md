@@ -34,7 +34,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 
 - **Parallel Computing**: Unlock the power of parallelism in Rust with the Parallelo Parallel Library (PPL). Harness the potential of multiple cores to make your computations faster and more efficient.
 - **Essential Tools**: PPL offers a variety of essential tools for parallel computing, including a work-stealing thread pool, pipelines, farms, and other parallel skeletons. These tools allow you to express complex parallel computations with ease.
-- **NUMA Awareness**: Take advantage of PPL's NUMA awareness to optimize the utilization of your system's resources. Customize aspects such as the maximum number of cores to use, the thread wait policies, and mapping of the threads to the physical cores for enhanced performance and efficiency.
+- **CPU Pinning**: Take advantage of PPL's CPU Pinning to optimize the utilization of your system's resources. Customize aspects such as the maximum number of cores to use, the thread wait policies, and mapping of the threads to the physical cores for enhanced performance and efficiency.
 - **Multiple Channel Backends**: Choose from a range of flexible channel implementations in PPL to enable seamless communication and coordination between parallel tasks. Select the channel backend that suits your application requirements, ensuring smooth data flow throughout your parallel computations.
 - **Customization and Stateful Nodes**: With PPL, you have the flexibility to create custom stages and nodes, allowing you to add state and express more complex parallel computations. Tailor your pipeline to specific needs and create highly customizable parallel workflows.
 - **Intuitive API**: Whether you're a seasoned parallel computing expert or new to parallelism, PPL simplifies parallel programming with its intuitive API. Developers of all levels of expertise can easily leverage the power of parallel computing in Rust.
@@ -430,9 +430,9 @@ More complex examples are available in *benches/*, *examples/*, and in *tests/*.
 
 The configuration of Parallelo Parallel Library (PPL) can be customized by setting environment variables. The following environment variables are available:
 
-- **PPL_MAX_CORES**: Specifies the maximum number of cores to use. This configuration is only valid when pinning is active.
+- **PPL_MAX_CORES**: Specifies the maximum number of CPUs to use. This configuration is only valid when pinning is active.
 
-- **PPL_PINNING**: Enables or disables the threads pinning. By default, pinning is disabled (`false`). (Equivalent to `OMP_PROC_BIND` in OpenMP).
+- **PPL_PINNING**: Enables or disables the CPU pinning. By default, pinning is disabled (`false`). (Equivalent to `OMP_PROC_BIND` in OpenMP).
 
 - **PPL_SCHEDULE**: Specifies the scheduling method used in the pipeline. The available options are:
   - `static`: Static scheduling (Round-robin).
@@ -440,7 +440,7 @@ The configuration of Parallelo Parallel Library (PPL) can be customized by setti
 
 - **PPL_WAIT_POLICY**: If set to `true`, the threads will try to give up their time to other threads when waiting for a communication or unused. This is particularly useful when we are using SMT and can improve performances. If is set to `false`, the threads wil do busy waiting. By default, this option is set to `false`.
 
-- **PPL_THREADS_MAPPING**: Specifies the threads mapping. By default, the threads are mapped in the order in which the cores are found. This option is only valid when pinning is active. (Note that this environment variable is kinda similar to the `OMP_PLACES` environment variable in OpenMP). 
+- **PPL_THREADS_MAPPING**: Specifies the threads mapping. By default, the threads are mapped in the order in which the CPUs are found. This option is only valid when pinning is active. (Note that this environment variable is kinda similar to the `OMP_PLACES` environment variable in OpenMP). 
   - Example: `PPL_THREADS_MAPPING=0,2,1,3` will map the threads in the following order: `0 -> core 0`, `1 -> core 2`, `2 -> core 1`, `3 -> core 3`.
 
 To customize the configuration, set the desired environment variables before running your Rust program that uses PPL. For example, you can set the environment variables in your shell script or use a tool to load them from a file.
