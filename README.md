@@ -34,7 +34,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 
 - **Parallel Computing**: Unlock the power of parallelism in Rust with the Parallelo Parallel Library (PPL). Harness the potential of multiple cores to make your computations faster and more efficient.
 - **Essential Tools**: PPL offers a variety of essential tools for parallel computing, including a work-stealing thread pool, pipelines, farms, and other parallel skeletons. These tools allow you to express complex parallel computations with ease.
-- **NUMA Awareness**: Take advantage of PPL's NUMA awareness to optimize the utilization of your system's resources. Customize aspects such as the maximum number of cores to use, thread wait policies, and mapping of threads to physical cores for enhanced performance and efficiency.
+- **NUMA Awareness**: Take advantage of PPL's NUMA awareness to optimize the utilization of your system's resources. Customize aspects such as the maximum number of cores to use, the thread wait policies, and mapping of the threads to the physical cores for enhanced performance and efficiency.
 - **Multiple Channel Backends**: Choose from a range of flexible channel implementations in PPL to enable seamless communication and coordination between parallel tasks. Select the channel backend that suits your application requirements, ensuring smooth data flow throughout your parallel computations.
 - **Customization and Stateful Nodes**: With PPL, you have the flexibility to create custom stages and nodes, allowing you to add state and express more complex parallel computations. Tailor your pipeline to specific needs and create highly customizable parallel workflows.
 - **Intuitive API**: Whether you're a seasoned parallel computing expert or new to parallelism, PPL simplifies parallel programming with its intuitive API. Developers of all levels of expertise can easily leverage the power of parallel computing in Rust.
@@ -107,7 +107,7 @@ fn main() {
 }
 ```
 
-The RTS of the library will call the clousure representing the Source till it returns `None`, when the Source returns `None` then a termination message will be propagated to the other stages of the pipeline.
+The run-time supports of the framework will call the clousure representing the Source till it returns `None`, when the Source returns `None` then a termination message will be propagated to the other stages of the pipeline.
 
 If we want to parallelize the computation we must find a part of this algorithm that can be parallelized.
 In this case the stage in the middle is a good candidate, we replicate that stage introducing a Farm.
@@ -457,7 +457,7 @@ Crossbeam provides a highly performant channel implementation that provides effi
 
 Overall, PPL supports the followings backends:
 
-- **crossbeam**: Uses the [Crossbeam](https://github.com/crossbeam-rs/crossbeam) channel.
+- **crossbeam**: Uses the [Crossbeam](https://github.com/crossbeam-rs/crossbeam) channel (**Default**).
 - **flume**: Uses the [Flume](https://github.com/zesterer/flume) channel.
 - **kanal**: Uses the [Kanal](https://github.com/fereidani/kanal) channel.
 - **ff**: Uses a channel based on [FastFlow](http://calvados.di.unipi.it/) queues (**Experimental**).
