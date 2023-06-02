@@ -331,7 +331,7 @@ impl Drop for Partition {
 /// The orchestrator is responsible to create the partitions and to distribute the jobs to the partitions.
 /// The orchestractor is global, implemented as a singleton.
 /// The main idea is to have a central point that distribuite evenly the jobs to the partitions, exploiting
-/// the numa architecture of the system.
+/// the CPU topology of the system.
 pub struct Orchestrator {
     partitions: Vec<Partition>,
     configuration: Arc<Configuration>,

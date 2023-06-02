@@ -1,3 +1,7 @@
+/*
+    Image Processing
+    https://github.com/GMAP/RustStreamBench/tree/main/image-processing
+*/
 use criterion::{AxisScale, BatchSize, BenchmarkId, Criterion, PlotConfiguration, SamplingMode};
 
 use super::img;
@@ -53,6 +57,7 @@ pub fn image_processing(criterion: &mut Criterion) {
                 BatchSize::LargeInput,
             )
         });
+    
 
         group.bench_function(BenchmarkId::new("rayon", threads), |b| {
             b.iter_batched(

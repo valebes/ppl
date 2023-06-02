@@ -1,3 +1,7 @@
+/*
+    Mandelbrot set
+    https://rosettacode.org/wiki/Mandelbrot_set#Rust
+*/
 use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, SamplingMode};
 
 use super::mandelbrot;

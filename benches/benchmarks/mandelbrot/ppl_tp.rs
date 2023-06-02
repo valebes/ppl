@@ -1,7 +1,3 @@
-/*
-    Mandelbrot set
-    https://rosettacode.org/wiki/Mandelbrot_set#Rust
-*/
 use num_complex::Complex;
 use ppl::prelude::*;
 
