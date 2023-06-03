@@ -8,7 +8,7 @@ use super::mandelbrot;
 
 pub fn mandelbrot_set(criterion: &mut Criterion) {
     // Sets up criterion.
-    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
+    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Linear);
     let mut group = criterion.benchmark_group("Mandelbrot set");
     group
         .sampling_mode(SamplingMode::Auto)
@@ -17,11 +17,15 @@ pub fn mandelbrot_set(criterion: &mut Criterion) {
 
     let mut num = 1;
     let mut threads_range = Vec::new();
-    while num < num_cpus::get() {
+    while num <= num_cpus::get() {
         threads_range.push(num);
-        num *= 2;
+        if num * 2 <= num_cpus::get() {
+            num *= 2;
+        } else {
+            num += 2;
+        }    
     }
-    threads_range.push(num_cpus::get());
+    
 
     for threads in threads_range {
         group.bench_function(BenchmarkId::new("rayon", threads), |b| {

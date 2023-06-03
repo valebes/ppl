@@ -8,7 +8,7 @@ use super::img;
 
 pub fn image_processing(criterion: &mut Criterion) {
     // Sets up criterion.
-    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
+    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Linear);
     let mut group = criterion.benchmark_group("Image processing");
     group
         .sampling_mode(SamplingMode::Auto)
@@ -30,13 +30,16 @@ pub fn image_processing(criterion: &mut Criterion) {
         })
         .expect("parsing error");
 
-    let mut num = 1;
-    let mut threads_range = Vec::new();
-    while num < num_cpus::get() / 5 {
-        threads_range.push(num);
-        num *= 2;
-    }
-    threads_range.push(num_cpus::get() / 5);
+        let mut num = 1;
+        let mut threads_range = Vec::new();
+        while num <= num_cpus::get() / 5 {
+            threads_range.push(num);
+            if num * 2 <= num_cpus::get() / 5 {
+                num *= 2;
+            } else {
+                num += 2;
+            }    
+        }
     
     for replicas in threads_range {
         let threads = replicas * 5;
