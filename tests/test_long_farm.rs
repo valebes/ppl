@@ -90,7 +90,7 @@ fn test_long_farm() {
     env_logger::init();
 
     // Create a pipeline of farm.
-    let mut p = parallel!(
+    let mut p = pipeline!(
         Source { streamlen: 500000 },
         WorkerA {},
         WorkerB {},

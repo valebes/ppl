@@ -63,10 +63,10 @@ This pipeline is composed by:
 
 Here a snipped of code to show how build this pipeline:
 ```rust
-use ppl::{prelude::*, collections::misc::{SourceIter, Sequential, SinkVec}};
+use ppl::{prelude::*, templates::misc::{SourceIter, Sequential, SinkVec}};
 
 fn main() {
-    let mut p = parallel![
+    let mut p = pipeline![
         SourceIter::build(1..21),
         Sequential::build(fib), // fib is a method that computes the i-th number of Fibonacci
         SinkVec::build()
@@ -83,7 +83,7 @@ In this example we're building a simple pipeline, so why not use clousure instea
 use ppl::prelude::*;
 
 fn main() {
-    let mut p = parallel![
+    let mut p = pipeline![
         {
             let mut counter = 0;
             move || {
@@ -114,10 +114,10 @@ In this case the stage in the middle is a good candidate, we replicate that stag
 
 Now the code is as follows:
 ```rust
-use ppl::{prelude::*, collections::misc::{SourceIter, Parallel, SinkVec}};
+use ppl::{prelude::*, templates::misc::{SourceIter, Parallel, SinkVec}};
 
 fn main() {
-    let mut p = parallel![
+    let mut p = pipeline![
         SourceIter::build(1..21),
         Parallel::build(8, fib), // We create 8 replicas of the stage seen in the previous code.
         SinkVec::build()
@@ -182,7 +182,7 @@ impl In<usize, usize> for Sink {
 }
 
 fn main() {
-    let mut p = parallel![
+    let mut p = pipeline![
         Source {
             streamlen: 20,
             counter: 0
@@ -238,7 +238,7 @@ Here's the Rust code for the word counter using the pipeline approach:
 
 ```rust
 use ppl::{
-    collections::map::{Map, MapReduce, Reduce},
+    templates::map::{Map, MapReduce, Reduce},
     prelude::*,
 };
 
@@ -270,7 +270,7 @@ impl In<Vec<(String, usize)>, Vec<(String, usize)>> for Sink {
 pub fn ppl(dataset: &str, threads: usize) {
     // Initialization and configuration...
 
-    let mut p = parallel![
+    let mut p = pipeline![
         Source { reader },
         Map::build::<Vec<String>, Vec<(String, usize)>>(threads / 2, |str| -> (String, usize) {
             (str, 1)
@@ -354,7 +354,7 @@ This pipeline involves the following stages:
 The implementation of the `InOut<usize, usize>` trait overrides the `run` method to process the input received from the source and prepare the worker for producing multiple copies. The `produce` method generates the specified number of copies of the input. By implementing the `is_producer` method and returning `true`, this stage is marked as a producer. Additionally, the `number_of_replicas` method specifies the number of replicas of this worker to create for parallel processing.
 
 ```rust
-use ppl::{collections::misc::SinkVec, prelude::*};
+use ppl::{templates::misc::SinkVec, prelude::*};
 
 // Source
 struct Source {
@@ -403,7 +403,7 @@ impl InOut<usize, usize> for Worker {
 
 fn main() {
     // Create the pipeline using the parallel! macro
-    let mut p = parallel![
+    let mut p = pipeline![
         Source {
             streamlen: 1000,
             counter: 0

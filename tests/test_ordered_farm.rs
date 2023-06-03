@@ -96,7 +96,7 @@ impl In<usize, bool> for Sink {
 fn test_ordered_farm() {
     env_logger::init();
 
-    let mut p = parallel![
+    let mut p = pipeline![
         Source {
             streamlen: 10000,
             counter: 0

@@ -2,7 +2,7 @@
    Pipeline with a Map node.
 */
 
-use ppl::{collections::map::Map, prelude::*};
+use ppl::{templates::map::Map, prelude::*};
 
 // Source node.
 // It generates a stream of 10000 elements each time.
@@ -43,7 +43,7 @@ fn test_map() {
     env_logger::init();
 
     // Create the pipeline.
-    let mut p = parallel![
+    let mut p = pipeline![
         Source {
             streamlen: 100,
             counter: 0

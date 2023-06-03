@@ -3,7 +3,7 @@
     It is similar to tests/test_map.rs, but it uses an ordered map.
 */
 
-use ppl::{collections::map::OrderedMap, prelude::*};
+use ppl::{templates::map::OrderedMap, prelude::*};
 
 // Source node.
 struct Source {
@@ -39,7 +39,7 @@ impl In<Vec<String>, Vec<Vec<String>>> for Sink {
 fn test_ordered_map() {
     env_logger::init();
 
-    let mut p = parallel!(
+    let mut p = pipeline!(
         Source {
             streamlen: 100,
             counter: 0

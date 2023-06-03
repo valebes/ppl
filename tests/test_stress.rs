@@ -53,7 +53,7 @@ fn test_stress() {
     env_logger::init();
 
     for _i in 0..10000 {
-        let mut p = parallel![
+        let mut p = pipeline![
             Source {
                 streamlen: 20,
                 counter: 0

@@ -5,7 +5,7 @@ use image::Luma;
 */
 use num_complex::Complex;
 use ppl::{
-    collections::misc::{OrderedParallel, OrderedSinkVec, SourceIter},
+    templates::misc::{OrderedParallel, OrderedSinkVec, SourceIter},
     prelude::*,
 };
 
@@ -34,7 +34,7 @@ pub fn ppl(threads: usize) {
     // Create the lines
     let lines: Vec<u32> = (0..img_side).collect();
 
-    let mut pipeline = parallel![
+    let mut pipeline = pipeline![
         SourceIter::build(lines.into_iter()),
         OrderedParallel::build(threads, move |y| {
             let mut row = Vec::with_capacity(img_side as usize);

@@ -95,7 +95,7 @@ impl In<Image, Vec<Image>> for Sink {
 }
 
 pub fn pspp(images: Vec<Image>, threads: usize) {
-    let mut p = parallel![
+    let mut p = pipeline![
         Source { all_images: images },
         WorkerA { replicas: threads },
         WorkerB { replicas: threads },

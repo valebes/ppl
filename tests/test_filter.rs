@@ -3,7 +3,7 @@
 */
 
 use ppl::{
-    collections::misc::{Filter, SinkVec},
+    templates::misc::{Filter, SinkVec},
     prelude::*,
 };
 
@@ -32,7 +32,7 @@ fn is_even(input: &usize) -> bool {
 fn test_filter() {
     env_logger::init();
 
-    let mut p = parallel![
+    let mut p = pipeline![
         Source {
             streamlen: 100,
             counter: 0

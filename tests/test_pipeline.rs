@@ -6,7 +6,7 @@
 */
 
 use ppl::{
-    collections::misc::{Sequential, SinkVec, SourceIter},
+    templates::misc::{Sequential, SinkVec, SourceIter},
     prelude::*,
 };
 
@@ -62,7 +62,7 @@ fn test_pipeline() {
     env_logger::init();
 
     // Fibonacci pipeline by using custom structs
-    let mut p = parallel![
+    let mut p = pipeline![
         Source {
             streamlen: 20,
             counter: 0
@@ -76,7 +76,7 @@ fn test_pipeline() {
     assert_eq!(res.unwrap(), 20);
 
     // Another way to write the same pipeline, but here using templates instead
-    let mut p = parallel![
+    let mut p = pipeline![
         SourceIter::build(1..21),
         Sequential::build(fibonacci_recursive),
         SinkVec::build()
@@ -86,7 +86,7 @@ fn test_pipeline() {
     assert_eq!(res, 20);
 
     // Also here another way to write the same pipeline, but here we use closures
-    let mut p = parallel![
+    let mut p = pipeline![
         {
             let mut counter = 0;
             move || {

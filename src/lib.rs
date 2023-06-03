@@ -6,7 +6,7 @@
 #![feature(box_into_inner)]
 #![feature(let_chains)]
 
-pub mod collections;
+pub mod templates;
 pub mod core;
 pub mod mpsc;
 pub mod pipeline;
@@ -20,5 +20,5 @@ pub mod prelude {
     pub use crate::pipeline::node::{In, InNode, InOut, InOutNode, Node, Out, OutNode};
     pub use crate::pipeline::Pipeline;
     pub use crate::thread_pool::ThreadPool;
-    pub use crate::{parallel, propagate};
+    pub use crate::{pipeline, propagate};
 }

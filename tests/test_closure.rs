@@ -6,7 +6,7 @@ use ppl::prelude::*;
 fn test_closure() {
     env_logger::init();
 
-    let mut p = parallel!(
+    let mut p = pipeline!(
         {
             // This closure is the source node.
             // It is executed until it returns None.

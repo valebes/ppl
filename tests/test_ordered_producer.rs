@@ -75,7 +75,7 @@ impl In<String, Vec<String>> for Sink {
 fn test_ordered_producer() {
     env_logger::init();
 
-    let mut p = parallel![
+    let mut p = pipeline![
         Source {
             strings: vec![
                 "pippo".to_string(),

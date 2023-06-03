@@ -79,7 +79,7 @@ fn test_mxv() {
     }
 
     // Build and start the spp graph
-    let mut p = parallel![
+    let mut p = pipeline![
         Source {
             matrix: matrix.clone()
         },

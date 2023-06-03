@@ -9,7 +9,7 @@ use std::{
 };
 
 use ppl::{
-    collections::map::{Map, MapReduce, Reduce},
+    templates::map::{Map, MapReduce, Reduce},
     prelude::*,
 };
 
@@ -63,7 +63,7 @@ pub fn ppl(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
     let reader = BufReader::new(file);
 
-    let mut p = parallel![
+    let mut p = pipeline![
         Source { reader },
         Map::build::<Vec<String>, Vec<(String, usize)>>(threads / 2, |str| -> (String, usize) {
             (str, 1)
@@ -95,7 +95,7 @@ pub fn ppl_combined_map_reduce(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
     let reader = BufReader::new(file);
 
-    let mut p = parallel![
+    let mut p = pipeline![
         Source { reader },
         MapReduce::build_with_replicas(
             threads / 2,

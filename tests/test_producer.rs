@@ -1,4 +1,4 @@
-use ppl::{collections::misc::SinkVec, prelude::*};
+use ppl::{templates::misc::SinkVec, prelude::*};
 
 // Source
 struct Source {
@@ -53,7 +53,7 @@ fn test_producer() {
 
     let mut tp = ThreadPool::new_with_global_registry(5);
 
-    let mut p = parallel![
+    let mut p = pipeline![
         Source {
             streamlen: 1000,
             counter: 0

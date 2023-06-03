@@ -137,9 +137,9 @@ macro_rules! propagate {
 ///
 /// ```
 /// use ppl::prelude::*;
-/// use ppl::collections::misc::*;
+/// use ppl::templates::misc::*;
 ///
-/// let mut pipeline = parallel![
+/// let mut pipeline = pipeline![
 ///      SourceIter::build(0..10),
 ///      Sequential::build(|el: usize| -> usize { el * 2 }),
 ///      SinkVec::build()
@@ -150,7 +150,7 @@ macro_rules! propagate {
 /// assert_eq!(res, vec![0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
 /// ```
 #[macro_export]
-macro_rules! parallel {
+macro_rules! pipeline {
     ($s1:expr $(, $tail:expr)*) => {
         {
             let orchestrator = get_global_orchestrator();
