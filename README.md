@@ -72,8 +72,7 @@ fn main() {
         SinkVec::build()
     ];
     p.start();
-    let res = p.wait_and_collect()
-        .unwrap().len();
+    let res = p.wait_and_collect().unwrap().len();
     assert_eq!(res, 20)
 }
 ```
