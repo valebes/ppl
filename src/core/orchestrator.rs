@@ -340,7 +340,7 @@ pub struct Orchestrator {
 static mut ORCHESTRATOR: OnceLock<Arc<Orchestrator>> = OnceLock::new();
 
 /// Create a new orchestrator with the default configuration.
-pub(crate) fn new_default_orchestrator() -> Arc<Orchestrator> {
+pub(crate) fn new() -> Arc<Orchestrator> {
     Arc::new(Orchestrator::new(Arc::new(Configuration::new_default())))
 }
 
@@ -349,7 +349,7 @@ pub(crate) fn new_default_orchestrator() -> Arc<Orchestrator> {
 pub fn get_global_orchestrator() -> Arc<Orchestrator> {
     unsafe {
         ORCHESTRATOR
-            .get_or_init(|| -> Arc<Orchestrator> { new_default_orchestrator() })
+            .get_or_init(|| -> Arc<Orchestrator> { new() })
             .clone()
     }
 }

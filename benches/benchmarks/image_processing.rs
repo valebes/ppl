@@ -8,10 +8,10 @@ use super::img;
 
 pub fn image_processing(criterion: &mut Criterion) {
     // Sets up criterion.
-    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Linear);
+    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
     let mut group = criterion.benchmark_group("Image processing");
     group
-        .sampling_mode(SamplingMode::Auto)
+        .sampling_mode(SamplingMode::Flat)
         .plot_config(plot_cfg)
         .sample_size(10);
 
@@ -34,7 +34,7 @@ pub fn image_processing(criterion: &mut Criterion) {
         let mut threads_range = Vec::new();
         while num <= num_cpus::get() / 5 {
             threads_range.push(num);
-            if num * 2 <= num_cpus::get() / 5 {
+            if num * 2 < num_cpus::get() / 5 {
                 num *= 2;
             } else {
                 num += 2;
