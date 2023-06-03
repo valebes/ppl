@@ -131,7 +131,7 @@ pub fn ppl_map(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
     let reader = BufReader::new(file);
 
-    let mut tp = ThreadPool::new_with_global_registry(threads);
+    let mut tp = ThreadPool::with_capacity(threads);
 
     let mut words = Vec::new();
 

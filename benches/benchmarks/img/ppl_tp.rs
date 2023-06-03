@@ -4,7 +4,7 @@ use raster::filter;
 use raster::Image;
 
 pub fn ppl_tp(images: Vec<Image>, threads: usize) {
-    let mut pool = ThreadPool::new_with_global_registry(threads * 5);
+    let mut pool = ThreadPool::with_capacity(threads * 5);
 
     let _res: Vec<Image> = pool
         .par_map(images, |mut image: Image| {

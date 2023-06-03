@@ -21,7 +21,7 @@ fn fib(n: i32) -> u64 {
 #[test]
 #[serial]
 fn test_threadpool() {
-    let tp = ThreadPool::new_with_global_registry(8);
+    let tp = ThreadPool::new();
     for i in 1..45 {
         tp.execute(move || {
             fib(i);
@@ -35,7 +35,7 @@ fn test_threadpool() {
 #[serial]
 fn test_scoped_thread() {
     let mut vec = vec![0; 100];
-    let mut tp = ThreadPool::new_with_global_registry(8);
+    let mut tp = ThreadPool::new();
 
     tp.scoped(|s| {
         for e in vec.iter_mut() {
@@ -52,7 +52,7 @@ fn test_scoped_thread() {
 #[serial]
 fn test_par_for_each() {
     let mut vec = vec![0; 100];
-    let mut tp = ThreadPool::new_with_global_registry(8);
+    let mut tp = TThreadPool::new();
 
     tp.par_for_each(&mut vec, |el: &mut i32| *el += 1);
     Orchestrator::delete_global_orchestrator();
@@ -63,7 +63,7 @@ fn test_par_for_each() {
 #[serial]
 fn test_par_map() {
     let mut vec = Vec::new();
-    let mut tp = ThreadPool::new_with_global_registry(16);
+    let mut tp = ThreadPool::new();
 
     for i in 0..10000 {
         vec.push(i);
@@ -87,7 +87,7 @@ fn test_par_map() {
 #[test]
 #[serial]
 fn test_par_for() {
-    let mut tp = ThreadPool::new_with_global_registry(8);
+    let mut tp = ThreadPool::new();
 
     let vec = {
         let mut v = Vec::with_capacity(100);
@@ -118,7 +118,7 @@ fn test_par_for() {
 #[serial]
 fn test_par_map_reduce() {
     let mut vec = Vec::new();
-    let mut tp = ThreadPool::new_with_global_registry(16);
+    let mut tp = ThreadPool::new();
 
     for _i in 0..100000 {
         for i in 0..10 {
@@ -148,7 +148,7 @@ fn test_par_map_reduce() {
 #[serial]
 fn test_par_map_reduce_seq() {
     let mut vec = Vec::new();
-    let mut tp = ThreadPool::new_with_global_registry(16);
+    let mut tp = ThreadPool::new();
 
     for _i in 0..100000 {
         for i in 0..10 {
@@ -174,8 +174,8 @@ fn test_par_map_reduce_seq() {
 #[test]
 #[serial]
 fn test_multiple_threadpool() {
-    let tp_1 = ThreadPool::new_with_global_registry(4);
-    let tp_2 = ThreadPool::new_with_global_registry(4);
+    let tp_1 = ThreadPool::new();
+    let tp_2 = ThreadPool::new();
     ::scopeguard::defer! {
         tp_1.wait();
         tp_2.wait();

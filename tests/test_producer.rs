@@ -51,7 +51,7 @@ impl InOut<usize, usize> for Worker {
 fn test_producer() {
     env_logger::init();
 
-    let mut tp = ThreadPool::new_with_global_registry(5);
+    let mut tp = ThreadPool::with_capacity(5);
 
     let mut p = pipeline![
         Source {

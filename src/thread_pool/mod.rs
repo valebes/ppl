@@ -138,15 +138,29 @@ pub struct ThreadPool {
 }
 
 impl Clone for ThreadPool {
-    /// Create a new threadpool from an existing one, using the same number of threads.
+    /// Create a new thread pool from an existing one, using the same number of threads.
     fn clone(&self) -> Self {
         let orchestrator = self.orchestrator.clone();
-        ThreadPool::new(self.num_workers, orchestrator)
+        ThreadPool::build(self.num_workers, orchestrator)
+    }
+}
+
+impl Default for ThreadPool {
+    /// Create a new thread pool with all the availables threads.
+    /// # Examples
+    ///
+    /// ```
+    /// use ppl::thread_pool::ThreadPool;
+    ///     
+    /// let mut pool = ThreadPool::default();
+    /// ```
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl ThreadPool {
-    fn new(num_threads: usize, orchestrator: Arc<Orchestrator>) -> Self {
+    fn build(num_threads: usize, orchestrator: Arc<Orchestrator>) -> Self {
         trace!("Creating new threadpool");
         let jobs_info;
         let mut workers = Vec::with_capacity(num_threads);
@@ -203,11 +217,31 @@ impl ThreadPool {
         }
     }
 
+    /// Create a new thread pool using all the threads availables.
+    /// 
+    /// # Examples
+    ///
+    /// ```
+    /// use ppl::thread_pool::ThreadPool;
+    ///     
+    /// let mut pool = ThreadPool::new();
+    /// ```
+    pub fn new() -> Self {
+        Self::with_capacity(num_cpus::get())
+    }
+
     /// Create a new thread pool with `num_threads` threads.
-    /// The thread pool will use the global orchestrator.
-    pub fn new_with_global_registry(num_threads: usize) -> Self {
+    /// 
+    /// # Examples
+    ///
+    /// ```
+    /// use ppl::thread_pool::ThreadPool;
+    ///     
+    /// let mut pool = ThreadPool::with_capacity(8);
+    /// ```
+    pub fn with_capacity(num_threads: usize) -> Self {
         let orchestrator = get_global_orchestrator();
-        Self::new(num_threads, orchestrator)
+        Self::build(num_threads, orchestrator)
     }
 
     /// Execute a function `task` on a thread in the thread pool.
@@ -271,7 +305,7 @@ impl ThreadPool {
     /// ```
     /// use ppl::thread_pool::ThreadPool;
     ///
-    /// let mut pool = ThreadPool::new_with_global_registry(8);
+    /// let mut pool = ThreadPool::new();
     /// let mut vec = vec![0; 100];
     ///
     /// pool.par_for_each(&mut vec, |el: &mut i32| *el = *el + 1);
@@ -297,7 +331,7 @@ impl ThreadPool {
     /// ```
     /// use ppl::thread_pool::ThreadPool;
     ///
-    /// let mut pool = ThreadPool::new_with_global_registry(8);
+    /// let mut pool = ThreadPool::new();
     /// let mut vec = vec![0i32; 100];
     ///
     /// let res: Vec<String> = pool.par_map(&mut vec, |el| -> String {
@@ -369,7 +403,7 @@ impl ThreadPool {
     /// ```
     /// use ppl::thread_pool::ThreadPool;
     ///     
-    /// let mut pool = ThreadPool::new_with_global_registry(8);
+    /// let mut pool = ThreadPool::with_capacity(8);
     /// let mut vec = Vec::new();
     ///
     /// for i in 0..100 {
@@ -417,7 +451,7 @@ impl ThreadPool {
     /// ```
     /// use ppl::thread_pool::ThreadPool;
     ///
-    /// let mut pool = ThreadPool::new_with_global_registry(8);
+    /// let mut pool = ThreadPool::new();
     ///
     /// let mut vec = Vec::new();
     ///
@@ -459,7 +493,7 @@ impl ThreadPool {
     /// ```
     /// use ppl::thread_pool::ThreadPool;
     ///
-    /// let mut pool = ThreadPool::new_with_global_registry(8);
+    /// let mut pool = ThreadPool::new();
     ///
     /// let mut vec = vec![0; 100];
     ///

@@ -15,7 +15,7 @@ fn save(img_side: u32, mut data:  Vec<Luma<u8>>, path: &str) {
 */
 
 pub fn ppl_tp(threads: usize) {
-    let mut pool = ThreadPool::new_with_global_registry(threads);
+    let mut pool = ThreadPool::with_capacity(threads);
 
     let max_iterations = 10000u16;
     let img_side = 1000u32;

@@ -32,7 +32,7 @@ where
         TOutIter: FromIterator<TOut>,
     {
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f,
             phantom: PhantomData,
             replicas: 1,
@@ -59,7 +59,7 @@ where
     {
         assert!(n_replicas > 0);
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f,
             phantom: PhantomData,
             replicas: n_replicas,
@@ -114,7 +114,7 @@ where
         TOutIter: FromIterator<TOut>,
     {
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f,
             phantom: PhantomData,
             replicas: 1,
@@ -139,7 +139,7 @@ where
     {
         assert!(n_replicas > 0);
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f,
             phantom: PhantomData,
             replicas: n_replicas,
@@ -199,7 +199,7 @@ where
         TOutIter: FromIterator<(TKey, TReduce)>,
     {
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f,
             phantom: PhantomData,
             replicas: 1,
@@ -224,7 +224,7 @@ where
     {
         assert!(n_replicas > 0);
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f,
             phantom: PhantomData,
             replicas: n_replicas,
@@ -284,7 +284,7 @@ where
         TOutIter: FromIterator<(TKey, TReduce)>,
     {
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f,
             phantom: PhantomData,
             replicas: 1,
@@ -309,7 +309,7 @@ where
     {
         assert!(n_replicas > 0);
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f,
             phantom: PhantomData,
             replicas: n_replicas,
@@ -383,7 +383,7 @@ where
         TOutIter: FromIterator<(TKey, TReduce)>,
     {
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f_map,
             f_reduce,
             phantom: PhantomData,
@@ -411,7 +411,7 @@ where
     {
         assert!(n_replicas > 0);
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f_map,
             f_reduce,
             phantom: PhantomData,
@@ -491,7 +491,7 @@ where
         TOutIter: FromIterator<(TKey, TReduce)>,
     {
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f_map,
             f_reduce,
             phantom: PhantomData,
@@ -519,7 +519,7 @@ where
     {
         assert!(n_replicas > 0);
         Self {
-            threadpool: ThreadPool::new_with_global_registry(n_worker),
+            threadpool: ThreadPool::with_capacity(n_worker),
             f_map,
             f_reduce,
             phantom: PhantomData,
