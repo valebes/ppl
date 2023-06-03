@@ -8,7 +8,7 @@ use super::mandelbrot;
 
 pub fn mandelbrot_set(criterion: &mut Criterion) {
     // Sets up criterion.
-    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Linear);
+    let plot_cfg = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
     let mut group = criterion.benchmark_group("Mandelbrot set");
     group
         .sampling_mode(SamplingMode::Auto)
