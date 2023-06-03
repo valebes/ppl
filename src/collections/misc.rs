@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::pipeline::node::{In, InOut, Out};
 
 /// SourceIter.
-/// 
+///
 /// This source node produces data from a iterator.
 pub struct SourceIter<I, T>
 where
@@ -37,7 +37,7 @@ where
 }
 
 /// SinkVec.
-/// 
+///
 /// Sink node that accumulates data into a vector.
 /// The sink will terminate when the upstream terminates.
 /// The sink will produce a vector containing all the data received
@@ -69,7 +69,7 @@ where
 }
 
 /// Splitter.
-/// 
+///
 /// This node receives a vector, split it into chunks of size `chunk_size`
 /// and send each chunk into the next node.
 /// The node will terminate when the upstream terminates.
@@ -114,7 +114,7 @@ where
 }
 
 /// Aggregator.
-/// 
+///
 /// This node receives elements and accumulates them into a vector.
 /// When the vector reaches the size `chunk_size` it is sent to the next node.
 /// The node will terminate when the upstream terminates.
@@ -165,7 +165,7 @@ where
 }
 
 /// Sequential node.
-/// 
+///
 /// Given a function that defines the logic of the stage, this method will create a stage with one replica.
 #[derive(Clone)]
 pub struct Sequential<T, U, F>
@@ -204,7 +204,7 @@ where
 }
 
 /// Parallel node.
-/// 
+///
 /// Given a function that defines the logic of the stage, this method will create 'n_replicas' replicas of that stage.
 #[derive(Clone)]
 pub struct Parallel<T, U, F>
@@ -248,7 +248,7 @@ where
 }
 
 /// Filter.
-/// 
+///
 /// This node receives elements and filters them according to the given predicate.
 /// The node will terminate when the upstream terminates.
 #[derive(Clone)]
@@ -305,7 +305,7 @@ where
 // Ordered versions of the above
 
 /// OrderedSinkVec.
-/// 
+///
 /// Sink node that accumulates data into a vector.
 /// This is a ordered version of SinkVec.
 /// The sink will terminate when the upstream terminates.
@@ -343,7 +343,7 @@ where
 }
 
 /// OrderedSplitter.
-/// 
+///
 /// This node receives a vector, split it into chunks of size `chunk_size`
 /// and send each chunk into the next node.
 /// This is a ordered version of Splitter.
@@ -406,7 +406,7 @@ where
 }
 
 /// OrderedAggregator.
-/// 
+///
 /// This node receives elements and accumulates them into a vector.
 /// When the vector reaches the size `chunk_size` it is sent to the next node.
 /// This is a ordered version of Aggregator.
@@ -475,7 +475,7 @@ where
 }
 
 /// OrderedSequential.
-/// 
+///
 /// This node receives elements and applies a function to each element.
 /// This is a ordered version of Sequential.
 /// The node will terminate when the upstream terminates.
@@ -516,7 +516,7 @@ where
 }
 
 /// OrderedParallel.
-/// 
+///
 /// This node receives elements and applies a function to each element.
 /// This is a ordered version of Parallel.
 /// The node will terminate when the upstream terminates.
@@ -562,7 +562,7 @@ where
 }
 
 /// OrderedFilter.
-/// 
+///
 /// This node receives elements and filters them according to a predicate.
 /// This is a ordered version of Filter.
 /// The node will terminate when the upstream terminates.

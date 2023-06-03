@@ -57,7 +57,6 @@ pub fn image_processing(criterion: &mut Criterion) {
                 BatchSize::LargeInput,
             )
         });
-    
 
         group.bench_function(BenchmarkId::new("rayon", threads), |b| {
             b.iter_batched(
@@ -67,7 +66,7 @@ pub fn image_processing(criterion: &mut Criterion) {
             )
         });
 
-        group.bench_function(BenchmarkId::new("ppl-map", threads), |b| {
+        group.bench_function(BenchmarkId::new("ppl-tp", threads), |b| {
             b.iter_batched(
                 || images.clone(),
                 |images| img::ppl_tp::ppl_tp(images, replicas),

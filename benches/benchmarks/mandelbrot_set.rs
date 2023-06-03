@@ -15,15 +15,18 @@ pub fn mandelbrot_set(criterion: &mut Criterion) {
         .plot_config(plot_cfg)
         .sample_size(20);
 
-
     let mut num = 1;
     let mut threads_range = Vec::new();
     while num <= num_cpus::get() {
         threads_range.push(num);
         num *= 2;
     }
-    
+
     for threads in threads_range {
+        group.bench_function(BenchmarkId::new("rayon", threads), |b| {
+            b.iter(|| mandelbrot::rayon::rayon(threads))
+        });
+
         group.bench_function(BenchmarkId::new("rust_ssp", threads), |b| {
             b.iter(|| mandelbrot::rust_ssp::rust_ssp(threads))
         });
@@ -34,10 +37,6 @@ pub fn mandelbrot_set(criterion: &mut Criterion) {
 
         group.bench_function(BenchmarkId::new("ppl_tp", threads), |b| {
             b.iter(|| mandelbrot::ppl_tp::ppl_tp(threads))
-        });
-
-        group.bench_function(BenchmarkId::new("rayon", threads), |b| {
-            b.iter(|| mandelbrot::rayon::rayon(threads))
         });
     }
 }

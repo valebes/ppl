@@ -1,3 +1,4 @@
+use image::{ImageBuffer, Luma};
 use num_complex::Complex;
 use ppl::prelude::*;
 
@@ -13,26 +14,41 @@ pub fn ppl_tp(threads: usize) {
     let scalex = (cxmax - cxmin) / img_side as f32;
     let scaley = (cymax - cymin) / img_side as f32;
 
-    // Create a new ImgBuf
-    let mut imgbuf = image::ImageBuffer::new(img_side, img_side);
+    // Create the lines
+    let lines: Vec<u32> = (0..img_side).collect();
 
-    pool.par_for_each(imgbuf.enumerate_pixels_mut(), |(x, y, pixel)| {
-        let cx = cxmin + x as f32 * scalex;
-        let cy = cymin + y as f32 * scaley;
+    let mut res: Vec<Luma<u8>> = pool
+        .par_map(lines, |y| {
+            let mut row = Vec::with_capacity(img_side as usize);
+            for x in 0..img_side {
+                let cx = cxmin + x as f32 * scalex;
+                let cy = cymin + y as f32 * scaley;
 
-        let c = Complex::new(cx, cy);
-        let mut z = Complex::new(0f32, 0f32);
+                let c = Complex::new(cx, cy);
+                let mut z = Complex::new(0f32, 0f32);
 
-        let mut i = 0;
-        for t in 0..max_iterations {
-            if z.norm() > 2.0 {
-                break;
+                let mut i = 0;
+                for t in 0..max_iterations {
+                    if z.norm() > 2.0 {
+                        break;
+                    }
+                    z = z * z + c;
+                    i = t;
+                }
+
+                row.push(image::Luma([i as u8]));
             }
-            z = z * z + c;
-            i = t;
-        }
+            row
+        })
+        .flat_map(|a| a.to_vec())
+        .collect();
 
-        *pixel = image::Luma([i as u8]);
-    });
+    let mut imgbuf: ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(img_side, img_side);
+    for (_, _, pixel) in imgbuf.enumerate_pixels_mut() {
+        *pixel = res.remove(0);
+    }
+    imgbuf
+        .save("benches/benchmarks/mandelbrot/fractal_ppl_tp.png")
+        .unwrap();
     Orchestrator::delete_global_orchestrator();
 }

@@ -125,8 +125,7 @@ impl ThreadPoolWorker {
 
     // Warn task done.
     fn task_done(&self) {
-        self.total_tasks
-            .fetch_sub(1, Ordering::AcqRel);
+        self.total_tasks.fetch_sub(1, Ordering::AcqRel);
     }
 }
 ///Struct representing a thread pool.
@@ -218,8 +217,7 @@ impl ThreadPool {
         F: FnOnce() + Send + 'static,
     {
         self.injector.push(Job::NewJob(Box::new(task)));
-        self.total_tasks
-            .fetch_add(1, Ordering::AcqRel);
+        self.total_tasks.fetch_add(1, Ordering::AcqRel);
     }
 
     /// Check if there are jobs in the thread pool.
