@@ -400,7 +400,7 @@ impl InOut<usize, usize> for Worker {
 }
 
 fn main() {
-    // Create the pipeline using the parallel! macro
+    // Create the pipeline using the pipeline! macro
     let mut p = pipeline![
         Source {
             streamlen: 1000,
