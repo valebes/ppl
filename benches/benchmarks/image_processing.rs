@@ -30,8 +30,15 @@ pub fn image_processing(criterion: &mut Criterion) {
         })
         .expect("parsing error");
 
-    let replicas_for_stage = 1..(num_cpus::get() / 5) + 1;
-    for replicas in replicas_for_stage {
+    let mut num = 1;
+    let mut threads_range = Vec::new();
+    while num < num_cpus::get() / 5 {
+        threads_range.push(num);
+        num *= 2;
+    }
+    threads_range.push(num_cpus::get() / 5);
+    
+    for replicas in threads_range {
         let threads = replicas * 5;
 
         group.bench_function(BenchmarkId::new("rust-ssp", threads), |b| {

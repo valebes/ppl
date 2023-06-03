@@ -1,3 +1,6 @@
+/*
+    WordCounter
+*/
 use std::{
     collections::HashMap,
     fs::File,
