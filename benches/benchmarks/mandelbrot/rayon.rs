@@ -1,6 +1,18 @@
-use image::{ImageBuffer, Luma};
+use image::Luma;
 use num_complex::Complex;
 use rayon::prelude::*;
+
+/*
+fn save(img_side: u32, mut data:  Vec<Luma<u8>>, path: &str) {
+    let mut imgbuf: ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(img_side, img_side);
+    for (_, _, pixel) in imgbuf.enumerate_pixels_mut() {
+        *pixel = data.remove(0);
+    }
+    imgbuf
+        .save(path)
+        .unwrap();
+}
+*/
 
 pub fn rayon(threads: usize) {
     let max_iterations = 10000u16;
@@ -21,7 +33,7 @@ pub fn rayon(threads: usize) {
     let lines: Vec<u32> = (0..img_side).collect();
 
     pool.install(|| {
-        let mut res: Vec<Luma<u8>> = lines
+        let _res: Vec<Luma<u8>> = lines
             .into_par_iter()
             .map(|y| {
                 let mut row = Vec::with_capacity(img_side as usize);
@@ -47,13 +59,5 @@ pub fn rayon(threads: usize) {
             })
             .flat_map(|a| a.to_vec())
             .collect();
-
-        let mut imgbuf: ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(img_side, img_side);
-        for (_, _, pixel) in imgbuf.enumerate_pixels_mut() {
-            *pixel = res.remove(0);
-        }
-        imgbuf
-            .save("benches/benchmarks/mandelbrot/fractal_rayon.png")
-            .unwrap();
     });
 }

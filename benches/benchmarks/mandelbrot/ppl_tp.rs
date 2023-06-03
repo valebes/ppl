@@ -1,6 +1,18 @@
-use image::{ImageBuffer, Luma};
+use image::Luma;
 use num_complex::Complex;
 use ppl::prelude::*;
+
+/*
+fn save(img_side: u32, mut data:  Vec<Luma<u8>>, path: &str) {
+    let mut imgbuf: ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(img_side, img_side);
+    for (_, _, pixel) in imgbuf.enumerate_pixels_mut() {
+        *pixel = data.remove(0);
+    }
+    imgbuf
+        .save(path)
+        .unwrap();
+}
+*/
 
 pub fn ppl_tp(threads: usize) {
     let mut pool = ThreadPool::new_with_global_registry(threads);
@@ -17,7 +29,7 @@ pub fn ppl_tp(threads: usize) {
     // Create the lines
     let lines: Vec<u32> = (0..img_side).collect();
 
-    let mut res: Vec<Luma<u8>> = pool
+    let _res: Vec<Luma<u8>> = pool
         .par_map(lines, |y| {
             let mut row = Vec::with_capacity(img_side as usize);
             for x in 0..img_side {
@@ -43,12 +55,5 @@ pub fn ppl_tp(threads: usize) {
         .flat_map(|a| a.to_vec())
         .collect();
 
-    let mut imgbuf: ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(img_side, img_side);
-    for (_, _, pixel) in imgbuf.enumerate_pixels_mut() {
-        *pixel = res.remove(0);
-    }
-    imgbuf
-        .save("benches/benchmarks/mandelbrot/fractal_ppl_tp.png")
-        .unwrap();
     Orchestrator::delete_global_orchestrator();
 }

@@ -1,4 +1,4 @@
-use image::{ImageBuffer, Luma};
+use image::Luma;
 /*
     Mandelbrot set
     https://rosettacode.org/wiki/Mandelbrot_set#Rust
@@ -8,6 +8,18 @@ use ppl::{
     collections::misc::{OrderedParallel, OrderedSinkVec, SourceIter},
     prelude::*,
 };
+
+/*
+fn save(img_side: u32, mut data:  Vec<Luma<u8>>, path: &str) {
+    let mut imgbuf: ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(img_side, img_side);
+    for (_, _, pixel) in imgbuf.enumerate_pixels_mut() {
+        *pixel = data.remove(0);
+    }
+    imgbuf
+        .save(path)
+        .unwrap();
+}
+*/
 
 pub fn ppl(threads: usize) {
     let max_iterations = 10000u16;
@@ -50,20 +62,12 @@ pub fn ppl(threads: usize) {
     ];
 
     pipeline.start();
-    let mut res: Vec<Luma<u8>> = pipeline
+    let mut _res: Vec<Luma<u8>> = pipeline
         .wait_and_collect()
         .unwrap()
         .into_iter()
         .flat_map(|a| a.to_vec())
         .collect();
-
-    let mut imgbuf: ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(img_side, img_side);
-    for (_, _, pixel) in imgbuf.enumerate_pixels_mut() {
-        *pixel = res.remove(0);
-    }
-    imgbuf
-        .save("benches/benchmarks/mandelbrot/fractal_ppl.png")
-        .unwrap();
 
     Orchestrator::delete_global_orchestrator();
 }

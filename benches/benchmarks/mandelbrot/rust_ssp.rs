@@ -1,7 +1,18 @@
-use image::{ImageBuffer, Luma};
+use image::Luma;
 use num_complex::Complex;
-
 use rust_spp::*;
+
+/*
+fn save(img_side: u32, mut data:  Vec<Luma<u8>>, path: &str) {
+    let mut imgbuf: ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(img_side, img_side);
+    for (_, _, pixel) in imgbuf.enumerate_pixels_mut() {
+        *pixel = data.remove(0);
+    }
+    imgbuf
+        .save(path)
+        .unwrap();
+}
+*/
 
 pub fn rust_ssp(threads: usize) {
     let max_iterations = 10000u16;
@@ -45,21 +56,13 @@ pub fn rust_ssp(threads: usize) {
         collect_ordered!()
     ];
 
-    for coord in lines.into_iter() {
-        pipeline.post(coord).unwrap();
+    for line in lines.into_iter() {
+        pipeline.post(line).unwrap();
     }
 
-    let mut res: Vec<Luma<u8>> = pipeline
+    let _res: Vec<Luma<u8>> = pipeline
         .collect()
         .into_iter()
         .flat_map(|a| a.to_vec())
         .collect();
-
-    let mut imgbuf: ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(img_side, img_side);
-    for (_, _, pixel) in imgbuf.enumerate_pixels_mut() {
-        *pixel = res.remove(0);
-    }
-    imgbuf
-        .save("benches/benchmarks/mandelbrot/fractal_rust_ssp.png")
-        .unwrap();
 }
