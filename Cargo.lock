@@ -690,7 +690,7 @@ dependencies = [
 [[package]]
 name = "kanal"
 version = "0.1.0-pre8"
-source = "git+https://github.com/fereidani/kanal.git#8d92bd44280ed6400cc97951d0c863d19d19fcc3"
+source = "git+https://github.com/fereidani/kanal.git#0d3a3e1e17ddb55280f4cc4d032ebd1e922a7bc0"
 dependencies = [
  "futures-core",
  "lock_api",
