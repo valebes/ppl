@@ -32,13 +32,21 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 
 ## Features
 
-- **Parallel Computing**: Unlock the power of parallelism in Rust with the Parallelo Parallel Library (PPL). Harness the potential of multiple cores to make your computations faster and more efficient.
-- **Essential Tools**: PPL offers a variety of essential tools for parallel computing, including a work-stealing thread pool, pipelines, farms, and other parallel skeletons. These tools allow you to express complex parallel computations with ease.
-- **CPU Pinning**: Take advantage of PPL's CPU Pinning to optimize the utilization of your system's resources. Customize aspects such as the maximum number of cores to use, the thread wait policies, and mapping of the threads to the physical cores for enhanced performance and efficiency.
-- **Multiple Channel Backends**: Choose from a range of flexible channel implementations in PPL to enable seamless communication and coordination between parallel tasks. Select the channel backend that suits your application requirements, ensuring smooth data flow throughout your parallel computations.
-- **Customization and Stateful Nodes**: With PPL, you have the flexibility to create custom stages and nodes, allowing you to add state and express more complex parallel computations. Tailor your pipeline to specific needs and create highly customizable parallel workflows.
-- **Intuitive API**: Whether you're a seasoned parallel computing expert or new to parallelism, PPL simplifies parallel programming with its intuitive API. Developers of all levels of expertise can easily leverage the power of parallel computing in Rust.
-- **Work-Stealing Thread Pool**: PPL includes a powerful work-stealing thread pool that further enhances parallel execution. Utilize the thread pool to distribute work across multiple threads, maximizing the efficiency of your parallel computations.
+## Features
+
+- **Parallel Computing**: Unleash the full power of parallelism in Rust with the Parallelo Parallel Library (PPL). Tap into the potential of multiple cores to turbocharge your computations, making them faster and more efficient than ever before.
+
+- **Streaming and Data Parallelism**: PPL offers tools to express both streaming and data parallelism models. Handle continuous data streams and process structured datasets in parallel, enabling efficient data processing and analysis.
+
+- **Work-Stealing Thread Pool**: PPL includes a work-stealing thread pool that elevates parallel execution to new heights. The work-stealing thread pool dynamically distributes tasks among available threads, ensuring load balancing and efficient utilization of computational resources. This feature boosts the efficiency of parallel computations, enabling superior performance and scalability in your Rust applications.
+
+- **Efficient Resource Management**: Optimal resource management is vital in the realm of parallel programming. PPL grants you fine-grained control over resource allocation, including core utilization, thread wait policies, and CPU pinning. This level of control ensures the optimal utilization of your hardware resources, resulting in enhanced performance and efficiency for your parallel computations.
+
+- **Multiple Channel Backends**: PPL provides you with the freedom to choose from a range of channel backends for seamless communication and coordination between parallel tasks. Take advantage of popular channel implementations like crossbeam-channel, flume, and kanal. Each backend possesses its own unique performance characteristics, memory usage, and feature set, allowing you to select the one that perfectly aligns with your specific requirements. These versatile channel backends facilitate smooth data flow and synchronization within your parallel computations.
+
+- **Flexibility and Customization**: With PPL you have the flexibility to create custom nodes, allowing you to express more complex parallel computations. This empowers you to tailor your parallel pipelines to suit your precise needs, creating highly customizable parallel workflows. Stateful nodes can store intermediate results and maintain crucial context information, enabling efficient data sharing between different stages of the computation. This flexibility and customizability augment the expressiveness of PPL, enabling you to tackle a wide range of parallel programming scenarios.
+
+- **Intuitive API**: Whether you're a seasoned parallel computing expert or a parallelism novice, PPL simplifies parallel programming with its intuitive API. Developers of all skill levels can effortlessly harness the power of parallel computing in Rust. The intuitive API ensures a smooth learning curve, allowing you to dive straight into parallelizing your computations with ease.
 
 ## Installation
 
