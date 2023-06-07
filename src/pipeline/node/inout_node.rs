@@ -14,7 +14,7 @@ use log::{trace, warn};
 use std::collections::BTreeMap;
 
 use crate::{
-    core::orchestrator::{JobInfo, Orchestrator},
+    core::{orchestrator::{JobInfo, Orchestrator}, configuration::{WaitPolicy, Scheduling}},
     mpsc::{
         channel::{Channel, InputChannel, OutputChannel},
         err::SenderError,
@@ -270,7 +270,7 @@ where
 
     // Create a new channel for the input.
     // Return the sender of the channel.
-    fn create_channel(&mut self, blocking: bool) -> OutputChannel<Message<TIn>> {
+    fn create_channel(&mut self, blocking: WaitPolicy) -> OutputChannel<Message<TIn>> {
         let (channel_rx, channel_tx) = Channel::channel(blocking);
         self.channel_rx = Some(channel_rx);
         channel_tx
@@ -596,11 +596,10 @@ where
     TNext: Node<TOut, TCollected> + Sync + Send + 'static,
 {
     /// Create a new Node.
+    /// 
     /// The `handler` is the  struct that implement the trait `InOut` and defines
     /// the behavior of the node we're creating.
     /// `next_node` contains the stage that follows the node.
-    /// If `blocking` is true the node will perform blocking operation on receive.
-    /// If `pinning` is `true` the node will be pinned to the thread in position `id`.
     ///
     pub fn new(
         id: usize,
@@ -653,7 +652,7 @@ where
         }
 
         // If workstealing is enabled (and the node isn't an ordered producer), we need to register the stealers
-        if splitter.is_none() && orchestrator.get_configuration().get_scheduling() {
+        if splitter.is_none() && orchestrator.get_configuration().get_scheduling() == Scheduling::Dynamic {
             // Register stealers to each worker
             let mut stealers = Vec::new();
             for worker in &worker_nodes {
