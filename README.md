@@ -36,7 +36,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 
 - **Parallel Computing**: Unleash the full power of parallelism in Rust with the Parallelo Parallel Library (PPL). Tap into the potential of multiple cores to turbocharge your computations, making them faster and more efficient than ever before.
 
-- **Streaming and Data Parallelism**: PPL offers tools to express both streaming and data parallelism models. Handle continuous data streams and process structured datasets in parallel, enabling efficient data processing and analysis.
+- **Task, Stream, and Data Parallelism**: PPL offers tools to express task, stream, and data parallelism models. Harness the power of task parallelism to break down your computations into smaller tasks that can be executed in parallel. Handle continuous data streams and process structured datasets in parallel, enabling efficient data processing and analysis.
 
 - **Work-Stealing Thread Pool**: PPL includes a work-stealing thread pool that elevates parallel execution to new heights. The work-stealing thread pool dynamically distributes tasks among available threads, ensuring load balancing and efficient utilization of computational resources. This feature boosts the efficiency of parallel computations, enabling superior performance and scalability in your Rust applications.
 
