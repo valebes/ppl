@@ -100,7 +100,7 @@ fn main() {
                 }
             }
         },
-        |input| Some(fibonacci_recursive(input)),
+        |input| Some(fib(input)),
         |input| println!("{}", input)
     ];
     p.start();
