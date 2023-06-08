@@ -467,7 +467,8 @@ The configuration of Parallelo Parallel Library (PPL) can be customized by setti
 - **PPL_WAIT_POLICY**: If set to `passive`, the threads will try to give up their time to other threads when waiting for a communication or unused. This is particularly useful when we are using SMT and can improve performances. Instead, if is set to `active`, the threads wil do busy waiting. By default, this option is set to `passive`.
 
 - **PPL_THREADS_MAPPING**: Specifies the threads mapping. By default, the threads are mapped in the order in which the CPUs are found. This option is only valid when pinning is active. (Note that this environment variable is kinda similar to the `OMP_PLACES` environment variable in OpenMP). 
-  - Example: `PPL_THREADS_MAPPING=0,2,1,3` will map the threads in the following order: `0 -> core 0`, `1 -> core 2`, `2 -> core 1`, `3 -> core 3`.
+  - Example: `PPL_THREADS_MAPPING=0,2,1,3` will map the threads in the following order:
+  `0 -> core 0`, `1 -> core 2`, `2 -> core 1`, `3 -> core 3`.
 
 To customize the configuration, set the desired environment variables before running your Rust program that uses PPL. For example, you can set the environment variables in your shell script or use a tool to load them from a file.
 
