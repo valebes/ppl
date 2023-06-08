@@ -92,8 +92,8 @@ use ppl::prelude::*;
 fn main() {
     let mut p = pipeline![
         {
-            let mut counter = 0;
-            move || {
+            let mut counter = 0; 
+            move || { 
                 if counter < 20 {
                     counter += 1;
                     Some(counter)
@@ -102,12 +102,8 @@ fn main() {
                 }
             }
         },
-        |input| Some(fib(input)),
-        {
-            move |input| {
-                println!("{}", input);
-            }
-        }
+        |input| Some(fibonacci_recursive(input)),
+        |input| println!("{}", input)
     ];
     p.start();
     p.wait_and_collect();
@@ -180,7 +176,7 @@ impl In<usize, usize> for Sink {
         println!("{}", input);
         self.counter += 1;
     }
-    // If at the end of the stream We want to return something, We can override the finalize method.
+    // If at the end of the stream we want to return something, we can override the finalize method.
     fn finalize(self) -> Option<usize> {
         println!("End");
         Some(self.counter)
@@ -198,7 +194,7 @@ fn main() {
     ];
 
     p.start();
-    let res = p.wait_and_collect(); // Here We will get the counter returned by the Sink
+    let res = p.wait_and_collect(); // Here we will get the counter returned by the Sink
     assert_eq!(res.unwrap(), 20);
 }
 ```
@@ -212,7 +208,7 @@ use ppl::thread_pool::ThreadPool;
 
 fn main() {
     let tp = ThreadPool::new(); // We create a new threadpool
-    for i in 1..45 {
+    for i in 1..21 {
         tp.execute(move || {
             fib(i);
         });
@@ -220,6 +216,26 @@ fn main() {
     tp.wait(); // Wait till al worker have finished
 }
 ```
+
+If we don't want to wait the threads explicitly, we can create a parallel scope.
+At the end of the scope, all the threads are guaranteed to have finished their jobs.
+This can be done with the following code:
+
+```rust
+use ppl::thread_pool::ThreadPool;
+
+fn main() {
+    let tp = ThreadPool::new(); // We create a new threadpool
+    tp.scoped(|s| {
+        for i in 1..21 {
+            s.execute(move || {
+                fib(i);
+            });
+        }
+    }); // After this all threads have finished
+}
+```
+
 ### A More Complex Example: Word Counter
 
 To demonstrate the capabilities of Parallelo Parallel Library (PPL), let's consider a common problem: counting the occurrences of words in a text dataset. This example showcases how PPL can significantly speed up computations by leveraging parallelism.
@@ -319,6 +335,7 @@ pub fn ppl_map(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
     let reader = BufReader::new(file);
 
+    // We can also create custom-sized thread pool
     let mut tp = ThreadPool::with_capacity(threads);
 
     let mut words = Vec::new();
@@ -442,9 +459,9 @@ The configuration of Parallelo Parallel Library (PPL) can be customized by setti
 
 - **PPL_SCHEDULE**: Specifies the scheduling method used in the pipeline. The available options are:
   - `static`: Static scheduling (Round-robin).
-  - `dynamic`: Dynamic scheduling (Work-stealing between replicas enabled).
+  - `dynamic`: Dynamic scheduling (Work-stealing between replicas of the same stage enabled).
 
-- **PPL_WAIT_POLICY**: If set to `passive`, the threads will try to give up their time to other threads when waiting for a communication or unused. This is particularly useful when we are using SMT and can improve performances. If is set to `active`, the threads wil do busy waiting. By default, this option is set to `passive`.
+- **PPL_WAIT_POLICY**: If set to `passive`, the threads will try to give up their time to other threads when waiting for a communication or unused. This is particularly useful when we are using SMT and can improve performances. Instead, if is set to `active`, the threads wil do busy waiting. By default, this option is set to `passive`.
 
 - **PPL_THREADS_MAPPING**: Specifies the threads mapping. By default, the threads are mapped in the order in which the CPUs are found. This option is only valid when pinning is active. (Note that this environment variable is kinda similar to the `OMP_PLACES` environment variable in OpenMP). 
   - Example: `PPL_THREADS_MAPPING=0,2,1,3` will map the threads in the following order: `0 -> core 0`, `1 -> core 2`, `2 -> core 1`, `3 -> core 3`.
