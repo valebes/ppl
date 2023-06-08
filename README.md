@@ -258,7 +258,7 @@ Here's the Rust code for the word counter using the pipeline approach:
 
 ```rust
 use ppl::{
-    templates::map::{Map, MapReduce, Reduce},
+    templates::map::{Map, Reduce},
     prelude::*,
 };
 
