@@ -408,6 +408,10 @@ impl InOut<usize, usize> for Worker {
         self.input = input;
         None
     }
+    // After calling the run method, the rts of the framework
+    // will call the produce method till a None is returned.
+    // After a None is returned, the node will fetch the 
+    // next input and call the run method again.
     fn produce(&mut self) -> Option<usize> {
         if self.counter < self.number_of_messages {
             self.counter += 1;
@@ -416,6 +420,7 @@ impl InOut<usize, usize> for Worker {
             None
         }
     }
+    // We mark this node as a producer
     fn is_producer(&self) -> bool {
         true
     }
