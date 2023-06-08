@@ -32,13 +32,19 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 
 ## Features
 
-- **Parallel Computing**: Unlock the power of parallelism in Rust with the Parallelo Parallel Library (PPL). Harness the potential of multiple cores to make your computations faster and more efficient.
-- **Essential Tools**: PPL offers a variety of essential tools for parallel computing, including a work-stealing thread pool, pipelines, farms, and other parallel skeletons. These tools allow you to express complex parallel computations with ease.
-- **CPU Pinning**: Take advantage of PPL's CPU Pinning to optimize the utilization of your system's resources. Customize aspects such as the maximum number of cores to use, the thread wait policies, and mapping of the threads to the physical cores for enhanced performance and efficiency.
-- **Multiple Channel Backends**: Choose from a range of flexible channel implementations in PPL to enable seamless communication and coordination between parallel tasks. Select the channel backend that suits your application requirements, ensuring smooth data flow throughout your parallel computations.
-- **Customization and Stateful Nodes**: With PPL, you have the flexibility to create custom stages and nodes, allowing you to add state and express more complex parallel computations. Tailor your pipeline to specific needs and create highly customizable parallel workflows.
-- **Intuitive API**: Whether you're a seasoned parallel computing expert or new to parallelism, PPL simplifies parallel programming with its intuitive API. Developers of all levels of expertise can easily leverage the power of parallel computing in Rust.
-- **Work-Stealing Thread Pool**: PPL includes a powerful work-stealing thread pool that further enhances parallel execution. Utilize the thread pool to distribute work across multiple threads, maximizing the efficiency of your parallel computations.
+- **Parallel Computing**: Unleash the full power of parallelism in Rust with the Parallelo Parallel Library (PPL). Tap into the potential of multiple cores to turbocharge your computations, making them faster and more efficient than ever before.
+
+- **Task, Stream, and Data Parallelism**: PPL offers tools to express task, stream, and data parallelism models. Harness the power of task parallelism to break down your computations into smaller tasks that can be executed in parallel. Handle continuous data streams and process structured datasets in parallel, enabling efficient data processing and analysis.
+
+- **Work-Stealing Thread Pool**: PPL includes a work-stealing thread pool that elevates parallel execution to new heights. The work-stealing thread pool dynamically distributes tasks among available threads, ensuring load balancing and efficient utilization of computational resources. This feature boosts the efficiency of parallel computations, enabling superior performance and scalability in your Rust applications.
+
+- **Efficient Resource Management**: Optimal resource management is vital in the realm of parallel programming. PPL grants you fine-grained control over resource allocation, including core utilization, thread wait policies, and CPU pinning. This level of control ensures the optimal utilization of your hardware resources, resulting in enhanced performance and efficiency for your parallel computations.
+
+- **Multiple Channel Backends**: PPL provides you with the freedom to choose from a range of channel backends for seamless communication and coordination between parallel tasks. Take advantage of popular channel implementations like crossbeam-channel, flume, and kanal. Each backend possesses its own unique performance characteristics, memory usage, and feature set, allowing you to select the one that perfectly aligns with your specific requirements. These versatile channel backends facilitate smooth data flow and synchronization within your parallel computations.
+
+- **Flexibility and Customization**: With PPL you have the flexibility to create custom nodes, allowing you to express more complex parallel computations. This empowers you to tailor your parallel pipelines to suit your precise needs, creating highly customizable parallel workflows. Stateful nodes can store intermediate results and maintain crucial context information, enabling efficient data sharing between different stages of the computation. This flexibility and customizability augment the expressiveness of PPL, enabling you to tackle a wide range of parallel programming scenarios.
+
+- **Intuitive API**: Whether you're a seasoned parallel computing expert or a parallelism novice, PPL simplifies parallel programming with its intuitive API. Developers of all skill levels can effortlessly harness the power of parallel computing in Rust. The intuitive API ensures a smooth learning curve, allowing you to dive straight into parallelizing your computations with ease.
 
 ## Installation
 
@@ -84,8 +90,8 @@ use ppl::prelude::*;
 fn main() {
     let mut p = pipeline![
         {
-            let mut counter = 0;
-            move || {
+            let mut counter = 0; 
+            move || { 
                 if counter < 20 {
                     counter += 1;
                     Some(counter)
@@ -95,11 +101,7 @@ fn main() {
             }
         },
         |input| Some(fib(input)),
-        {
-            move |input| {
-                println!("{}", input);
-            }
-        }
+        |input| println!("{}", input)
     ];
     p.start();
     p.wait_and_collect();
@@ -172,7 +174,7 @@ impl In<usize, usize> for Sink {
         println!("{}", input);
         self.counter += 1;
     }
-    // If at the end of the stream We want to return something, We can override the finalize method.
+    // If at the end of the stream we want to return something, we can override the finalize method.
     fn finalize(self) -> Option<usize> {
         println!("End");
         Some(self.counter)
@@ -190,7 +192,7 @@ fn main() {
     ];
 
     p.start();
-    let res = p.wait_and_collect(); // Here We will get the counter returned by the Sink
+    let res = p.wait_and_collect(); // Here we will get the counter returned by the Sink
     assert_eq!(res.unwrap(), 20);
 }
 ```
@@ -204,7 +206,7 @@ use ppl::thread_pool::ThreadPool;
 
 fn main() {
     let tp = ThreadPool::new(); // We create a new threadpool
-    for i in 1..45 {
+    for i in 1..21 {
         tp.execute(move || {
             fib(i);
         });
@@ -212,6 +214,26 @@ fn main() {
     tp.wait(); // Wait till al worker have finished
 }
 ```
+
+If we don't want to wait the threads explicitly, we can create a parallel scope.
+At the end of the scope, all the threads are guaranteed to have finished their jobs.
+This can be done with the following code:
+
+```rust
+use ppl::thread_pool::ThreadPool;
+
+fn main() {
+    let tp = ThreadPool::new(); // We create a new threadpool
+    tp.scoped(|s| {
+        for i in 1..21 {
+            s.execute(move || {
+                fib(i);
+            });
+        }
+    }); // After this all threads have finished
+}
+```
+
 ### A More Complex Example: Word Counter
 
 To demonstrate the capabilities of Parallelo Parallel Library (PPL), let's consider a common problem: counting the occurrences of words in a text dataset. This example showcases how PPL can significantly speed up computations by leveraging parallelism.
@@ -236,7 +258,7 @@ Here's the Rust code for the word counter using the pipeline approach:
 
 ```rust
 use ppl::{
-    templates::map::{Map, MapReduce, Reduce},
+    templates::map::{Map, Reduce},
     prelude::*,
 };
 
@@ -311,6 +333,7 @@ pub fn ppl_map(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
     let reader = BufReader::new(file);
 
+    // We can also create custom-sized thread pool
     let mut tp = ThreadPool::with_capacity(threads);
 
     let mut words = Vec::new();
@@ -383,6 +406,10 @@ impl InOut<usize, usize> for Worker {
         self.input = input;
         None
     }
+    // After calling the run method, the rts of the framework
+    // will call the produce method till a None is returned.
+    // After a None is returned, the node will fetch the 
+    // next input and call the run method again.
     fn produce(&mut self) -> Option<usize> {
         if self.counter < self.number_of_messages {
             self.counter += 1;
@@ -391,6 +418,7 @@ impl InOut<usize, usize> for Worker {
             None
         }
     }
+    // We mark this node as a producer
     fn is_producer(&self) -> bool {
         true
     }
@@ -434,12 +462,13 @@ The configuration of Parallelo Parallel Library (PPL) can be customized by setti
 
 - **PPL_SCHEDULE**: Specifies the scheduling method used in the pipeline. The available options are:
   - `static`: Static scheduling (Round-robin).
-  - `dynamic`: Dynamic scheduling (Work-stealing between replicas enabled).
+  - `dynamic`: Dynamic scheduling (Work-stealing between replicas of the same stage enabled).
 
-- **PPL_WAIT_POLICY**: If set to `true`, the threads will try to give up their time to other threads when waiting for a communication or unused. This is particularly useful when we are using SMT and can improve performances. If is set to `false`, the threads wil do busy waiting. By default, this option is set to `false`.
+- **PPL_WAIT_POLICY**: If set to `passive`, the threads will try to give up their time to other threads when waiting for a communication or unused. This is particularly useful when we are using SMT and can improve performances. Instead, if is set to `active`, the threads wil do busy waiting. By default, this option is set to `passive`.
 
 - **PPL_THREADS_MAPPING**: Specifies the threads mapping. By default, the threads are mapped in the order in which the CPUs are found. This option is only valid when pinning is active. (Note that this environment variable is kinda similar to the `OMP_PLACES` environment variable in OpenMP). 
-  - Example: `PPL_THREADS_MAPPING=0,2,1,3` will map the threads in the following order: `0 -> core 0`, `1 -> core 2`, `2 -> core 1`, `3 -> core 3`.
+  - Example: `PPL_THREADS_MAPPING=0,2,1,3` will map the threads in the following order:
+  `0 -> core 0`, `1 -> core 2`, `2 -> core 1`, `3 -> core 3`.
 
 To customize the configuration, set the desired environment variables before running your Rust program that uses PPL. For example, you can set the environment variables in your shell script or use a tool to load them from a file.
 

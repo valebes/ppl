@@ -2,6 +2,29 @@ use std::env;
 
 use core_affinity::CoreId;
 
+/// Types of scheduling methods available for the pipeline.
+/// 
+/// * `Dynamic`: Workstealing between replicas of the same stage enabled.
+/// * `Static`: The work is distribuited among the replicas of a stage in a Round-Robin way.
+#[derive(PartialEq, Debug, Copy, Clone)]
+pub enum Scheduling{
+    Dynamic,
+    Static,
+}
+
+/// Types of wait policies available.
+/// 
+/// This serves to provide the framework the desired behavior of waiting threads.
+/// 
+/// * `Active`: Prefers busy wait, consuming processor cycles while waiting.
+/// * `Passive`: Prefers that waiting threads yield the processor to other threads
+/// while waiting, in other words not consuming processor cycles.
+#[derive(PartialEq, Debug, Copy, Clone)]
+pub enum WaitPolicy{
+    Active,
+    Passive,
+}
+
 /// Configuration of the framework.
 ///
 /// The configuration is set by the user through environment variables.
@@ -15,8 +38,8 @@ pub struct Configuration {
     max_cores: usize,
     threads_mapping: Vec<CoreId>,
     pinning: bool,
-    scheduling: bool,
-    wait_policy: bool,
+    scheduling: Scheduling,
+    wait_policy: WaitPolicy,
 }
 
 /// Parse the threads mapping from the environment variable PPL_THREAD_MAPPING.
@@ -64,14 +87,14 @@ impl Configuration {
     /// Create a new configuration.
     /// # Arguments
     /// * `max_cores`: maximum number of cores allowed. Only valid when pinning is active.
-    /// * `pinning`: enable pinning of the partitions to the cores.
+    /// * `pinning`: enable threads pinning.
     /// * `scheduling`: scheduling method used in the pipeline.
-    /// * `wait_policy`: enable blocking in channels.
+    /// * `wait_policy`: the threads wait policy that the framework should prefer.
     pub fn new(
         max_cores: usize,
         pinning: bool,
-        scheduling: bool,
-        wait_policy: bool,
+        scheduling: Scheduling,
+        wait_policy: WaitPolicy,
     ) -> Configuration {
         let threads_mapping = parse_threads_mapping();
 
@@ -89,7 +112,7 @@ impl Configuration {
     /// * `max_cores`: the number of cores found by the framework.
     /// * `pinning`: false.
     /// * `scheduling`: static.
-    /// * `wait_policy`: false.
+    /// * `wait_policy`: passive.
     pub fn new_default() -> Configuration {
         let max_threads = match env::var("PPL_MAX_CORES") {
             Ok(val) => val.parse::<usize>().unwrap(),
@@ -101,19 +124,29 @@ impl Configuration {
         };
         let scheduling = match env::var("PPL_SCHEDULE") {
             Ok(val) => {
-                if val == "static" {
-                    false
-                } else if val == "dynamic" {
-                    true
+                let value = val.to_lowercase();
+                if value == "static" {
+                    Scheduling::Static
+                } else if value == "dynamic" {
+                    Scheduling::Dynamic
                 } else {
-                    panic!("Invalid scheduling policy");
+                    panic!("{} is an invalid scheduling policy", value);
                 }
             }
-            Err(_) => false,
+            Err(_) => Scheduling::Static,
         };
         let wait_policy = match env::var("PPL_WAIT_POLICY") {
-            Ok(val) => val.parse::<bool>().unwrap(),
-            Err(_) => false,
+            Ok(val) => {
+                let value = val.to_lowercase();
+                if value == "active" {
+                    WaitPolicy::Active
+                } else if value == "passive" {
+                    WaitPolicy::Passive
+                } else {
+                    panic!("{} is an invalid threads wait policy", value);
+                }
+            },
+            Err(_) => WaitPolicy::Passive,
         };
         Configuration::new(max_threads, pinning, scheduling, wait_policy)
     }
@@ -156,7 +189,7 @@ impl Configuration {
     /// work is done in a round-robin fashion.
     /// Instead, if the scheduling policy is dynamic, the distribution
     /// of the work is done in a work-stealing fashion.
-    pub(crate) fn get_scheduling(&self) -> bool {
+    pub(crate) fn get_scheduling(&self) -> Scheduling {
         self.scheduling
     }
 
@@ -166,7 +199,7 @@ impl Configuration {
     /// Otherwise, the channels are non-blocking.
     /// This choice is enforced both in the pipeline and in the
     /// parallel map.
-    pub(crate) fn get_wait_policy(&self) -> bool {
+    pub(crate) fn get_wait_policy(&self) -> WaitPolicy {
         self.wait_policy
     }
 }
@@ -198,14 +231,14 @@ mod tests {
     fn test_configuration_with_env() {
         env::set_var("PPL_MAX_CORES", "4");
         env::set_var("PPL_PINNING", "true");
-        env::set_var("PPL_WAIT_POLICY", "true");
-        env::set_var("PPL_SCHEDULE", "dynamic");
+        env::set_var("PPL_WAIT_POLICY", "PASSIVE");
+        env::set_var("PPL_SCHEDULE", "DYNAMIC");
 
         let conf = Configuration::new_default();
         assert_eq!(conf.max_cores, 4);
         assert!(conf.pinning);
-        assert!(conf.wait_policy);
-        assert!(conf.scheduling);
+        assert_eq!(conf.wait_policy, WaitPolicy::Passive);
+        assert_eq!(conf.scheduling, Scheduling::Dynamic);
         reset_env();
     }
 }

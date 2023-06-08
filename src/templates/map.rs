@@ -12,9 +12,10 @@ where
     F: FnOnce(TIn) -> TOut + Send + Copy,
 {
     threadpool: ThreadPool,
+    replicas: usize,
     f: F,
     phantom: PhantomData<(TIn, TOut)>,
-    replicas: usize,
+    
 }
 impl<TIn, TOut, F> Map<TIn, TOut, F>
 where
@@ -33,25 +34,26 @@ where
     {
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: 1,
             f,
             phantom: PhantomData,
-            replicas: 1,
+            
         }
     }
 
     /// Create a new Map node with n_replicas replicas.
     /// # Arguments
     /// * `n_worker` - Number of worker threads.
-    /// * `f` - Function to apply to each element of the input.
     /// * `n_replicas` - Number of replicas.
+    /// * `f` - Function to apply to each element of the input.
     /// # Panics
     /// Panics if n_replicas is 0.
     /// # Remarks
     /// The replicas are created by cloning the Map node.
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
-        f: F,
         n_replicas: usize,
+        f: F,  
     ) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = TIn>,
@@ -60,9 +62,9 @@ where
         assert!(n_replicas > 0);
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: n_replicas,
             f,
             phantom: PhantomData,
-            replicas: n_replicas,
         }
     }
 }
@@ -94,9 +96,9 @@ where
     F: FnOnce(TIn) -> TOut + Send + Copy,
 {
     threadpool: ThreadPool,
+    replicas: usize,
     f: F,
     phantom: PhantomData<(TIn, TOut)>,
-    replicas: usize,
 }
 impl<TIn, TOut, F> OrderedMap<TIn, TOut, F>
 where
@@ -115,23 +117,23 @@ where
     {
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: 1,
             f,
             phantom: PhantomData,
-            replicas: 1,
         }
     }
     /// Create a new OrderedMap node with n_replicas replicas.
     ///
     /// # Arguments
     /// * `n_worker` - Number of worker threads.
-    /// * `f` - Function to apply to each element of the input.
     /// * `n_replicas` - Number of replicas.
+    /// * `f` - Function to apply to each element of the input.
     /// # Panics
     /// Panics if n_replicas is 0.
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
-        f: F,
         n_replicas: usize,
+        f: F,
     ) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = TIn>,
@@ -140,9 +142,9 @@ where
         assert!(n_replicas > 0);
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: n_replicas,
             f,
             phantom: PhantomData,
-            replicas: n_replicas,
         }
     }
 }
@@ -178,9 +180,9 @@ where
     F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
 {
     threadpool: ThreadPool,
+    replicas: usize,
     f: F,
     phantom: PhantomData<(TIn, TKey, TReduce)>,
-    replicas: usize,
 }
 impl<TIn, TKey, TReduce, F> Reduce<TIn, TKey, TReduce, F>
 where
@@ -200,23 +202,23 @@ where
     {
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: 1,
             f,
             phantom: PhantomData,
-            replicas: 1,
         }
     }
     /// Create a new Reduce node with n_replicas replicas.
     ///
     /// # Arguments
     /// * `n_worker` - Number of worker threads.
-    /// * `f` - Function to apply to each element of the input.
     /// * `n_replicas` - Number of replicas.
+    /// * `f` - Function to apply to each element of the input.
     /// # Panics
     /// Panics if n_replicas is 0.
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
-        f: F,
         n_replicas: usize,
+        f: F,
     ) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = (TKey, TIn)>,
@@ -225,9 +227,9 @@ where
         assert!(n_replicas > 0);
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: n_replicas,
             f,
             phantom: PhantomData,
-            replicas: n_replicas,
         }
     }
 }
@@ -263,9 +265,9 @@ where
     F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
 {
     threadpool: ThreadPool,
+    replicas: usize,
     f: F,
     phantom: PhantomData<(TIn, TKey, TReduce)>,
-    replicas: usize,
 }
 impl<TIn, TKey, TReduce, F> OrderedReduce<TIn, TKey, TReduce, F>
 where
@@ -285,23 +287,23 @@ where
     {
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: 1,
             f,
             phantom: PhantomData,
-            replicas: 1,
         }
     }
     /// Create a new OrderedReduce node with n_replicas replicas.
     ///
     /// # Arguments
     /// * `n_worker` - Number of worker threads.
-    /// * `f` - Function to apply to each element of the input.
     /// * `n_replicas` - Number of replicas.
+    /// * `f` - Function to apply to each element of the input.
     /// # Panics
     /// Panics if n_replicas is 0.
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
-        f: F,
         n_replicas: usize,
+        f: F,
     ) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = (TKey, TIn)>,
@@ -310,9 +312,9 @@ where
         assert!(n_replicas > 0);
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: n_replicas,
             f,
             phantom: PhantomData,
-            replicas: n_replicas,
         }
     }
 }
@@ -353,10 +355,10 @@ where
     FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
 {
     threadpool: ThreadPool,
+    replicas: usize,
     f_map: FMap,
     f_reduce: FReduce,
     phantom: PhantomData<(TIn, TMapOut, TKey, TReduce)>,
-    replicas: usize,
 }
 impl<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
     MapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
@@ -384,19 +386,19 @@ where
     {
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: 1,
             f_map,
             f_reduce,
             phantom: PhantomData,
-            replicas: 1,
         }
     }
     /// Create a new MapReduce node with n_replicas replicas.
     ///
     /// # Arguments
     /// * `n_worker` - Number of worker threads.
+    /// * `n_replicas` - Number of replicas.
     /// * `f_map` - Function to apply to each element of the input.
     /// * `f_reduce` - Function to apply to the output of the Map.
-    /// * `n_replicas` - Number of replicas.
     /// # Panics
     /// Panics if n_replicas is 0.
     pub fn build_with_replicas<TInIter, TOutIter>(
@@ -412,10 +414,10 @@ where
         assert!(n_replicas > 0);
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: n_replicas,
             f_map,
             f_reduce,
             phantom: PhantomData,
-            replicas: n_replicas,
         }
     }
 }
@@ -461,10 +463,10 @@ where
     FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
 {
     threadpool: ThreadPool,
+    replicas: usize,
     f_map: FMap,
     f_reduce: FReduce,
     phantom: PhantomData<(TIn, TMapOut, TKey, TReduce)>,
-    replicas: usize,
 }
 impl<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
     OrderedMapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
@@ -492,26 +494,26 @@ where
     {
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: 1,
             f_map,
             f_reduce,
             phantom: PhantomData,
-            replicas: 1,
         }
     }
     /// Create a new OrderedMapReduce node with n_replicas replicas.
     ///
     /// # Arguments
     /// * `n_worker` - Number of worker threads.
+    /// * `n_replicas` - Number of replicas.
     /// * `f_map` - Function to apply to each element of the input.
     /// * `f_reduce` - Function to apply to the output of the Map.
-    /// * `n_replicas` - Number of replicas.
     /// # Panics
     /// Panics if n_replicas is 0.
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
+        n_replicas: usize,
         f_map: FMap,
         f_reduce: FReduce,
-        n_replicas: usize,
     ) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = TIn>,
@@ -520,10 +522,10 @@ where
         assert!(n_replicas > 0);
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: n_replicas,
             f_map,
             f_reduce,
             phantom: PhantomData,
-            replicas: n_replicas,
         }
     }
 }

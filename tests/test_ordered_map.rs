@@ -46,9 +46,9 @@ fn test_ordered_map() {
         },
         // Create an OrderedMap node with the build_with_replicas method.
         OrderedMap::build_with_replicas(
-            6,
+            6, // Number of workers per stage
+            3, // number of replicas of this stage
             |el: i32| -> String { "Hello from: ".to_string() + &el.to_string() },
-            6
         ),
         Sink { res: Vec::new() }
     );

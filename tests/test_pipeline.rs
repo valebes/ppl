@@ -99,11 +99,7 @@ fn test_pipeline() {
             }
         },
         |input| Some(fibonacci_recursive(input)),
-        {
-            move |input| {
-                println!("{}", input);
-            }
-        }
+        |input| println!("{}", input)
     ];
     p.start();
     let _ = p.wait_and_collect();
