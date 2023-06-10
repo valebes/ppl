@@ -22,6 +22,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 - [Channel Backend](#channel-backend)
   - [FastFlow Channel](#fastflow-channel)
 - [Benchmarks](#benchmarks)
+  -[Results](#results)
 - [Contributing](#contributing)
   - [Code of Conduct](#code-of-conduct)
   - [How to Contribute](#how-to-contribute)
@@ -519,6 +520,20 @@ cargo bench
 For now there are only two benchmarks.
 The first, called *image_processing*, is based on the [RustStreamBench](https://github.com/GMAP/RustStreamBench/) Image Processing benchmark that can be found [here](https://github.com/GMAP/RustStreamBench/tree/main/image-processing).
 The second is a basic parallel implementation of the well known iterative algorithm to compute the Mandelbrot Set, is called *mandelbrot_set*.
+
+### Results
+Following are results obtained by running the image-processing benchmark on a machine with 2x Ampere Altra 80 Cores @ 3.0GHz and on a machine with 2x AMD EPYC 7551 32 Cores @ 2.5 GHz.
+In the results reported here, PPL was used by enabling pinning and dynamic scheduling.
+
+#### Ampere Altra (ARM)
+![alt-text-1](.github/benchmark/AMPERE_PINNING/time.svg "Execution Times") ![alt-text-2](.github/benchmark/AMPERE_PINNING/speedup.svg "SpeedUp")
+
+![alt-text-1](.github/benchmark/AMPERE_PINNING/efficiency.svg "Efficiency") ![alt-text-2](.github/benchmark/AMPERE_PINNING/scalability.svg "Scalability")
+
+#### AMD EPYC 7551 (x86)
+![alt-text-1](.github/benchmark/TITANIC_PINNING/time.svg "Execution Times") ![alt-text-2](.github/benchmark/TITANIC_PINNING/speedup.svg "SpeedUp")
+
+![alt-text-1](.github/benchmark/TITANIC_PINNING/efficiency.svg "Efficiency") ![alt-text-2](.github/benchmark/TITANIC_PINNING/scalability.svg "Scalability")
 
 ## Contributing
 
