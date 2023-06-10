@@ -222,8 +222,9 @@ mod tests {
     fn test_configuration() {
         let conf = Configuration::new_default();
         assert_eq!(conf.max_cores, num_cpus::get());
-        //assert!(!conf.pinning);
-        //assert!(!conf.blocking_channel);
+        assert!(!conf.pinning);
+        assert_eq!(conf.wait_policy, WaitPolicy::Passive);
+        assert_eq!(conf.scheduling, Scheduling::Static);
     }
 
     #[test]
