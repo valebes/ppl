@@ -22,6 +22,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 - [Channel Backend](#channel-backend)
   - [FastFlow Channel](#fastflow-channel)
 - [Benchmarks](#benchmarks)
+  - [Available Benchmarks](#available-benchmarks)
   - [Image-Processing Results](#image-processing-results)
 - [Contributing](#contributing)
   - [Code of Conduct](#code-of-conduct)
