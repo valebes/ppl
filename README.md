@@ -22,7 +22,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 - [Channel Backend](#channel-backend)
   - [FastFlow Channel](#fastflow-channel)
 - [Benchmarks](#benchmarks)
-  - [Results](#results)
+  - [Image-Processing Results](#image-processing-results)
 - [Contributing](#contributing)
   - [Code of Conduct](#code-of-conduct)
   - [How to Contribute](#how-to-contribute)
@@ -521,7 +521,7 @@ For now there are only two benchmarks.
 The first, called *image_processing*, is based on the [RustStreamBench](https://github.com/GMAP/RustStreamBench/) Image Processing benchmark that can be found [here](https://github.com/GMAP/RustStreamBench/tree/main/image-processing).
 The second is a basic parallel implementation of the well known iterative algorithm to compute the Mandelbrot Set, is called *mandelbrot_set*.
 
-### Results
+### Image-Processing Results
 Following are results obtained by running the image-processing benchmark on a machine with 2x Ampere Altra 80 Cores @ 3.0GHz and on a machine with 2x AMD EPYC 7551 32 Cores @ 2.5 GHz.
 In the results reported here, PPL was used by enabling pinning and dynamic scheduling.
 
