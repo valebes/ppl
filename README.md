@@ -533,7 +533,7 @@ In the results reported here, PPL was used by enabling pinning and dynamic sched
 
 <table><tr>
 <td> <img src=".github/benchmark/AMPERE_PINNING/efficiency.svg" alt="Efficiency" style="width: 450px;"/> </td>
-<td> <img src=".github/benchmark/AMPERE_PINNING/scalability.svg" alt="Scalability" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/AMPERE_PINNING/scala.svg" alt="Scalability" style="width: 450px;"/> </td>
 </tr></table>
 
 #### AMD EPYC 7551 (x86)
@@ -544,7 +544,7 @@ In the results reported here, PPL was used by enabling pinning and dynamic sched
 
 <table><tr>
 <td> <img src=".github/benchmark/TITANIC_PINNING/efficiency.svg" alt="Efficiency" style="width: 450px;"/> </td>
-<td> <img src=".github/benchmark/TITANIC_PINNING/scalability.svg" alt="Scalability" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/TITANIC_PINNING/scala.svg" alt="Scalability" style="width: 450px;"/> </td>
 </tr></table>
 
 ## Contributing
