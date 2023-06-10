@@ -517,15 +517,19 @@ The benchmarks are available in the *benches/* directory. To run the benchmarks,
 cargo bench
 ```
 
-For now there are only two benchmarks.
-The first, called *image_processing*, is based on the [RustStreamBench](https://github.com/GMAP/RustStreamBench/) Image Processing benchmark that can be found [here](https://github.com/GMAP/RustStreamBench/tree/main/image-processing).
-The second is a basic parallel implementation of the well known iterative algorithm to compute the Mandelbrot Set, is called *mandelbrot_set*.
+### Available Benchmarks
+- **Image Processing**: A benchmark that is based on the [RustStreamBench](https://github.com/GMAP/RustStreamBench/). You can find the benchmark source code here [here](https://github.com/GMAP/RustStreamBench/tree/main/image-processing).
+
+- **Mandelbrot Set**: A basic parallel implementation of the well-known iterative algorithm to compute the Mandelbrot Set.
 
 ### Image-Processing Results
 Following are results obtained by running the image-processing benchmark on a machine with 2x Ampere Altra 80 Cores @ 3.0GHz and on a machine with 2x AMD EPYC 7551 32 Cores @ 2.5 GHz.
 In the results reported here, PPL was used by enabling pinning and dynamic scheduling.
 
 #### Ampere Altra (ARM)
+- **Processor**: 2x Ampere Altra 80 Cores @ 3.0GHz
+- **Configuration**: PPL with pinning and dynamic scheduling enabled
+
 <table><tr>
 <td> <img src=".github/benchmark/AMPERE_PINNING/time.svg" alt="Time" style="width: 450px;"/> </td>
 <td> <img src=".github/benchmark/AMPERE_PINNING/speedup.svg" alt="SpeedUp" style="width: 450px;"/> </td>
@@ -537,6 +541,9 @@ In the results reported here, PPL was used by enabling pinning and dynamic sched
 </tr></table>
 
 #### AMD EPYC 7551 (x86)
+- **Processor**: 2x AMD EPYC 7551 32 Cores @ 2.5 GHz
+- **Configuration**: PPL with pinning and dynamic scheduling enabled
+
 <table><tr>
 <td> <img src=".github/benchmark/TITANIC_PINNING/time.svg" alt="Time" style="width: 450px;"/> </td>
 <td> <img src=".github/benchmark/TITANIC_PINNING/speedup.svg" alt="SpeedUp" style="width: 450px;"/> </td>
