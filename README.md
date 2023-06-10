@@ -524,8 +524,8 @@ cargo bench
 - **Mandelbrot Set**: A basic parallel implementation of the well-known iterative algorithm to compute the Mandelbrot Set.
 
 ### Image-Processing Results
-Following are results obtained by running the image-processing benchmark on a machine with 2x Ampere Altra 80 Cores @ 3.0GHz and on a machine with 2x AMD EPYC 7551 32 Cores @ 2.5 GHz.
-In the results reported here, PPL was used by enabling pinning and dynamic scheduling.
+Following are reported the results obtained by running the image-processing benchmark on a machine with 2x Ampere Altra 80 Cores @ 3.0GHz and on a machine with 2x AMD EPYC 7551 32 Cores @ 2.5 GHz.
+In the results reported here, PPL was used enabling both threads pinning and dynamic scheduling.
 
 #### Ampere Altra (ARM)
 - **Processor**: 2x Ampere Altra 80 Cores @ 3.0GHz
