@@ -531,14 +531,21 @@ In the results reported here, PPL was used by enabling pinning and dynamic sched
 <td> <img src=".github/benchmark/AMPERE_PINNING/speedup.svg" alt="Drawing" style="width: 450px;"/> </td>
 </tr></table>
 
-![alt-text-1](.github/benchmark/AMPERE_PINNING/time.svg "Execution Times") ![alt-text-2](.github/benchmark/AMPERE_PINNING/speedup.svg "SpeedUp")
-
-![alt-text-1](.github/benchmark/AMPERE_PINNING/efficiency.svg "Efficiency") ![alt-text-2](.github/benchmark/AMPERE_PINNING/scalability.svg "Scalability")
+<table><tr>
+<td> <img src=".github/benchmark/AMPERE_PINNING/efficiency.svg" alt="Drawing" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/AMPERE_PINNING/scalability.svg" alt="Drawing" style="width: 450px;"/> </td>
+</tr></table>
 
 #### AMD EPYC 7551 (x86)
-![alt-text-1](.github/benchmark/TITANIC_PINNING/time.svg "Execution Times") ![alt-text-2](.github/benchmark/TITANIC_PINNING/speedup.svg "SpeedUp")
+<table><tr>
+<td> <img src=".github/benchmark/TITANIC_PINNING/time.svg" alt="Drawing" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/TITANIC_PINNING/speedup.svg" alt="Drawing" style="width: 450px;"/> </td>
+</tr></table>
 
-![alt-text-1](.github/benchmark/TITANIC_PINNING/efficiency.svg "Efficiency") ![alt-text-2](.github/benchmark/TITANIC_PINNING/scalability.svg "Scalability")
+<table><tr>
+<td> <img src=".github/benchmark/TITANIC_PINNING/efficiency.svg" alt="Drawing" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/TITANIC_PINNING/scalability.svg" alt="Drawing" style="width: 450px;"/> </td>
+</tr></table>
 
 ## Contributing
 
