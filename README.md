@@ -519,7 +519,7 @@ cargo bench
 ```
 
 ### Available Benchmarks
-- **Image Processing**: A benchmark that is based on the [RustStreamBench](https://github.com/GMAP/RustStreamBench/). You can find the benchmark source code here [here](https://github.com/GMAP/RustStreamBench/tree/main/image-processing).
+- **Image Processing**: A benchmark that is based on the Image-Processing benchmark found in [RustStreamBench](https://github.com/GMAP/RustStreamBench/). You can find the benchmark source code here [here](https://github.com/GMAP/RustStreamBench/tree/main/image-processing).
 
 - **Mandelbrot Set**: A basic parallel implementation of the well-known iterative algorithm to compute the Mandelbrot Set.
 
