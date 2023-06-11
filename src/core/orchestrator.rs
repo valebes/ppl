@@ -489,7 +489,7 @@ impl Orchestrator {
     ///
     /// # Safety
     /// This method should be used only when writing test or benchmarks, or in
-    /// the few cases where we want close the global orchestrator before quitting
+    /// the few cases where we want destroy the global orchestrator long before the end
     /// the application.
     pub unsafe fn delete_global_orchestrator() {
         unsafe {
