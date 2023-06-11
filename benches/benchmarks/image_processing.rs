@@ -63,7 +63,7 @@ pub fn image_processing(criterion: &mut Criterion) {
         group.bench_function(BenchmarkId::new("ppl", threads), |b| {
             b.iter_batched(
                 || images.clone(),
-                |images| img::ppl::pspp(images, replicas),
+                |images| img::ppl::ppl(images, replicas),
                 BatchSize::LargeInput,
             )
         });
