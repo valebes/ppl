@@ -24,6 +24,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 - [Benchmarks](#benchmarks)
   - [Available Benchmarks](#available-benchmarks)
   - [Image-Processing Results](#image-processing-results)
+  - [Mandelbrot Set Results](#mandelbrot-set-results)
 - [Contributing](#contributing)
   - [Code of Conduct](#code-of-conduct)
   - [How to Contribute](#how-to-contribute)
