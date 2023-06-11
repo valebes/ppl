@@ -69,5 +69,5 @@ pub fn ppl(threads: usize) {
         .flat_map(|a| a.to_vec())
         .collect();
 
-    Orchestrator::delete_global_orchestrator();
+        unsafe { Orchestrator::delete_global_orchestrator(); }
 }

@@ -8,5 +8,9 @@
 //! distribution of the tasks to the partitions. Each partition contain, if present,
 //! one or more executors.
 //!
+
+/// Configuration of the framework
 pub mod configuration;
+
+/// Orchestrator of the framework
 pub mod orchestrator;

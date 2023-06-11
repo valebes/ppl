@@ -14,8 +14,11 @@ use super::configuration::Configuration;
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
+/// Enum representing a Job in the orchestrator.
 pub enum Job {
+    /// A New job
     NewJob(Func<'static>),
+    /// Terminate the executor
     Terminate,
 }
 
@@ -482,7 +485,13 @@ impl Orchestrator {
         Arc::clone(&self.configuration)
     }
 
-    pub fn delete_global_orchestrator() {
+    /// Delete the global orchestrator.
+    /// 
+    /// # Safety
+    /// This method should be used only when writing test or benchmarks, or in
+    /// the few cases where we want close the global orchestrator before quitting
+    /// the application.
+    pub unsafe fn delete_global_orchestrator() {
         unsafe {
             drop(ORCHESTRATOR.take());
         }
@@ -548,6 +557,6 @@ mod tests {
         }
 
         assert_eq!(counter.load(Ordering::Acquire), 1000);
-        Orchestrator::delete_global_orchestrator();
+        unsafe { Orchestrator::delete_global_orchestrator(); }
     }
 }

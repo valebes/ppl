@@ -266,10 +266,10 @@ impl ThreadPool {
         }
     }
 
-    /// Given a function 'f', a range of indices 'range', and a chunk size 'chunk_size',
-    /// it distributes works of size 'chunk_size' to the threads in the pool.
-    /// The function 'f' is applied to each element in the range.
-    /// The range is split in chunks of size 'chunk_size' and each chunk is assigned to a thread.
+    /// Given a function `f`, a range of indices `range`, and a chunk size `chunk_size`,
+    /// it distributes works of size `chunk_size` to the threads in the pool.
+    /// The function `f` is applied to each element in the range.
+    /// The range is split in chunks of size `chunk_size` and each chunk is assigned to a thread.
     pub fn par_for<F>(&mut self, range: Range<usize>, chunk_size: usize, mut f: F)
     where
         F: FnMut(usize) + Send + Copy,

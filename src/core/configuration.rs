@@ -8,7 +8,9 @@ use core_affinity::CoreId;
 /// * `Static`: The work is distribuited among the replicas of a stage in a Round-Robin way.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum Scheduling{
+    /// Dynamic Scheduling
     Dynamic,
+    /// Round Robin Scheduling
     Static,
 }
 
@@ -21,7 +23,9 @@ pub enum Scheduling{
 /// while waiting, in other words not consuming processor cycles.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum WaitPolicy{
+    /// Busy wait
     Active,
+    /// Passive wait
     Passive,
 }
 

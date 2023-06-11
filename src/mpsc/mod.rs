@@ -18,6 +18,7 @@
 //!
 //! The channel implementation is selected at compile time by the feature flag.
 
+/// Module containing Traits and Structs to support channel operations.
 pub mod channel;
 #[cfg(feature = "crossbeam")]
 mod channel_cb;
@@ -27,4 +28,5 @@ mod channel_ff;
 mod channel_flume;
 #[cfg(feature = "kanal")]
 mod channel_kanal;
+/// Channel errors
 pub mod err;

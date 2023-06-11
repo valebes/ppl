@@ -6,6 +6,7 @@
 //! There are also some traits and structs that are used to create the pipeline.
 //! For example, the [`Node`] trait is used to define a node of the pipeline.
 //!
+/// Traits and Struct representing the various type of nodes in a pipeline.
 pub mod node;
 
 use node::{Node, OutNode};
@@ -93,6 +94,7 @@ where
     }
 }
 
+/// Support macro used by [`pipeline!`]
 #[macro_export]
 macro_rules! propagate {
     ($id:expr, $s1:expr) => {

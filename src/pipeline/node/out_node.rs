@@ -51,6 +51,7 @@ where
     }
 }
 
+/// Struct representing a Source node.
 pub struct OutNode<TOut, TCollected, TNext>
 where
     TOut: Send,

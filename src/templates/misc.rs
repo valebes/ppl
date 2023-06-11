@@ -369,6 +369,9 @@ where
             data: Vec::new(),
         }
     }
+    /// Creates a new splitter node with 'n_replicas' replicas of the same node.
+    /// The node will terminate when the upstream terminates.
+    /// The node will produce data in the same order as it is received from the upstream.
     pub fn build_with_replicas(chunk_size: usize, n_replicas: usize) -> impl InOut<Vec<T>, Vec<T>> {
         Self {
             chunk_size,
@@ -432,6 +435,9 @@ where
             data: Vec::new(),
         }
     }
+    /// Creates a new aggregator nod with 'n_replicas' replicas of the same node.
+    /// The node will terminate when the upstream terminates.
+    /// The node will produce data in the same order as it is received from the upstream.
     pub fn build_with_replicas(chunk_size: usize, n_replicas: usize) -> impl InOut<T, Vec<T>> {
         Self {
             chunk_size,

@@ -73,6 +73,7 @@ where
     }
 }
 
+/// Struct representing a Sink node.
 pub struct InNode<TIn, TCollected>
 where
     TIn: Send,
