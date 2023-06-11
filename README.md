@@ -58,6 +58,7 @@ Please make sure you have Rust and Cargo installed on your system before proceed
 To use PPL in your Rust project, you can add the following in your Cargo.toml:
 
 ```toml
+[dependencies]
 ppl = { git = "https://github.com/valebes/ppl.git" }
 ```
 
