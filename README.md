@@ -38,7 +38,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 
 - **Task, Stream, and Data Parallelism**: PPL offers tools to express task, stream, and data parallelism models. Harness the power of task parallelism to break down your computations into smaller tasks that can be executed in parallel. Handle continuous data streams and process structured datasets in parallel, enabling efficient data processing and analysis.
 
-- **Work-Stealing Thread Pool**: PPL includes a work-stealing thread pool that elevates parallel execution to new heights. The work-stealing thread pool dynamically distributes tasks among available threads, ensuring load balancing and efficient utilization of computational resources. This feature boosts the efficiency of parallel computations, enabling superior performance and scalability in your Rust applications.
+- **Work-Stealing Thread Pool**: PPL includes a work-stealing thread pool that elevates parallel execution to new heights. Thanks to the work-stealing thread pool, tasks are dynamically distributed among available threads, ensuring load balancing and efficient utilization of computational resources. This feature boosts the efficiency of parallel computations, enabling superior performance and scalability in your Rust applications.
 
 - **Efficient Resource Management**: Optimal resource management is vital in the realm of parallel programming. PPL grants you fine-grained control over resource allocation, including core utilization, thread wait policies, and CPU pinning. This level of control ensures the optimal utilization of your hardware resources, resulting in enhanced performance and efficiency for your parallel computations.
 
@@ -50,14 +50,14 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 
 ## Installation
 
-Parallelo Parallel Library (PPL) is currently available on GitHub. To use PPL in your Rust project, you can clone the repository from GitHub.
+Parallelo Parallel Library (PPL) is currently available only on GitHub. 
 
 Please make sure you have Rust and Cargo installed on your system before proceeding. If you don't have them installed, you can get them from the official Rust website: [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install)
 
-To clone the PPL repository, open your terminal and run the following command:
+To use PPL in your Rust project, you can add the following in your Cargo.toml:
 
-```shell
-$ git clone https://github.com/valebes/ppl.git
+```toml
+ppl = { git = "https://github.com/valebes/ppl.git" }
 ```
 
 ## Usage
@@ -524,8 +524,7 @@ cargo bench
 - **Mandelbrot Set**: A basic parallel implementation of the well-known iterative algorithm to compute the Mandelbrot Set.
 
 ### Image-Processing Results
-Following are reported the results obtained by running the image-processing benchmark on a machine with 2x Ampere Altra 80 Cores @ 3.0GHz and on a machine with 2x AMD EPYC 7551 32 Cores @ 2.5 GHz.
-In the results reported here, PPL was used enabling both threads pinning and dynamic scheduling.
+Following are reported the results obtained by running the image-processing benchmark.
 
 #### Ampere Altra (ARM)
 - **Processor**: 2x Ampere Altra 80 Cores @ 3.0GHz
@@ -553,6 +552,37 @@ In the results reported here, PPL was used enabling both threads pinning and dyn
 <table><tr>
 <td> <img src=".github/benchmark/TITANIC_PINNING/efficiency.svg" alt="Efficiency" style="width: 450px;"/> </td>
 <td> <img src=".github/benchmark/TITANIC_PINNING/scala.svg" alt="Scalability" style="width: 450px;"/> </td>
+</tr></table>
+
+### Mandelbrot Set Results
+Following are reported the results obtained by running the mandelbrot set benchmark.
+
+#### Ampere Altra (ARM)
+- **Processor**: 2x Ampere Altra 80 Cores @ 3.0GHz
+- **Configuration**: PPL with pinning and dynamic scheduling enabled
+
+<table><tr>
+<td> <img src=".github/benchmark/AMPERE_PINNING_MS/time.svg" alt="Time" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/AMPERE_PINNING_MS/speedup.svg" alt="SpeedUp" style="width: 450px;"/> </td>
+</tr></table>
+
+<table><tr>
+<td> <img src=".github/benchmark/AMPERE_PINNING_MS/efficiency.svg" alt="Efficiency" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/AMPERE_PINNING_MS/scala.svg" alt="Scalability" style="width: 450px;"/> </td>
+</tr></table>
+
+#### AMD EPYC 7551 (x86)
+- **Processor**: 2x AMD EPYC 7551 32 Cores @ 2.5 GHz
+- **Configuration**: PPL with pinning and dynamic scheduling enabled
+
+<table><tr>
+<td> <img src=".github/benchmark/TITANIC_PINNING_MS/time.svg" alt="Time" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/TITANIC_PINNING_MS/speedup.svg" alt="SpeedUp" style="width: 450px;"/> </td>
+</tr></table>
+
+<table><tr>
+<td> <img src=".github/benchmark/TITANIC_PINNING_MS/efficiency.svg" alt="Efficiency" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/TITANIC_PINNING_MS/scala.svg" alt="Scalability" style="width: 450px;"/> </td>
 </tr></table>
 
 ## Contributing
