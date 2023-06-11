@@ -493,11 +493,11 @@ Overall, PPL supports the following backends:
 - **kanal**: Uses the [Kanal](https://github.com/fereidani/kanal) channel.
 - **ff**: Uses a channel based on [FastFlow](http://calvados.di.unipi.it/) queues (**Experimental**).
 
-To select a specific channel backend, enable the corresponding feature flag during the build process. For example, to use the crossbeam channel, add the following to your Cargo.toml file:
+To select a specific channel backend, enable the corresponding feature flag during the build process. For example, to use the flume channel, add the following to your Cargo.toml file:
 
 ```toml
-[dependencies.ppl]
-features = ["crossbeam"]
+[dependencies]
+ppl = { git = "https://github.com/valebes/ppl.git", default-features = false, features = ["flume"]}
 ```
 
 ### FastFlow Channel
