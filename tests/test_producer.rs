@@ -1,4 +1,4 @@
-use ppl::{templates::misc::SinkVec, prelude::*};
+use ppl::{prelude::*, templates::misc::SinkVec};
 
 // Source
 struct Source {

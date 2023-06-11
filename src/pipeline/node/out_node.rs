@@ -94,7 +94,7 @@ where
     TNext: Node<TOut, TCollected> + Send + Sync + 'static,
 {
     /// Create a new output Node.
-    /// 
+    ///
     /// The `handler` is the  struct that implement the trait `Out` and defines
     /// the behavior of the node we're creating.
     /// `next_node` contains the stage that follows the node.

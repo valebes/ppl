@@ -1,5 +1,5 @@
-use crate::core::configuration::WaitPolicy;
 use super::err::{ReceiverError, SenderError};
+use crate::core::configuration::WaitPolicy;
 
 #[cfg(feature = "ff")]
 use super::channel_ff as backend;
@@ -92,7 +92,9 @@ pub struct Channel;
 
 impl Channel {
     /// Create a new channel.
-    pub fn channel<T: Send + 'static>(wait_policy: WaitPolicy) -> (InputChannel<T>, OutputChannel<T>) {
+    pub fn channel<T: Send + 'static>(
+        wait_policy: WaitPolicy,
+    ) -> (InputChannel<T>, OutputChannel<T>) {
         let blocking = match wait_policy {
             WaitPolicy::Active => false,
             WaitPolicy::Passive => true,

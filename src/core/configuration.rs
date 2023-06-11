@@ -3,11 +3,11 @@ use std::env;
 use core_affinity::CoreId;
 
 /// Types of scheduling methods available for the pipeline.
-/// 
+///
 /// * `Dynamic`: Workstealing between replicas of the same stage enabled.
 /// * `Static`: The work is distribuited among the replicas of a stage in a Round-Robin way.
 #[derive(PartialEq, Debug, Copy, Clone)]
-pub enum Scheduling{
+pub enum Scheduling {
     /// Dynamic Scheduling
     Dynamic,
     /// Round Robin Scheduling
@@ -15,14 +15,14 @@ pub enum Scheduling{
 }
 
 /// Types of wait policies available.
-/// 
+///
 /// This serves to provide the framework the desired behavior of waiting threads.
-/// 
+///
 /// * `Active`: Prefers busy wait, consuming processor cycles while waiting.
 /// * `Passive`: Prefers that waiting threads yield the processor to other threads
 /// while waiting, in other words not consuming processor cycles.
 #[derive(PartialEq, Debug, Copy, Clone)]
-pub enum WaitPolicy{
+pub enum WaitPolicy {
     /// Busy wait
     Active,
     /// Passive wait
@@ -149,7 +149,7 @@ impl Configuration {
                 } else {
                     panic!("{} is an invalid threads wait policy", value);
                 }
-            },
+            }
             Err(_) => WaitPolicy::Passive,
         };
         Configuration::new(max_threads, pinning, scheduling, wait_policy)

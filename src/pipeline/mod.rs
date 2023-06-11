@@ -94,7 +94,7 @@ where
     }
 }
 
-/// Support macro used by [`pipeline!`]
+/// Support macro used by [`crate::pipeline!`]
 #[macro_export]
 macro_rules! propagate {
     ($id:expr, $s1:expr) => {

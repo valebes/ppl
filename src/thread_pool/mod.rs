@@ -218,7 +218,7 @@ impl ThreadPool {
     }
 
     /// Create a new thread pool using all the threads availables.
-    /// 
+    ///
     /// # Examples
     ///
     /// ```
@@ -231,7 +231,7 @@ impl ThreadPool {
     }
 
     /// Create a new thread pool with `num_threads` threads.
-    /// 
+    ///
     /// # Examples
     ///
     /// ```

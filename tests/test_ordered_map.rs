@@ -3,7 +3,7 @@
     It is similar to tests/test_map.rs, but it uses an ordered map.
 */
 
-use ppl::{templates::map::OrderedMap, prelude::*};
+use ppl::{prelude::*, templates::map::OrderedMap};
 
 // Source node.
 struct Source {

@@ -3,8 +3,8 @@
 */
 
 use ppl::{
-    templates::misc::{Filter, SinkVec},
     prelude::*,
+    templates::misc::{Filter, SinkVec},
 };
 
 // Source node.

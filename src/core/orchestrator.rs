@@ -486,7 +486,7 @@ impl Orchestrator {
     }
 
     /// Delete the global orchestrator.
-    /// 
+    ///
     /// # Safety
     /// This method should be used only when writing test or benchmarks, or in
     /// the few cases where we want close the global orchestrator before quitting
@@ -557,6 +557,8 @@ mod tests {
         }
 
         assert_eq!(counter.load(Ordering::Acquire), 1000);
-        unsafe { Orchestrator::delete_global_orchestrator(); }
+        unsafe {
+            Orchestrator::delete_global_orchestrator();
+        }
     }
 }

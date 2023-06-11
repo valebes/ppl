@@ -23,9 +23,8 @@ pub fn mandelbrot_set(criterion: &mut Criterion) {
             num *= 2;
         } else {
             num += 2;
-        }    
+        }
     }
-    
 
     for threads in threads_range {
         group.bench_function(BenchmarkId::new("rayon", threads), |b| {

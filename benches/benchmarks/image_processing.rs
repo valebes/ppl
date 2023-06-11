@@ -30,17 +30,17 @@ pub fn image_processing(criterion: &mut Criterion) {
         })
         .expect("parsing error");
 
-        let mut num = 1;
-        let mut threads_range = Vec::new();
-        while num <= num_cpus::get() / 5 {
-            threads_range.push(num);
-            if num * 2 < num_cpus::get() / 5 {
-                num *= 2;
-            } else {
-                num += 2;
-            }    
+    let mut num = 1;
+    let mut threads_range = Vec::new();
+    while num <= num_cpus::get() / 5 {
+        threads_range.push(num);
+        if num * 2 < num_cpus::get() / 5 {
+            num *= 2;
+        } else {
+            num += 2;
         }
-    
+    }
+
     for replicas in threads_range {
         let threads = replicas * 5;
 

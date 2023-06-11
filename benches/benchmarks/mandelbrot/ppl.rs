@@ -5,8 +5,8 @@ use image::Luma;
 */
 use num_complex::Complex;
 use ppl::{
-    templates::misc::{OrderedParallel, OrderedSinkVec, SourceIter},
     prelude::*,
+    templates::misc::{OrderedParallel, OrderedSinkVec, SourceIter},
 };
 
 /*
@@ -69,5 +69,7 @@ pub fn ppl(threads: usize) {
         .flat_map(|a| a.to_vec())
         .collect();
 
-        unsafe { Orchestrator::delete_global_orchestrator(); }
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
 }

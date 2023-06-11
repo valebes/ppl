@@ -14,7 +14,10 @@ use log::{trace, warn};
 use std::collections::BTreeMap;
 
 use crate::{
-    core::{orchestrator::{JobInfo, Orchestrator}, configuration::{WaitPolicy, Scheduling}},
+    core::{
+        configuration::{Scheduling, WaitPolicy},
+        orchestrator::{JobInfo, Orchestrator},
+    },
     mpsc::{
         channel::{Channel, InputChannel, OutputChannel},
         err::SenderError,
@@ -596,7 +599,7 @@ where
     TNext: Node<TOut, TCollected> + Sync + Send + 'static,
 {
     /// Create a new Node.
-    /// 
+    ///
     /// The `handler` is the  struct that implement the trait `InOut` and defines
     /// the behavior of the node we're creating.
     /// `next_node` contains the stage that follows the node.
@@ -652,7 +655,9 @@ where
         }
 
         // If workstealing is enabled (and the node isn't an ordered producer), we need to register the stealers
-        if splitter.is_none() && orchestrator.get_configuration().get_scheduling() == Scheduling::Dynamic {
+        if splitter.is_none()
+            && orchestrator.get_configuration().get_scheduling() == Scheduling::Dynamic
+        {
             // Register stealers to each worker
             let mut stealers = Vec::new();
             for worker in &worker_nodes {

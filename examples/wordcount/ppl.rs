@@ -9,8 +9,8 @@ use std::{
 };
 
 use ppl::{
-    templates::map::{Map, MapReduce, Reduce},
     prelude::*,
+    templates::map::{Map, MapReduce, Reduce},
 };
 
 struct Source {

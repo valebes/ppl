@@ -155,7 +155,7 @@ where
     TCollected: Send + 'static,
 {
     /// Create a new input Node.
-    /// 
+    ///
     /// The `handler` is the  struct that implement the trait `In` and defines
     /// the behavior of the node we're creating.
     /// `next_node` contains the stage that follows the node.

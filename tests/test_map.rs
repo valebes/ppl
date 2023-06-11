@@ -2,7 +2,7 @@
    Pipeline with a Map node.
 */
 
-use ppl::{templates::map::Map, prelude::*};
+use ppl::{prelude::*, templates::map::Map};
 
 // Source node.
 // It generates a stream of 10000 elements each time.

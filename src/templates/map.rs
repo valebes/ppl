@@ -15,7 +15,6 @@ where
     replicas: usize,
     f: F,
     phantom: PhantomData<(TIn, TOut)>,
-    
 }
 impl<TIn, TOut, F> Map<TIn, TOut, F>
 where
@@ -37,7 +36,6 @@ where
             replicas: 1,
             f,
             phantom: PhantomData,
-            
         }
     }
 
@@ -53,7 +51,7 @@ where
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
-        f: F,  
+        f: F,
     ) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = TIn>,

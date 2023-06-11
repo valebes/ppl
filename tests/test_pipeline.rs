@@ -6,8 +6,8 @@
 */
 
 use ppl::{
-    templates::misc::{Sequential, SinkVec, SourceIter},
     prelude::*,
+    templates::misc::{Sequential, SinkVec, SourceIter},
 };
 
 struct Source {

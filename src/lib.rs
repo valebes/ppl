@@ -6,11 +6,11 @@
 #![feature(box_into_inner)]
 #![feature(let_chains)]
 
-pub mod templates;
 pub mod core;
 pub mod mpsc;
 pub mod pipeline;
 mod task;
+pub mod templates;
 pub mod thread_pool;
 
 pub mod prelude {

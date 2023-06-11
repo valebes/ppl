@@ -17,5 +17,7 @@ pub fn ppl_tp(images: Vec<Image>, threads: usize) {
         })
         .collect();
 
-        unsafe { Orchestrator::delete_global_orchestrator(); }
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
 }
