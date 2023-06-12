@@ -374,7 +374,7 @@ dependencies = [
 [[package]]
 name = "ff_buffer"
 version = "0.1.0"
-source = "git+https://github.com/valebes/ff_buffer.git#826a3e4f5246e3e22c7592166cf54727d0bc5a63"
+source = "git+https://github.com/valebes/ppl-ff-buffer#3165dff5dee51636542f9c2546dcf4760cd480d5"
 dependencies = [
  "cc",
  "dirs",
