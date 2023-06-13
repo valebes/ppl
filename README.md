@@ -2,7 +2,16 @@
   <img width="325" height="104" src=".github/logo.png">
 </p>
 
-[![Rust](https://github.com/valebes/pspp/actions/workflows/rust.yml/badge.svg)](https://github.com/valebes/pspp/actions/workflows/rust.yml)
+<p align="center">
+  <a href="https://github.com/valebes/pspp/actions/workflows/rust.yml">
+    <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/valebes/ppl/rust.yml">
+  </a>
+
+  <a href="https://opensource.org/license/apache-2-0/">
+    <img src="https://img.shields.io/github/license/valebes/ppl">
+  </a>
+  
+</p>
  
 # Parallelo: Unlock the Power of Parallel Computing in Rust
 
