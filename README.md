@@ -2,13 +2,15 @@
   <img width="325" height="104" src=".github/logo.png">
 </p>
 
+<hr/>
+
 <p align="center">
   <a href="https://github.com/valebes/pspp/actions/workflows/rust.yml">
-    <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/valebes/ppl/rust.yml">
+    <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/valebes/ppl/rust.yml?style=for-the-badge">
   </a>
 
   <a href="https://opensource.org/license/apache-2-0/">
-    <img src="https://img.shields.io/github/license/valebes/ppl">
+    <img src="https://img.shields.io/github/license/valebes/ppl?style=for-the-badge">
   </a>
   
 </p>
