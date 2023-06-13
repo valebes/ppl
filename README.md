@@ -13,6 +13,10 @@
     <img src="https://img.shields.io/github/license/valebes/ppl?style=for-the-badge">
   </a>
   
+   <a href="https://codecov.io/gh/valebes/ppl">
+    <img alt="Codecov" src="https://img.shields.io/codecov/c/github/valebes/ppl?style=for-the-badge">
+  </a>
+  
 </p>
  
 # Parallelo: Unlock the Power of Parallel Computing in Rust
