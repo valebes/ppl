@@ -104,3 +104,64 @@ impl Channel {
         (InputChannel { rx, blocking }, OutputChannel { tx })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serial_test::parallel;
+
+    use super::Channel;
+
+    #[test]
+    #[parallel]
+    fn test_non_blocking() {
+        let (rx, tx) = Channel::channel(crate::core::configuration::WaitPolicy::Active);
+        let mut check = true;
+        for i in 0..1000 {
+            let _ = tx.send(i);
+        }
+
+        for i in 0..1000 {
+            match rx.receive() {
+                Ok(Some(msg)) => {
+                    if msg != i {
+                        check = false;
+                    }
+                }
+                Ok(None) => {}
+                Err(_) => check = false,
+            }
+        }
+
+        assert!(check)
+    }
+
+    #[test]
+    #[parallel]
+    fn test_blocking() {
+        let (rx, tx) = Channel::channel(crate::core::configuration::WaitPolicy::Passive);
+        let mut check = true;
+        for i in 0..1000 {
+            let _ = tx.send(i);
+        }
+
+        drop(tx);
+
+        for i in 0..1000 {
+            match rx.receive() {
+                Ok(Some(msg)) => {
+                    if msg != i {
+                        check = false;
+                    }
+                }
+                Ok(None) => {}
+                Err(_) => check = false,
+            }
+        }
+
+        if rx.receive().is_ok() {
+            check = false;
+        }
+
+        assert!(check)
+    }
+}
