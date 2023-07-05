@@ -23,7 +23,7 @@ crossbeam-channel = { version = "0.5.8", optional = true }
 crossbeam-deque = "0.8.3"
 dyn-clone = "1.0.11"
 log = "0.4.19"
-num_cpus = "1.15.0"
+num_cpus = "1.16.0"
 ff_buffer = { git = "https://github.com/valebes/ppl-ff-buffer", optional = true }
 kanal = { git = "https://github.com/fereidani/kanal.git", optional = true }
 flume = { version = "0.10.14", optional = true }
@@ -36,7 +36,7 @@ rand = "0.8.5"
 raster = {git = "https://github.com/valebes/raster.git"}
 rayon = "1.7.0"
 rust-spp = {git = "https://github.com/GMAP/rust-ssp.git"}
-num_cpus = "1.15.0"
+num_cpus = "1.16.0"
 serial_test = "2.0.0"
 scopeguard = "1.1.0"
 image = "0.24.6"
