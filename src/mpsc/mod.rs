@@ -23,10 +23,13 @@ pub mod channel;
 #[cfg(feature = "crossbeam")]
 mod channel_cb;
 #[cfg(feature = "ff")]
+#[cfg(not(tarpaulin_include))]
 mod channel_ff;
 #[cfg(feature = "flume")]
+#[cfg(not(tarpaulin_include))]
 mod channel_flume;
 #[cfg(feature = "kanal")]
+#[cfg(not(tarpaulin_include))]
 mod channel_kanal;
 /// Channel errors
 pub mod err;
