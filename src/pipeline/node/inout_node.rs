@@ -605,12 +605,10 @@ where
     /// `next_node` contains the stage that follows the node.
     ///
     pub fn new(
-        id: usize,
         handler: Box<dyn InOut<TIn, TOut> + Send + Sync>,
         next_node: TNext,
         orchestrator: Arc<Orchestrator>,
     ) -> InOutNode<TIn, TOut, TCollected, TNext> {
-        trace!("Created a new InOutNode! Id: {}", id);
         let mut funcs = Vec::new();
         let mut channels = Vec::new();
         let next_node = Arc::new(next_node);

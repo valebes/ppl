@@ -97,19 +97,18 @@ where
 /// Support macro used by [`crate::pipeline!`]
 #[macro_export]
 macro_rules! propagate {
-    ($id:expr, $s1:expr) => {
+    ($s1:expr) => {
         {
-            let mut block = InNode::new($id, Box::new($s1), get_global_orchestrator());
+            let mut block = InNode::new(Box::new($s1), get_global_orchestrator());
             block
         }
     };
 
-    ($id:expr, $s1:expr $(, $tail:expr)*) => {
+    ($s1:expr $(, $tail:expr)*) => {
         {
             let node = ($s1);
-            let replicas = node.number_of_replicas();
-            let mut block = InOutNode::new($id, Box::new(node),
-                propagate!($id + (1 * replicas), $($tail),*),
+            let mut block = InOutNode::new(Box::new(node),
+                propagate!($($tail),*),
                 get_global_orchestrator());
             block
         }
@@ -156,8 +155,8 @@ macro_rules! pipeline {
     ($s1:expr $(, $tail:expr)*) => {
         {
             let orchestrator = get_global_orchestrator();
-            let mut block = OutNode::new(0, Box::new($s1),
-                propagate!(1, $($tail),*), orchestrator);
+            let mut block = OutNode::new(Box::new($s1),
+                propagate!($($tail),*), orchestrator);
 
             let mut pipeline = Pipeline::new(block);
             pipeline

@@ -1,8 +1,6 @@
 use std::marker::PhantomData;
 use std::sync::{Arc, Condvar, Mutex};
 
-use log::trace;
-
 use crate::core::orchestrator::{JobInfo, Orchestrator};
 use crate::mpsc::err::SenderError;
 use crate::task::{Message, Task};
@@ -99,12 +97,10 @@ where
     /// the behavior of the node we're creating.
     /// `next_node` contains the stage that follows the node.
     pub fn new(
-        id: usize,
         handler: Box<dyn Out<TOut> + Send + Sync>,
         next_node: TNext,
         orchestrator: Arc<Orchestrator>,
     ) -> OutNode<TOut, TCollected, TNext> {
-        trace!("Created a new Source! Id: {}", id);
         let stop = Arc::new(Mutex::new(true));
         let stop_copy = Arc::clone(&stop);
 

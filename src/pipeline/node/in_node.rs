@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use log::{trace, warn};
+use log::warn;
 
 use crate::{
     core::orchestrator::{JobInfo, Orchestrator},
@@ -160,12 +160,9 @@ where
     /// the behavior of the node we're creating.
     /// `next_node` contains the stage that follows the node.
     pub fn new(
-        id: usize,
         handler: Box<dyn In<TIn, TCollected> + Send + Sync>,
         orchestrator: Arc<Orchestrator>,
     ) -> InNode<TIn, TCollected> {
-        trace!("Created a new Sink! Id: {}", id);
-
         let (channel_in, channel_out) =
             Channel::channel(orchestrator.get_configuration().get_wait_policy());
         let result = Arc::new(Mutex::new(None));
