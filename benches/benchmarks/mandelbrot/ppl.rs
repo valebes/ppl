@@ -63,7 +63,7 @@ pub fn ppl(threads: usize) {
 
     pipeline.start();
     let mut _res: Vec<Luma<u8>> = pipeline
-        .wait_and_collect()
+        .wait_end()
         .unwrap()
         .into_iter()
         .flat_map(|a| a.to_vec())

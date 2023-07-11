@@ -99,6 +99,6 @@ fn test_long_farm() {
     );
 
     p.start();
-    let res = p.wait_and_collect();
+    let res = p.wait_end();
     assert_eq!(res.unwrap(), 500000);
 }

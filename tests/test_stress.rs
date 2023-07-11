@@ -63,7 +63,7 @@ fn test_stress() {
         ];
 
         p.start();
-        let res = p.wait_and_collect().unwrap();
+        let res = p.wait_end().unwrap();
         assert_eq!(res, 20);
     }
 }

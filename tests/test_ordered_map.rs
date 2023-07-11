@@ -54,7 +54,7 @@ fn test_ordered_map() {
     );
 
     p.start();
-    let res = p.wait_and_collect().unwrap();
+    let res = p.wait_end().unwrap();
 
     assert_eq!(res.len(), 100);
     (0..100).for_each(|i| {

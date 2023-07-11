@@ -67,6 +67,6 @@ fn test_farm() {
 
     let mut p = pipeline![Source { streamlen: 45 }, WorkerA {}, Sink { counter: 0 }];
     p.start();
-    let res = p.wait_and_collect();
+    let res = p.wait_end();
     assert_eq!(res.unwrap(), 45);
 }

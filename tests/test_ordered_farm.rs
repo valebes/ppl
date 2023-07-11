@@ -111,6 +111,6 @@ fn test_ordered_farm() {
     ];
 
     p.start();
-    let res = p.wait_and_collect();
+    let res = p.wait_end();
     assert!(res.unwrap());
 }

@@ -67,7 +67,7 @@ fn test_producer() {
     ];
 
     p.start();
-    let res = p.wait_and_collect().unwrap();
+    let res = p.wait_end().unwrap();
 
     // Check that the number of messages is correct.
     assert_eq!(res.len(), 5000);

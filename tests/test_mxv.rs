@@ -90,7 +90,7 @@ fn test_mxv() {
     p.start();
 
     // Collect the results of the computation
-    let res = p.wait_and_collect().unwrap();
+    let res = p.wait_end().unwrap();
 
     // Compute the "reference" result
     for i in 0..matrix.len() {

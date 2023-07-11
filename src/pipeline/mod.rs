@@ -58,7 +58,7 @@ where
     /// # Panics
     ///
     /// This method panics if the pipeline is empty.
-    pub fn wait_and_collect(mut self) -> Option<TCollected> {
+    pub fn wait_end(mut self) -> Option<TCollected> {
         match &mut self.first_block {
             Some(_block) => {
                 let block = self.first_block.take();
@@ -69,6 +69,17 @@ where
             }
             None => None,
         }
+    }
+
+    /// Start the pipeline and wait for the result.
+    /// This method will start the pipeline and wait for the result.
+    /// 
+    /// # Panics
+    ///
+    /// This method panics if the pipeline is empty.
+    pub fn start_and_wait_end(mut self) -> Option<TCollected> {
+        self.start();
+        self.wait_end()
     }
 }
 
@@ -146,7 +157,7 @@ macro_rules! propagate {
 ///      SinkVec::build()
 /// ];
 /// pipeline.start();
-/// let res = pipeline.wait_and_collect().unwrap();
+/// let res = pipeline.wait_end().unwrap();
 ///
 /// assert_eq!(res, vec![0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
 /// ```

@@ -33,5 +33,5 @@ fn test_closure() {
     );
 
     p.start();
-    assert_eq!(p.wait_and_collect(), None);
+    assert_eq!(p.wait_end(), None);
 }

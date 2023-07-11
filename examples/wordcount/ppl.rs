@@ -81,7 +81,7 @@ pub fn ppl(dataset: &str, threads: usize) {
     ];
 
     p.start();
-    let res = p.wait_and_collect();
+    let res = p.wait_end();
 
     let mut total_words = 0;
     for (_key, value) in res.unwrap() {
@@ -115,7 +115,7 @@ pub fn ppl_combined_map_reduce(dataset: &str, threads: usize) {
     ];
 
     p.start();
-    let res = p.wait_and_collect();
+    let res = p.wait_end();
 
     let mut total_words = 0;
     for (_key, value) in res.unwrap() {

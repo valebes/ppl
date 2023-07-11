@@ -43,7 +43,7 @@ fn test_map() {
     env_logger::init();
 
     // Create the pipeline.
-    let mut p = pipeline![
+    let p = pipeline![
         Source {
             streamlen: 100,
             counter: 0
@@ -55,8 +55,7 @@ fn test_map() {
         Sink { res: Vec::new() }
     ];
     // Start the pipeline.
-    p.start();
-    let res = p.wait_and_collect().unwrap();
+    let res = p.start_and_wait_end().unwrap();
 
     // Check the results.
     let mut check = true;

@@ -45,6 +45,6 @@ fn test_filter() {
     // Start the pipeline.
     p.start();
     // Wait for the pipeline to finish and collect the results.
-    let res = p.wait_and_collect().unwrap();
+    let res = p.wait_end().unwrap();
     assert_eq!(res.len(), 50);
 }

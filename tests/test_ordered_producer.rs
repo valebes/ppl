@@ -92,7 +92,7 @@ fn test_ordered_producer() {
     ];
 
     p.start();
-    let res = p.wait_and_collect().unwrap();
+    let res = p.wait_end().unwrap();
     let a = vec!["pippo".to_string(); 5];
     let b = vec!["pluto".to_string(); 5];
     let c = vec!["paperino".to_string(); 5];

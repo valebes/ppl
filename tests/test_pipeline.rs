@@ -72,7 +72,7 @@ fn test_pipeline() {
     ];
 
     p.start();
-    let res = p.wait_and_collect();
+    let res = p.wait_end();
     assert_eq!(res.unwrap(), 20);
 
     // Another way to write the same pipeline, but here using templates instead
@@ -82,7 +82,7 @@ fn test_pipeline() {
         SinkVec::build()
     ];
     p.start();
-    let res = p.wait_and_collect().unwrap().len();
+    let res = p.wait_end().unwrap().len();
     assert_eq!(res, 20);
 
     // Also here another way to write the same pipeline, but here we use closures
@@ -102,5 +102,5 @@ fn test_pipeline() {
         |input| println!("{}", input)
     ];
     p.start();
-    let _ = p.wait_and_collect();
+    let _ = p.wait_end();
 }
