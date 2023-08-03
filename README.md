@@ -19,10 +19,11 @@
   
 </p>
  
-# Parallelo: Unlock the Power of Parallel Computing in Rust
+# Parallelo Parallel Library (PPL): Unlock the Power of Parallel Computing in Rust
 
 🌟 Welcome to Parallelo Parallel Library (PPL) – a small, but powerful, parallel framework written in Rust. 🚀
 
+Parallelo Parallel Library (PPL) is an ongoing parallel framework written in Rust. The main goal of PPL is to provide a structured approach to parallel programming in Rust, allowing developers to unleash the power of parallelism without having to deal with low-level concurrency management mechanisms.
 PPL empowers your Rust programs by unlocking the immense potential of parallelism, making your computations faster and more efficient. Whether you're working on large-scale data processing, simulations, or any computationally intensive task, PPL has got you covered.
 
 ## Table of Contents
