@@ -1,7 +1,7 @@
 //! Parallel pipeline
 //!
-//! The pipeline module contains the [`Pipeline`] struct and the `parallel!` macro.
-//! The `Parallel` struct represents a pipeline of nodes. The `parallel!` macro
+//! The pipeline module contains the [`Pipeline`] struct and the [`pipeline!`] macro.
+//! The [`Pipeline`] struct represents a pipeline of nodes. The [`pipeline!`] macro
 //! is used to create that pipeline.
 //! There are also some traits and structs that are used to create the pipeline.
 //! For example, the [`Node`] trait is used to define a node of the pipeline.
@@ -13,7 +13,7 @@ use node::{Node, OutNode};
 /// The [`Pipeline`] struct represents a pipeline of nodes.
 ///
 /// The [`Pipeline`] struct is generic over the type of the output of the pipeline
-/// and the type of the collected result, is created using the `parallel!` macro.
+/// and the type of the collected result, is created using the [`pipeline!`] macro.
 pub struct Pipeline<TOut, TCollected, TNext>
 where
     TOut: Send + 'static,
