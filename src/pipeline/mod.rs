@@ -105,7 +105,7 @@ where
     }
 }
 
-/// Support macro used by [`crate::pipeline!`]
+/// Support macro used by `pipeline!`.
 #[macro_export]
 macro_rules! propagate {
     ($s1:expr) => {
@@ -126,7 +126,7 @@ macro_rules! propagate {
     };
 }
 
-/// Macro that allows to create a parallel pipeline.
+/// Macro that allows to create a concurrent pipeline.
 ///
 /// The macro takes as input a list of stages. Each stage is a node of the pipeline.
 ///
