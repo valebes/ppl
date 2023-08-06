@@ -98,7 +98,7 @@ fn main() {
         SinkVec::build()
     ];
     p.start();
-    let res = p.wait_and_collect().unwrap().len();
+    let res = p.wait_end().unwrap().len();
     assert_eq!(res, 20)
 }
 ```
@@ -124,7 +124,7 @@ fn main() {
         |input| println!("{}", input)
     ];
     p.start();
-    p.wait_and_collect();
+    p.wait_end();
 }
 ```
 
@@ -144,7 +144,7 @@ fn main() {
         SinkVec::build()
     ];
     p.start();
-    let res = p.wait_and_collect().unwrap().len();
+    let res = p.wait_end().unwrap().len();
     assert_eq!(res, 20)
 }
 ```
@@ -212,7 +212,7 @@ fn main() {
     ];
 
     p.start();
-    let res = p.wait_and_collect(); // Here we will get the counter returned by the Sink
+    let res = p.wait_end(); // Here we will get the counter returned by the Sink
     assert_eq!(res.unwrap(), 20);
 }
 ```
@@ -328,7 +328,7 @@ pub fn ppl(dataset: &str, threads: usize) {
     ];
 
     p.start();
-    let res = p.wait_and_collect();
+    let res = p.wait_end();
 }
 ```
 #### Approach 2: Thread Pool
@@ -466,7 +466,7 @@ fn main() {
     p.start();
 
     // Wait for the processing to finish and collect the results
-    let res = p.wait_and_collect().unwrap();
+    let res = p.wait_end().unwrap();
 }
 ```
 
