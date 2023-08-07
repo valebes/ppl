@@ -18,7 +18,7 @@ kanal = ["dep:kanal"]
 debug = false
 
 [dependencies]
-core_affinity = "0.8.0"
+core_affinity = "0.8.1"
 crossbeam-channel = { version = "0.5.8", optional = true }
 crossbeam-deque = "0.8.3"
 dyn-clone = "1.0.12"
