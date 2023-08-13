@@ -194,7 +194,7 @@ impl In<usize, usize> for Sink {
         println!("{}", input);
         self.counter += 1;
     }
-    // If at the end of the stream we want to return something, we can override the finalize method.
+    // If at the end of the stream we want to return something,we can do it by implementing this method.
     fn finalize(self) -> Option<usize> {
         println!("End");
         Some(self.counter)
