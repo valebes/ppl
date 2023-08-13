@@ -53,8 +53,8 @@ where
     /// at the end of the computation.
     fn finalize(self) -> Option<TCollected>;
 
-    /// This method return a boolean that represent if the node produce the output in an ordered way or not. 
-    /// Override this method allow choosing if the node must produce the output preserving the order of the input.
+    /// This method return a boolean that represent if the node must receive the input respecting the order of arrival. 
+    /// Override this method allow choosing if the node must preserve the order of the input.
     fn is_ordered(&self) -> bool {
         false
     }
