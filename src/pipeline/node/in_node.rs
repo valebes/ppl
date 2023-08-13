@@ -48,11 +48,13 @@ where
 {
     /// This method is called each time the node receive an input.
     fn run(&mut self, input: TIn);
+
     /// This method is called before the node terminates. Is useful to take out data
     /// at the end of the computation.
     fn finalize(self) -> Option<TCollected>;
-    /// This method return a boolean that represent if the node produce the output in an ordered way.
-    /// Override this method allow to choose if the node is ordered or not.
+
+    /// This method return a boolean that represent if the node produce the output in an ordered way or not. 
+    /// Override this method allow choosing if the node must produce the output preserving the order of the input.
     fn is_ordered(&self) -> bool {
         false
     }
