@@ -52,7 +52,7 @@ where
     /// at the end of the computation.
     fn finalize(self) -> Option<TCollected>;
     /// This method return a boolean that represent if the node receive the input in an ordered way.
-    /// Overload this method allow to choose if the node is ordered or not.
+    /// Override this method allow to choose if the node is ordered or not.
     fn is_ordered(&self) -> bool {
         false
     }
