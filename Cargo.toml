@@ -40,7 +40,7 @@ num_cpus = "1.16.0"
 serial_test = "2.0.0"
 scopeguard = "1.2.0"
 image = "0.24.6"
-num-complex = "0.4.3"
+num-complex = "0.4.4"
 
 [[bench]]
 harness = false
