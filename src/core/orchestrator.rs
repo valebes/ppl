@@ -228,7 +228,6 @@ impl Thread {
 pub struct Partition {
     core_id: CoreId,
     workers: Mutex<Vec<Executor>>,
-    total_workers: Arc<AtomicUsize>,
     available_workers: Arc<AtomicUsize>,
     configuration: Arc<Configuration>,
 }
@@ -243,7 +242,6 @@ impl Partition {
         Partition {
             core_id,
             workers: Mutex::new(workers),
-            total_workers: Arc::new(AtomicUsize::new(0)),
             available_workers: Arc::new(AtomicUsize::new(0)),
             configuration,
         }
@@ -251,7 +249,7 @@ impl Partition {
 
     /// Get the number of executor in the partition.
     fn get_worker_count(&self) -> usize {
-        self.total_workers.load(Ordering::Acquire)
+        self.workers.lock().unwrap().len()
     }
 
     /// Get the number of busy executors (in this instant) in the partition.
@@ -303,7 +301,6 @@ impl Partition {
                 );
                 executor.push(job);
                 workers.push(executor);
-                self.total_workers.fetch_add(1, Ordering::AcqRel);
             }
         }
 
@@ -498,10 +495,16 @@ impl Orchestrator {
     }
 }
 
+
 impl Drop for Orchestrator {
     fn drop(&mut self) {
         while !self.partitions.is_empty() {
-            drop(self.partitions.remove(0));
+            let partition = self.partitions.remove(0);
+            /*println!(
+                "Total worker for Partition[{}]: {}",
+                partition.core_id.id,
+                partition.get_worker_count()
+            )*/
         }
     }
 }

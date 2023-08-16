@@ -52,7 +52,7 @@ impl In<usize, usize> for Sink {
 fn test_stress() {
     env_logger::init();
 
-    for _i in 0..10000 {
+    for _i in 0..100000 {
         let mut p = pipeline![
             Source {
                 streamlen: 20,
@@ -66,4 +66,6 @@ fn test_stress() {
         let res = p.wait_end().unwrap();
         assert_eq!(res, 20);
     }
+
+    unsafe {Orchestrator::delete_global_orchestrator()}
 }
