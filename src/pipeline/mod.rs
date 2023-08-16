@@ -73,7 +73,7 @@ where
 
     /// Start the pipeline and wait for the result.
     /// This method will start the pipeline and wait for the result.
-    /// 
+    ///
     /// # Panics
     ///
     /// This method panics if the pipeline is empty.
@@ -135,11 +135,13 @@ macro_rules! propagate {
 /// implements the [`node::In`] trait. The stages in the middle are the processing stages of the
 /// pipeline. They can be any struct that implements the [`node::InOut`] trait.
 ///
-/// The stages in the middle can be replicated. This means that the same stage can be used
-/// multiple times in the pipeline. This is useful when the processing stage is a heavy
-/// computation and the input data is large. In this case, the input data can be split
-/// into multiple chunks and each chunk can be processed by a different replica of the
-/// processing stage. The number of replicas of a stage is defined by the
+/// The stages in the middle, the ones that implement [`node::InOut`] trait, can be replicated.
+/// Thanks to this it is possible to introduce parallelism in a stage of the pipeline.
+/// When a stage is replicated, the inputs arriving at that stage are distributed equally
+/// among all replicas. This replication mechanism enables the expression of a task farm pattern,
+/// which in turn introduces parallelism within a stage. This parallelism allows for more efficient
+/// and concurrent processing of data within the pipeline.
+/// The number of replicas of a stage is defined by the
 /// [`node::InOut::number_of_replicas`] method of the [`node::InOut`] trait.
 ///
 ///

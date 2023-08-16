@@ -71,7 +71,7 @@ where
 /// Splitter.
 ///
 /// This node receives a vector, split it into chunks of size `chunk_size`
-/// and send each chunk into the next node.
+/// and send each chunk to the next node.
 /// The node will terminate when the upstream terminates.
 #[derive(Clone)]
 pub struct Splitter<T> {
@@ -116,7 +116,7 @@ where
 /// Aggregator.
 ///
 /// This node receives elements and accumulates them into a vector.
-/// When the vector reaches the size `chunk_size` it is sent to the next node.
+/// When the vector reaches the size `chunk_size` it send the vector with the elements accumulated to the next node.
 /// The node will terminate when the upstream terminates.
 #[derive(Clone)]
 pub struct Aggregator<T> {
@@ -345,7 +345,7 @@ where
 /// OrderedSplitter.
 ///
 /// This node receives a vector, split it into chunks of size `chunk_size`
-/// and send each chunk into the next node.
+/// and send each chunk to the next node.
 /// This is a ordered version of Splitter.
 /// The node will terminate when the upstream terminates.
 /// The node will produce data in the same order as it is received from the upstream.
@@ -411,7 +411,8 @@ where
 /// OrderedAggregator.
 ///
 /// This node receives elements and accumulates them into a vector.
-/// When the vector reaches the size `chunk_size` it is sent to the next node.
+/// When the vector reaches the size `chunk_size` it send the vector
+/// with the elements accumulated to the next node.
 /// This is a ordered version of Aggregator.
 /// The node will terminate when the upstream terminates.
 /// The node will produce data in the same order as it is received from the upstream.

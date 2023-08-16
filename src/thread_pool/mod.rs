@@ -479,7 +479,7 @@ impl ThreadPool {
             ordered_map.entry(k).or_insert_with(Vec::new).push(v);
         }
         // Reduce the elements by key.
-        self.par_map(ordered_map.into_iter(), move |(k, v)| f(k, v))
+        self.par_map(ordered_map, move |(k, v)| f(k, v))
     }
 
     /// Create a new scope to execute jobs on other threads.

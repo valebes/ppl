@@ -60,14 +60,14 @@ pub trait InOut<TIn, TOut>: DynClone {
     fn number_of_replicas(&self) -> usize {
         1
     }
-    
-    /// This method return a boolean that represent if the node produce the output in an ordered way or not. 
+
+    /// This method return a boolean that represent if the node produce the output in an ordered way or not.
     /// Override this method allow choosing if the node must produce the output preserving the order of the input.
     fn is_ordered(&self) -> bool {
         false
     }
 
-    /// This method return a boolean that represent if the node is a producer or not. 
+    /// This method return a boolean that represent if the node is a producer or not.
     /// Override this method allow choosing if the node produce multiple output for each input received, or not.
     fn is_producer(&self) -> bool {
         false
