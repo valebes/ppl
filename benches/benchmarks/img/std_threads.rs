@@ -59,9 +59,8 @@ pub fn std_threads(images: Vec<Image>, threads: usize) {
             let image = recv.try_recv();
             let mut image = match image {
                 Ok(image) => image,
-                Err(e) if e == TryRecvError::Disconnected => break,
-                Err(e) if e == TryRecvError::Empty => continue,
-                Err(e) => panic!("Error during recv {}", e),
+                Err(TryRecvError::Disconnected) => break,
+                Err(TryRecvError::Empty) => continue,
             };
 
             filter::saturation(&mut image, 0.2).unwrap();
@@ -78,9 +77,8 @@ pub fn std_threads(images: Vec<Image>, threads: usize) {
             let image = recv.try_recv();
             let mut image = match image {
                 Ok(image) => image,
-                Err(e) if e == TryRecvError::Disconnected => break,
-                Err(e) if e == TryRecvError::Empty => continue,
-                Err(e) => panic!("Error during recv {}", e),
+                Err(TryRecvError::Disconnected) => break,
+                Err(TryRecvError::Empty) => continue,
             };
 
             filter::emboss(&mut image).unwrap();
@@ -97,9 +95,8 @@ pub fn std_threads(images: Vec<Image>, threads: usize) {
             let image = recv.try_recv();
             let mut image = match image {
                 Ok(image) => image,
-                Err(e) if e == TryRecvError::Disconnected => break,
-                Err(e) if e == TryRecvError::Empty => continue,
-                Err(e) => panic!("Error during recv {}", e),
+                Err(TryRecvError::Disconnected) => break,
+                Err(TryRecvError::Empty) => continue,
             };
 
             filter::gamma(&mut image, 2.0).unwrap();
@@ -116,9 +113,8 @@ pub fn std_threads(images: Vec<Image>, threads: usize) {
             let image = recv.try_recv();
             let mut image = match image {
                 Ok(image) => image,
-                Err(e) if e == TryRecvError::Disconnected => break,
-                Err(e) if e == TryRecvError::Empty => continue,
-                Err(e) => panic!("Error during recv {}", e),
+                Err(TryRecvError::Disconnected) => break,
+                Err(TryRecvError::Empty) => continue,
             };
 
             filter::sharpen(&mut image).unwrap();
@@ -135,9 +131,8 @@ pub fn std_threads(images: Vec<Image>, threads: usize) {
             let image = recv.try_recv();
             let mut image = match image {
                 Ok(image) => image,
-                Err(e) if e == TryRecvError::Disconnected => break,
-                Err(e) if e == TryRecvError::Empty => continue,
-                Err(e) => panic!("Error during recv {}", e),
+                Err(TryRecvError::Disconnected) => break,
+                Err(TryRecvError::Empty) => continue,
             };
 
             filter::grayscale(&mut image).unwrap();
