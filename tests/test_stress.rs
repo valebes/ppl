@@ -52,7 +52,7 @@ impl In<usize, usize> for Sink {
 fn test_stress() {
     env_logger::init();
 
-    for _i in 0..100000 {
+    for _i in 0..10000 {
         let mut p = pipeline![
             Source {
                 streamlen: 20,

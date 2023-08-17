@@ -483,7 +483,7 @@ impl ThreadPool {
     }
 
     /// Create a new scope to execute jobs on other threads.
-    /// The function passed to thismethod will be provided with a [`Scope`] object,
+    /// The function passed to this method will be provided with a [`Scope`] object,
     /// which can be used to spawn new jobs through the [`Scope::execute`] method.
     /// The scope will block the current thread until all jobs spawned from this scope
     /// have completed.

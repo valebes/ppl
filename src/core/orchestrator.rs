@@ -500,11 +500,11 @@ impl Drop for Orchestrator {
     fn drop(&mut self) {
         while !self.partitions.is_empty() {
             let partition = self.partitions.remove(0);
-            /*println!(
+            println!(
                 "Total worker for Partition[{}]: {}",
                 partition.core_id.id,
                 partition.get_worker_count()
-            )*/
+            )
         }
     }
 }
