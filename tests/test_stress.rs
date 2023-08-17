@@ -1,7 +1,7 @@
 /*
     Stress test
 */
-use ppl::prelude::*;
+use ppl::{prelude::*, templates::misc::Parallel};
 
 struct Source {
     streamlen: usize,
@@ -24,14 +24,6 @@ pub fn fibonacci_recursive(n: usize) -> usize {
         1 | 2 => 1,
         3 => 2,
         _ => fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2),
-    }
-}
-
-#[derive(Clone)]
-struct Worker {}
-impl InOut<usize, usize> for Worker {
-    fn run(&mut self, input: usize) -> Option<usize> {
-        Some(fibonacci_recursive(input))
     }
 }
 
@@ -58,7 +50,7 @@ fn test_stress() {
                 streamlen: 20,
                 counter: 0
             },
-            Worker {},
+            Parallel::build(2, fibonacci_recursive),
             Sink { counter: 0 }
         ];
 

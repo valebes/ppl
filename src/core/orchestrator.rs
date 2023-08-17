@@ -8,7 +8,7 @@ use std::{
 };
 
 use core_affinity::CoreId;
-use log::{error, trace, warn};
+use log::{error, trace, warn, debug};
 
 use super::configuration::Configuration;
 
@@ -500,7 +500,7 @@ impl Drop for Orchestrator {
     fn drop(&mut self) {
         while !self.partitions.is_empty() {
             let partition = self.partitions.remove(0);
-            println!(
+            debug!(
                 "Total worker for Partition[{}]: {}",
                 partition.core_id.id,
                 partition.get_worker_count()
