@@ -45,7 +45,7 @@ fn test_stress() {
     env_logger::init();
 
     for _i in 0..10000 {
-        /*
+        
         let mut p = pipeline![
             Source {
                 streamlen: 20,
@@ -58,10 +58,11 @@ fn test_stress() {
         p.start();
         let res = p.wait_end().unwrap();
         assert_eq!(res, 20);
-        */
-
-        let mut tp = ThreadPool::with_capacity(3);
-        tp.par_for(1..20, 1, |x| { let _res = fibonacci_recursive(x); println!("Hello");});
+        
+        
+        let mut tp = ThreadPool::with_capacity(4);
+        tp.par_for(1..20, 1, |x| { let res = fibonacci_recursive(x); println!("Hello, {}", res);});
+        
     }
 
     unsafe {Orchestrator::delete_global_orchestrator()}
