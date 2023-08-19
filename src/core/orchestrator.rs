@@ -8,27 +8,31 @@ use std::{
 };
 
 use core_affinity::CoreId;
-use log::{error, trace, warn, debug};
+use log::{debug, error, trace, warn};
 
 use super::configuration::Configuration;
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
-
 /// Mini Spin Lock
-/// 
+///
 /// This can be used to protect critical sections of the code
 struct Lock {
-    lock: AtomicBool
+    lock: AtomicBool,
 }
 impl Lock {
     fn new() -> Self {
-        Lock { lock: AtomicBool::new(false) }
+        Lock {
+            lock: AtomicBool::new(false),
+        }
     }
 
     fn lock(&self) {
-        while self.lock.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err()
-        { 
+        while self
+            .lock
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
             hint::spin_loop()
         }
     }
@@ -67,7 +71,7 @@ impl JobInfo {
 
     pub(crate) fn wait(&self) {
         while !self.status.load(Ordering::Relaxed) {
-            hint::spin_loop(); 
+            hint::spin_loop();
         }
     }
 }
@@ -126,7 +130,7 @@ impl Executor {
         self.global_lock.lock();
 
         let res = self.status.load(Ordering::Relaxed);
-        
+
         self.global_lock.unlock();
 
         res
@@ -196,7 +200,6 @@ impl ExecutorInfo {
         self.available_workers.fetch_add(1, Ordering::Relaxed);
 
         self.global_lock.unlock();
-
     }
 
     /// Run the executor.
@@ -317,7 +320,6 @@ impl Partition {
 
         self.global_lock.unlock();
 
-
         res
     }
 
@@ -328,9 +330,6 @@ impl Partition {
                 return Some(workers.remove(i));
             }
         }
-        /*if !workers.is_empty() && workers[0].available_workers.load(Ordering::Acquire) > 0 {
-            panic!("Len: {}", workers.len())
-        }*/
         None
     }
     /// Push a new job to the partition.
@@ -557,7 +556,6 @@ impl Orchestrator {
         }
     }
 }
-
 
 impl Drop for Orchestrator {
     fn drop(&mut self) {

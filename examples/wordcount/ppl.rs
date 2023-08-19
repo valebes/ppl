@@ -100,7 +100,8 @@ pub fn ppl_combined_map_reduce(dataset: &str, threads: usize) {
         MapReduce::build_with_replicas(
             threads / 2,
             |str| -> (String, usize) { (str, 1) }, // Map function
-            |str, count| {  // Reduce
+            |str, count| {
+                // Reduce
                 let mut sum = 0;
                 for c in count {
                     sum += c;
