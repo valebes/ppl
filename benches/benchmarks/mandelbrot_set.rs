@@ -13,7 +13,7 @@ pub fn mandelbrot_set(criterion: &mut Criterion) {
     group
         .sampling_mode(SamplingMode::Flat)
         .plot_config(plot_cfg)
-        .sample_size(10);
+        .sample_size(15);
 
     let mut num = 1;
     let mut threads_range = Vec::new();

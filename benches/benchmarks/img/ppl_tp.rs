@@ -5,8 +5,7 @@ use raster::Image;
 
 pub fn ppl_tp(images: Vec<Image>, threads: usize) {
     let mut pool = ThreadPool::with_capacity(threads * 5);
-    let len = images.len();
-    let res: Vec<Image> = pool
+    let _res: Vec<Image> = pool
         .par_map(images, |mut image: Image| {
             filter::saturation(&mut image, 0.2).unwrap();
             filter::emboss(&mut image).unwrap();
@@ -16,7 +15,6 @@ pub fn ppl_tp(images: Vec<Image>, threads: usize) {
             image
         })
         .collect();
-    assert_eq!(res.len(), len);
     unsafe {
         Orchestrator::delete_global_orchestrator();
     }

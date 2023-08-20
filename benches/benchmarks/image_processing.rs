@@ -13,7 +13,7 @@ pub fn image_processing(criterion: &mut Criterion) {
     group
         .sampling_mode(SamplingMode::Flat)
         .plot_config(plot_cfg)
-        .sample_size(10);
+        .sample_size(15);
 
     // Parses the images.
     let images = std::fs::read_dir("benches/benchmarks/img/images/")

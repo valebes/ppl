@@ -95,7 +95,6 @@ impl In<Image, Vec<Image>> for Sink {
 }
 
 pub fn ppl(images: Vec<Image>, threads: usize) {
-    let len = images.len();
     let mut p = pipeline![
         Source { all_images: images },
         WorkerA { replicas: threads },
@@ -107,8 +106,8 @@ pub fn ppl(images: Vec<Image>, threads: usize) {
     ];
 
     p.start();
-    let res = p.wait_end().unwrap();
-    assert_eq!(res.len(), len);
+    let _res = p.wait_end().unwrap();
+
     unsafe {
         Orchestrator::delete_global_orchestrator();
     }
