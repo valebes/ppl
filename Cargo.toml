@@ -26,7 +26,7 @@ log = "0.4.20"
 num_cpus = "1.16.0"
 ff_buffer = { git = "https://github.com/valebes/ppl-ff-buffer", optional = true }
 kanal = { git = "https://github.com/fereidani/kanal.git", optional = true }
-flume = { version = "0.10.14", optional = true }
+flume = { version = "0.11.0", optional = true }
 
 [dev-dependencies]
 criterion = {version = "0.5.1", features = ["html_reports"]}
