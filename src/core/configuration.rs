@@ -16,7 +16,7 @@ pub enum Scheduling {
 
 /// Types of wait policies available.
 ///
-/// This serves to provide the framework the desired behavior of waiting threads.
+/// This indicates the desired behavior for waiting threads.
 ///
 /// * `Active`: Prefers busy wait, consuming processor cycles while waiting.
 /// * `Passive`: Prefers that waiting threads yield the processor to other threads

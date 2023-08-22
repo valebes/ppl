@@ -481,7 +481,7 @@ The configuration of Parallelo Parallel Library (PPL) can be customized by setti
 - **PPL_PINNING**: Enables or disables the CPU pinning. By default, pinning is disabled (`false`). (Equivalent to `OMP_PROC_BIND` in OpenMP).
 
 - **PPL_SCHEDULE**: Specifies the scheduling method used in the pipeline. The available options are:
-  - `static`: Static scheduling (Round-robin).
+  - `static`: Static scheduling (Round-robin) (**Default**).
   - `dynamic`: Dynamic scheduling (Work-stealing between replicas of the same stage enabled).
 
 - **PPL_WAIT_POLICY**: If set to `passive`, the threads will try to give up their time to other threads when waiting for a communication or unused. This is particularly useful when we are using SMT and can improve performances. Instead, if is set to `active`, the threads wil do busy waiting. By default, this option is set to `passive`.
