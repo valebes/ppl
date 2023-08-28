@@ -8,12 +8,44 @@ use std::{
 };
 
 use core_affinity::CoreId;
-use log::{error, trace, warn};
+use log::{debug, error, trace, warn};
 
 use super::configuration::Configuration;
 
 type Func<'a> = Box<dyn FnOnce() + Send + 'a>;
 
+/// Mini Spin Lock
+///
+/// This can be used to protect critical sections of the code
+struct Lock {
+    lock: AtomicBool,
+}
+impl Lock {
+    fn new() -> Self {
+        Lock {
+            lock: AtomicBool::new(false),
+        }
+    }
+
+    fn lock(&self) {
+        while self
+            .lock
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            hint::spin_loop()
+        }
+    }
+
+    fn unlock(&self) {
+        self.lock.store(false, Ordering::Release);
+    }
+}
+impl Drop for Lock {
+    fn drop(&mut self) {
+        self.unlock();
+    }
+}
 /// Enum representing a Job in the orchestrator.
 pub enum Job {
     /// A New job
@@ -38,7 +70,7 @@ impl JobInfo {
     }
 
     pub(crate) fn wait(&self) {
-        while !self.status.load(Ordering::Acquire) {
+        while !self.status.load(Ordering::Relaxed) {
             hint::spin_loop();
         }
     }
@@ -49,6 +81,7 @@ impl JobInfo {
 /// It will fetch jobs from it's local queue.
 struct Executor {
     thread: Thread,
+    global_lock: Arc<Lock>,
     status: Arc<AtomicBool>,
     available_workers: Arc<AtomicUsize>,
     queue: Arc<Mutex<Vec<Job>>>,
@@ -61,6 +94,7 @@ impl Executor {
     fn new(
         core_id: CoreId,
         config: Arc<Configuration>,
+        global_lock: Arc<Lock>,
         available_workers: Arc<AtomicUsize>,
     ) -> Executor {
         let status = Arc::new(AtomicBool::new(false));
@@ -69,6 +103,7 @@ impl Executor {
 
         let worker = ExecutorInfo::new(
             status.clone(),
+            global_lock.clone(),
             available_workers.clone(),
             queue.clone(),
             cvar.clone(),
@@ -82,6 +117,7 @@ impl Executor {
         );
         Executor {
             thread,
+            global_lock,
             status,
             available_workers,
             queue,
@@ -91,7 +127,13 @@ impl Executor {
 
     /// Get the status of this executor
     fn get_status(&self) -> bool {
-        self.status.load(Ordering::Acquire)
+        self.global_lock.lock();
+
+        let res = self.status.load(Ordering::Relaxed);
+
+        self.global_lock.unlock();
+
+        res
     }
 
     /// Push a job in the executor queue
@@ -105,12 +147,16 @@ impl Executor {
 
     // Warn that the executor is busy.
     fn warn_busy(&self) {
-        self.status.store(false, Ordering::Release);
+        self.global_lock.lock();
+
+        self.status.store(false, Ordering::Relaxed);
         let _ = self.available_workers.fetch_update(
-            Ordering::AcqRel,
-            Ordering::Acquire,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
             |x| -> Option<usize> { Some(x.saturating_sub(1)) },
         );
+
+        self.global_lock.unlock();
     }
 
     /// Join the thread running the executor.
@@ -123,6 +169,7 @@ impl Executor {
 /// It contains the queue of jobs and the number of available executors in it's partition.
 struct ExecutorInfo {
     status: Arc<AtomicBool>,
+    global_lock: Arc<Lock>,
     available_workers: Arc<AtomicUsize>,
     queue: Arc<Mutex<Vec<Job>>>,
     cvar: Arc<Condvar>,
@@ -131,12 +178,14 @@ impl ExecutorInfo {
     /// Create a new executor info.
     fn new(
         status: Arc<AtomicBool>,
+        global_lock: Arc<Lock>,
         available_workers: Arc<AtomicUsize>,
         queue: Arc<Mutex<Vec<Job>>>,
         cvar: Arc<Condvar>,
     ) -> ExecutorInfo {
         ExecutorInfo {
             status,
+            global_lock,
             available_workers,
             queue,
             cvar,
@@ -145,8 +194,12 @@ impl ExecutorInfo {
 
     // Warn that the executor is available.
     fn warn_available(&self) {
-        self.status.store(true, Ordering::Release);
-        self.available_workers.fetch_add(1, Ordering::AcqRel);
+        self.global_lock.lock();
+
+        self.status.store(true, Ordering::Relaxed);
+        self.available_workers.fetch_add(1, Ordering::Relaxed);
+
+        self.global_lock.unlock();
     }
 
     /// Run the executor.
@@ -228,7 +281,7 @@ impl Thread {
 pub struct Partition {
     core_id: CoreId,
     workers: Mutex<Vec<Executor>>,
-    total_workers: Arc<AtomicUsize>,
+    global_lock: Arc<Lock>,
     available_workers: Arc<AtomicUsize>,
     configuration: Arc<Configuration>,
 }
@@ -243,7 +296,7 @@ impl Partition {
         Partition {
             core_id,
             workers: Mutex::new(workers),
-            total_workers: Arc::new(AtomicUsize::new(0)),
+            global_lock: Arc::new(Lock::new()),
             available_workers: Arc::new(AtomicUsize::new(0)),
             configuration,
         }
@@ -251,7 +304,7 @@ impl Partition {
 
     /// Get the number of executor in the partition.
     fn get_worker_count(&self) -> usize {
-        self.total_workers.load(Ordering::Acquire)
+        self.workers.lock().unwrap().len()
     }
 
     /// Get the number of busy executors (in this instant) in the partition.
@@ -261,7 +314,13 @@ impl Partition {
 
     /// Get the number of free executors (in this instant) in the partition.
     fn get_free_worker_count(&self) -> usize {
-        self.available_workers.load(Ordering::Acquire)
+        self.global_lock.lock();
+
+        let res = self.available_workers.load(Ordering::Acquire);
+
+        self.global_lock.unlock();
+
+        res
     }
 
     /// Find executor
@@ -285,7 +344,7 @@ impl Partition {
 
         let job = Job::NewJob(Box::new(move || {
             f();
-            job_info_clone.store(true, Ordering::Release);
+            job_info_clone.store(true, Ordering::Relaxed);
         }));
 
         let mut workers = self.workers.lock().unwrap();
@@ -299,11 +358,11 @@ impl Partition {
                 let executor = Executor::new(
                     self.core_id,
                     self.configuration.clone(),
+                    self.global_lock.clone(),
                     self.available_workers.clone(),
                 );
                 executor.push(job);
                 workers.push(executor);
-                self.total_workers.fetch_add(1, Ordering::AcqRel);
             }
         }
 
@@ -501,7 +560,12 @@ impl Orchestrator {
 impl Drop for Orchestrator {
     fn drop(&mut self) {
         while !self.partitions.is_empty() {
-            drop(self.partitions.remove(0));
+            let partition = self.partitions.remove(0);
+            debug!(
+                "Total worker for Partition[{}]: {}",
+                partition.core_id.id,
+                partition.get_worker_count()
+            )
         }
     }
 }

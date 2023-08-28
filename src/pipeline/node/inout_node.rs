@@ -19,7 +19,7 @@ use crate::{
         orchestrator::{JobInfo, Orchestrator},
     },
     mpsc::{
-        channel::{Channel, InputChannel, OutputChannel},
+        channel::{Channel, ReceiverChannel, SenderChannel},
         err::SenderError,
     },
     task::{Message, Task},
@@ -113,7 +113,7 @@ where
     TNext: Node<TOut, TCollected>,
 {
     id: usize,
-    channel_rx: Option<InputChannel<Message<TIn>>>,
+    channel_rx: Option<ReceiverChannel<Message<TIn>>>,
     node: Box<dyn InOut<TIn, TOut> + Send + Sync>,
     next_node: Arc<TNext>,
     splitter: Option<Arc<(Mutex<OrderedSplitter>, Condvar)>>,
@@ -275,7 +275,7 @@ where
 
     // Create a new channel for the input.
     // Return the sender of the channel.
-    fn create_channel(&mut self, blocking: WaitPolicy) -> OutputChannel<Message<TIn>> {
+    fn create_channel(&mut self, blocking: WaitPolicy) -> SenderChannel<Message<TIn>> {
         let (channel_rx, channel_tx) = Channel::channel(blocking);
         self.channel_rx = Some(channel_rx);
         channel_tx
@@ -494,7 +494,7 @@ where
     TOut: Send,
     TNext: Node<TOut, TCollected>,
 {
-    channels: Vec<OutputChannel<Message<TIn>>>,
+    channels: Vec<SenderChannel<Message<TIn>>>,
     next_node: Arc<TNext>,
     ordered: bool,
     producer: bool,

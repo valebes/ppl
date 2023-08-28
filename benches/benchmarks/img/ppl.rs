@@ -106,7 +106,8 @@ pub fn ppl(images: Vec<Image>, threads: usize) {
     ];
 
     p.start();
-    let _res = p.wait_end();
+    let _res = p.wait_end().unwrap();
+
     unsafe {
         Orchestrator::delete_global_orchestrator();
     }

@@ -30,11 +30,11 @@ pub trait Sender<T> {
 /// Struct defining the receiver side of a channel.
 /// This struct is implemented by the channel backend.
 /// The channel backend is selected at compile time by the feature flag.
-pub struct InputChannel<T> {
+pub struct ReceiverChannel<T> {
     rx: Box<dyn Receiver<T> + Sync + Send>,
     blocking: bool,
 }
-impl<T> InputChannel<T>
+impl<T> ReceiverChannel<T>
 where
     T: Send,
 {
@@ -72,10 +72,10 @@ where
 /// Struct defining the sender side of a channel.
 /// This struct is implemented by the channel backend.
 /// The channel backend is selected at compile time by the feature flag.
-pub struct OutputChannel<T> {
+pub struct SenderChannel<T> {
     tx: Box<dyn Sender<T> + Sync + Send>,
 }
-impl<T> OutputChannel<T>
+impl<T> SenderChannel<T>
 where
     T: Send,
 {
@@ -94,14 +94,14 @@ impl Channel {
     /// Create a new channel.
     pub fn channel<T: Send + 'static>(
         wait_policy: WaitPolicy,
-    ) -> (InputChannel<T>, OutputChannel<T>) {
+    ) -> (ReceiverChannel<T>, SenderChannel<T>) {
         let blocking = match wait_policy {
             WaitPolicy::Active => false,
             WaitPolicy::Passive => true,
         };
 
         let (rx, tx) = backend::Channel::channel(blocking);
-        (InputChannel { rx, blocking }, OutputChannel { tx })
+        (ReceiverChannel { rx, blocking }, SenderChannel { tx })
     }
 }
 

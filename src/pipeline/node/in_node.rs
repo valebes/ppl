@@ -11,7 +11,7 @@ use log::warn;
 use crate::{
     core::orchestrator::{JobInfo, Orchestrator},
     mpsc::{
-        channel::{Channel, InputChannel, OutputChannel},
+        channel::{Channel, ReceiverChannel, SenderChannel},
         err::SenderError,
     },
     task::{Message, Task},
@@ -80,7 +80,7 @@ pub struct InNode<TIn, TCollected>
 where
     TIn: Send,
 {
-    channel: OutputChannel<Message<TIn>>,
+    channel: SenderChannel<Message<TIn>>,
     ordered: bool,
     storage: Mutex<BTreeMap<usize, Message<TIn>>>,
     counter: AtomicUsize,
@@ -197,7 +197,7 @@ where
 
     fn rts(
         mut node: Box<dyn In<TIn, TCollected>>,
-        channel: InputChannel<Message<TIn>>,
+        channel: ReceiverChannel<Message<TIn>>,
     ) -> Option<TCollected> {
         loop {
             let input = channel.receive();
