@@ -21,7 +21,7 @@ debug = false
 core_affinity = "0.8.1"
 crossbeam-channel = { version = "0.5.8", optional = true }
 crossbeam-deque = "0.8.3"
-dyn-clone = "1.0.12"
+dyn-clone = "1.0.13"
 log = "0.4.20"
 num_cpus = "1.16.0"
 ff_buffer = { git = "https://github.com/valebes/ppl-ff-buffer", optional = true }
