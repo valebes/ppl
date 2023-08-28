@@ -244,7 +244,7 @@ use ppl::thread_pool::ThreadPool;
 
 fn main() {
     let tp = ThreadPool::new(); // We create a new threadpool
-    tp.scoped(|s| {
+    tp.scope(|s| {
         for i in 1..21 {
             s.execute(move || {
                 fib(i);
