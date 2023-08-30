@@ -547,7 +547,7 @@ impl Orchestrator {
     /// Delete the global orchestrator.
     ///
     /// # Safety
-    /// This method should be used only when writing test or benchmarks, or in
+    /// This method should be used only when writing tests or benchmarks, or in
     /// the few cases where we want destroy the global orchestrator long before the end
     /// the application.
     pub unsafe fn delete_global_orchestrator() {
