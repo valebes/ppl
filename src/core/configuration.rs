@@ -37,28 +37,28 @@ pub enum WaitPolicy {
 /// * `PPL_PINNING`: Enable threads pinning. Default is false.
 /// * `PPL_SCHEDULE`: Scheduling method used in the pipeline. Default is static.
 /// * `PPL_WAIT_POLICY`: Enable blocking in threads communications. Default is false.
-/// * `PPL_THREADS_MAPPING`: Custom threads mapping to cores. Default is the order in which the cores are found.
+/// * `PPL_THREAD_MAPPING`: Custom threads mapping to cores. Default is the order in which the cores are found.
 pub struct Configuration {
     max_cores: usize,
-    threads_mapping: Vec<CoreId>,
+    thread_mapping: Vec<CoreId>,
     pinning: bool,
     scheduling: Scheduling,
     wait_policy: WaitPolicy,
 }
 
-/// Parse the threads mapping from the environment variable PPL_THREAD_MAPPING.
+/// Parse the thread mapping from the environment variable PPL_THREAD_MAPPING.
 /// The threads mapping is a string of comma separated integers.
 /// Each integer represents a core. The order of the integers
 /// in the string is the order in which the cores are used for pinning.
 /// For example, if the string is "0,1,2,3", the first core
 /// is used first, then the second core, and so on.
 ///
-/// If the environment variable is not set, the threads mapping
+/// If the environment variable is not set, the thread mapping
 /// is set to the default mapping, i.e., the cores are used
 /// in the order in which they are found by the framework.
-fn parse_threads_mapping() -> Vec<CoreId> {
+fn parse_thread_mapping() -> Vec<CoreId> {
     let mut env_mapping = Vec::new();
-    match env::var("PPL_THREADS_MAPPING") {
+    match env::var("PPL_THREAD_MAPPING") {
         Ok(val) => {
             let mapping: Vec<&str> = val.split(',').collect();
 
@@ -100,11 +100,11 @@ impl Configuration {
         scheduling: Scheduling,
         wait_policy: WaitPolicy,
     ) -> Configuration {
-        let threads_mapping = parse_threads_mapping();
+        let threads_mapping = parse_thread_mapping();
 
         Configuration {
             max_cores,
-            threads_mapping,
+            thread_mapping: threads_mapping,
             pinning,
             scheduling,
             wait_policy,
@@ -176,8 +176,8 @@ impl Configuration {
     /// of a threadpool, or the replicas of a stage of a pipeline, in
     /// a subset of neighboring cores. This is done to reduce the
     /// communication overhead between the workers.
-    pub(crate) fn get_threads_mapping(&self) -> &Vec<CoreId> {
-        &self.threads_mapping
+    pub(crate) fn get_thread_mapping(&self) -> &Vec<CoreId> {
+        &self.thread_mapping
     }
 
     /// Get the pinning flag.
@@ -217,7 +217,7 @@ mod tests {
         env::remove_var("PPL_MAX_CORES");
         env::remove_var("PPL_PINNING");
         env::remove_var("PPL_WAIT_POLICY");
-        env::remove_var("PPL_THREADS_MAPPING");
+        env::remove_var("PPL_THREAD_MAPPING");
         env::remove_var("PPL_SCHEDULE");
     }
 

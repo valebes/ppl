@@ -292,7 +292,7 @@ impl Partition {
     /// If pinning is enabled, it will pin the partition to the specified core.
     fn new(core_id: usize, configuration: Arc<Configuration>) -> Partition {
         let workers = Vec::new();
-        let core_id = configuration.get_threads_mapping()[core_id];
+        let core_id = configuration.get_thread_mapping()[core_id];
         Partition {
             core_id,
             workers: Mutex::new(workers),
@@ -445,13 +445,13 @@ impl Orchestrator {
         partitions.iter().min_by_key(|p| p.get_busy_worker_count())
     }
 
-    /// Find the subarray of size count of partition that minimize the number of busy executors contained in each partition of the subarray.
+    /// Find the subarray of size count of partitions that minimize the number of busy executors contained in each partition of the subarray.
     /// If there are more than one sequence with the same number of busy executors, the first sequence found is returned.
     /// This algorithm will use the sum of the previous subarray, removing the first element, to compute the sum of the next subarray.
     /// This will reduce the complexity from O(n^2) to O(n).
     /// If there are no executors in any partition, the first sequence of 'count' partitions is returned.
     /// This method is used to find the best sequence of partitions to pin a set of jobs.
-    fn find_partition_sequence(partitions: &[Partition], count: usize) -> Option<&[Partition]> {
+    fn find_partitions_sequence(partitions: &[Partition], count: usize) -> Option<&[Partition]> {
         if count > partitions.len() {
             return None;
         }
@@ -517,7 +517,7 @@ impl Orchestrator {
         let mut partitions = None;
 
         if f.len() > 1 {
-            partitions = Self::find_partition_sequence(&self.partitions, f.len());
+            partitions = Self::find_partitions_sequence(&self.partitions, f.len());
         }
         match partitions {
             Some(p) => {
