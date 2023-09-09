@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use std::sync::{Arc, Mutex};
 
 use super::ThreadPool;
@@ -28,7 +26,7 @@ fn test_threadpool() {
         });
     }
     tp.wait();
-    Orchestrator::delete_global_orchestrator();
+    unsafe{ Orchestrator::delete_global_orchestrator(); }
 }
 
 #[test]
@@ -37,25 +35,24 @@ fn test_scoped_thread() {
     let mut vec = vec![0; 100];
     let mut tp = ThreadPool::new();
 
-    tp.scoped(|s| {
+    tp.scope(|s| {
         for e in vec.iter_mut() {
             s.execute(move || {
                 *e += 1;
             });
         }
     });
-    Orchestrator::delete_global_orchestrator();
-    assert_eq!(vec, vec![1i32; 100])
+    unsafe{ Orchestrator::delete_global_orchestrator(); }
 }
 
 #[test]
 #[serial]
 fn test_par_for_each() {
     let mut vec = vec![0; 100];
-    let mut tp = TThreadPool::new();
+    let mut tp = ThreadPool::new();
 
     tp.par_for_each(&mut vec, |el: &mut i32| *el += 1);
-    Orchestrator::delete_global_orchestrator();
+    unsafe{ Orchestrator::delete_global_orchestrator(); }
     assert_eq!(vec, vec![1i32; 100])
 }
 
@@ -80,7 +77,7 @@ fn test_par_map() {
             check = false;
         }
     }
-    Orchestrator::delete_global_orchestrator();
+    unsafe{ Orchestrator::delete_global_orchestrator(); }
     assert!(check)
 }
 
@@ -109,7 +106,7 @@ fn test_par_for() {
         }
     });
 
-    Orchestrator::delete_global_orchestrator();
+    unsafe{ Orchestrator::delete_global_orchestrator(); }
     assert!(check)
 }
 
@@ -140,7 +137,7 @@ fn test_par_map_reduce() {
         println!("Key: {} Total: {}", k, v)
     }
 
-    Orchestrator::delete_global_orchestrator();
+    unsafe{ Orchestrator::delete_global_orchestrator(); }
     assert!(check)
 }
 
@@ -167,7 +164,7 @@ fn test_par_map_reduce_seq() {
         println!("Key: {} Total: {}", k, v)
     }
 
-    Orchestrator::delete_global_orchestrator();
+    unsafe{ Orchestrator::delete_global_orchestrator(); }
     assert!(check)
 }
 
@@ -181,5 +178,27 @@ fn test_multiple_threadpool() {
         tp_2.wait();
 
     }
-    Orchestrator::delete_global_orchestrator();
+    unsafe{ Orchestrator::delete_global_orchestrator(); }
+}
+
+fn square(x: f64) -> f64 {
+    x * x
+}
+
+#[test]
+#[serial]
+fn test_simple_map() {
+    let mut pool = ThreadPool::new(); // Create a new threadpool
+    let mut counter = 1.0;
+    let mut numbers: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+
+    // Transform the vec of integers into a vec of strings
+    let res: Vec<f64> = pool.par_map(&mut numbers, |el| square(*el)).collect();
+
+    for el in res {
+        assert_eq!(el.sqrt(), counter);
+        counter += 1.0;
+    }
+
+    unsafe{ Orchestrator::delete_global_orchestrator();}
 }

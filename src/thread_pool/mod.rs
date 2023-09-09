@@ -3,6 +3,9 @@
 //! This module contains the implementation of a work-stealing based thread pool.
 //! This implementation of the thread pool supports scoped jobs.
 //! This module offers struct as [`ThreadPool`] that allows to create a thread pool.
+#[cfg(test)]
+mod test;
+
 use crossbeam_deque::{Injector, Steal, Stealer, Worker};
 use log::{trace, warn};
 use std::collections::BTreeMap;
