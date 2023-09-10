@@ -4,15 +4,10 @@ use super::ThreadPool;
 use crate::core::orchestrator::Orchestrator;
 use serial_test::serial;
 
-fn fib(n: i32) -> u64 {
-    if n < 0 {
-        panic!("{} is negative!", n);
-    }
+pub fn fib(n: usize) -> usize {
     match n {
-        0 => panic!("zero is not a right argument to fib()!"),
-        1 | 2 => 1,
-        3 => 2,
-        _ => fib(n - 1) + fib(n - 2),
+        0 | 1 => 1,
+        _ => fib(n - 2) + fib(n - 1),
     }
 }
 
@@ -26,7 +21,9 @@ fn test_threadpool() {
         });
     }
     tp.wait();
-    unsafe{ Orchestrator::delete_global_orchestrator(); }
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
 }
 
 #[test]
@@ -42,7 +39,9 @@ fn test_scoped_thread() {
             });
         }
     });
-    unsafe{ Orchestrator::delete_global_orchestrator(); }
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
 }
 
 #[test]
@@ -52,7 +51,9 @@ fn test_par_for_each() {
     let mut tp = ThreadPool::new();
 
     tp.par_for_each(&mut vec, |el: &mut i32| *el += 1);
-    unsafe{ Orchestrator::delete_global_orchestrator(); }
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
     assert_eq!(vec, vec![1i32; 100])
 }
 
@@ -77,7 +78,9 @@ fn test_par_map() {
             check = false;
         }
     }
-    unsafe{ Orchestrator::delete_global_orchestrator(); }
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
     assert!(check)
 }
 
@@ -106,7 +109,9 @@ fn test_par_for() {
         }
     });
 
-    unsafe{ Orchestrator::delete_global_orchestrator(); }
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
     assert!(check)
 }
 
@@ -137,7 +142,9 @@ fn test_par_map_reduce() {
         println!("Key: {} Total: {}", k, v)
     }
 
-    unsafe{ Orchestrator::delete_global_orchestrator(); }
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
     assert!(check)
 }
 
@@ -164,7 +171,9 @@ fn test_par_map_reduce_seq() {
         println!("Key: {} Total: {}", k, v)
     }
 
-    unsafe{ Orchestrator::delete_global_orchestrator(); }
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
     assert!(check)
 }
 
@@ -178,7 +187,9 @@ fn test_multiple_threadpool() {
         tp_2.wait();
 
     }
-    unsafe{ Orchestrator::delete_global_orchestrator(); }
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
 }
 
 fn square(x: f64) -> f64 {
@@ -200,5 +211,7 @@ fn test_simple_map() {
         counter += 1.0;
     }
 
-    unsafe{ Orchestrator::delete_global_orchestrator();}
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
 }

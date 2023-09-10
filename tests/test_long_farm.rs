@@ -9,12 +9,10 @@
 use ppl::prelude::*;
 
 // Fibonacci function
-pub fn fibonacci_recursive(n: u64) -> u64 {
+pub fn fib(n: usize) -> usize {
     match n {
-        0 => panic!("zero is not a right argument to fibonacci_recursive()!"),
-        1 | 2 => 1,
-        3 => 2,
-        _ => fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2),
+        0 | 1 => 1,
+        _ => fib(n - 2) + fib(n - 1),
     }
 }
 
@@ -22,11 +20,11 @@ pub fn fibonacci_recursive(n: u64) -> u64 {
 struct Source {
     streamlen: usize,
 }
-impl Out<u64> for Source {
-    fn run(&mut self) -> Option<u64> {
+impl Out<usize> for Source {
+    fn run(&mut self) -> Option<usize> {
         let mut ret = None;
         if self.streamlen > 0 {
-            ret = Some((self.streamlen as u64 % 20) + 1);
+            ret = Some((self.streamlen % 20) + 1);
             self.streamlen -= 1;
         }
         ret
@@ -36,8 +34,8 @@ impl Out<u64> for Source {
 // Stage that return simply the i-th number received.
 #[derive(Clone)]
 struct WorkerA {}
-impl InOut<u64, u64> for WorkerA {
-    fn run(&mut self, input: u64) -> Option<u64> {
+impl InOut<usize, usize> for WorkerA {
+    fn run(&mut self, input: usize) -> Option<usize> {
         Some(input)
     }
     fn number_of_replicas(&self) -> usize {
@@ -48,9 +46,9 @@ impl InOut<u64, u64> for WorkerA {
 // Stage that computes the i-th Fibonacci number.
 #[derive(Clone)]
 struct WorkerB {}
-impl InOut<u64, u64> for WorkerB {
-    fn run(&mut self, input: u64) -> Option<u64> {
-        Some(fibonacci_recursive(input))
+impl InOut<usize, usize> for WorkerB {
+    fn run(&mut self, input: usize) -> Option<usize> {
+        Some(fib(input))
     }
     fn number_of_replicas(&self) -> usize {
         8
@@ -60,8 +58,8 @@ impl InOut<u64, u64> for WorkerB {
 // Stage that subtract 1 to the i-th Fibonacci number.
 #[derive(Clone)]
 struct WorkerC {}
-impl InOut<u64, u64> for WorkerC {
-    fn run(&mut self, input: u64) -> Option<u64> {
+impl InOut<usize, usize> for WorkerC {
+    fn run(&mut self, input: usize) -> Option<usize> {
         Some(input - 1)
     }
     fn number_of_replicas(&self) -> usize {
@@ -73,8 +71,8 @@ impl InOut<u64, u64> for WorkerC {
 struct Sink {
     counter: usize,
 }
-impl In<u64, usize> for Sink {
-    fn run(&mut self, input: u64) {
+impl In<usize, usize> for Sink {
+    fn run(&mut self, input: usize) {
         println!("{}", input);
         self.counter += 1;
     }

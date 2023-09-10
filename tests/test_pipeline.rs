@@ -25,12 +25,10 @@ impl Out<usize> for Source {
     }
 }
 
-pub fn fibonacci_recursive(n: usize) -> usize {
+pub fn fib(n: usize) -> usize {
     match n {
-        0 => panic!("zero is not a right argument to fibonacci_reccursive()!"),
-        1 | 2 => 1,
-        3 => 2,
-        _ => fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2),
+        0 | 1 => 1,
+        _ => fib(n - 2) + fib(n - 1),
     }
 }
 
@@ -38,7 +36,7 @@ pub fn fibonacci_recursive(n: usize) -> usize {
 struct Worker {}
 impl InOut<usize, usize> for Worker {
     fn run(&mut self, input: usize) -> Option<usize> {
-        Some(fibonacci_recursive(input))
+        Some(fib(input))
     }
 }
 
@@ -78,7 +76,7 @@ fn test_pipeline() {
     // Another way to write the same pipeline, but here using templates instead
     let mut p = pipeline![
         SourceIter::build(1..21),
-        Sequential::build(fibonacci_recursive),
+        Sequential::build(fib),
         SinkVec::build()
     ];
     p.start();
@@ -98,7 +96,7 @@ fn test_pipeline() {
                 }
             }
         },
-        |input| Some(fibonacci_recursive(input)),
+        |input| Some(fib(input)),
         |input| println!("{}", input)
     ];
     p.start();

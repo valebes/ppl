@@ -8,12 +8,10 @@
 use ppl::prelude::*;
 
 // Fibonacci function
-pub fn fibonacci_recursive(n: u64) -> u64 {
+pub fn fib(n: usize) -> usize {
     match n {
-        0 => panic!("zero is not a right argument to fibonacci_recursive()!"),
-        1 | 2 => 1,
-        3 => 2,
-        _ => fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2),
+        0 | 1 => 1,
+        _ => fib(n - 2) + fib(n - 1),
     }
 }
 
@@ -22,11 +20,11 @@ pub fn fibonacci_recursive(n: u64) -> u64 {
 struct Source {
     streamlen: usize,
 }
-impl Out<u64> for Source {
-    fn run(&mut self) -> Option<u64> {
+impl Out<usize> for Source {
+    fn run(&mut self) -> Option<usize> {
         let mut ret = None;
         if self.streamlen > 0 {
-            ret = Some(self.streamlen as u64);
+            ret = Some(self.streamlen);
             self.streamlen -= 1;
         }
         ret
@@ -36,9 +34,9 @@ impl Out<u64> for Source {
 // Worker of the farm, it computes the i-th Fibonacci number.
 #[derive(Clone)]
 struct WorkerA {}
-impl InOut<u64, u64> for WorkerA {
-    fn run(&mut self, input: u64) -> Option<u64> {
-        Some(fibonacci_recursive(input))
+impl InOut<usize, usize> for WorkerA {
+    fn run(&mut self, input: usize) -> Option<usize> {
+        Some(fib(input))
     }
     fn number_of_replicas(&self) -> usize {
         8
@@ -49,8 +47,8 @@ impl InOut<u64, u64> for WorkerA {
 struct Sink {
     counter: usize,
 }
-impl In<u64, usize> for Sink {
-    fn run(&mut self, input: u64) {
+impl In<usize, usize> for Sink {
+    fn run(&mut self, input: usize) {
         println!("{}", input);
         self.counter += 1;
     }
