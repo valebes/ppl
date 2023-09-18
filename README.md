@@ -549,7 +549,7 @@ Following are reported the results obtained by running the image-processing benc
 - **Configuration**: PPL with pinning and dynamic scheduling enabled
 
 <table><tr>
-<td> <img src=".github/benchmark/AMPERE_PINNING/time.svg" alt="Time" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/AMPERE_PINNING/result_time.svg" alt="Time" style="width: 450px;"/> </td>
 <td> <img src=".github/benchmark/AMPERE_PINNING/speedup.svg" alt="SpeedUp" style="width: 450px;"/> </td>
 </tr></table>
 
@@ -563,7 +563,7 @@ Following are reported the results obtained by running the image-processing benc
 - **Configuration**: PPL with pinning and dynamic scheduling enabled
 
 <table><tr>
-<td> <img src=".github/benchmark/TITANIC_PINNING/time.svg" alt="Time" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/TITANIC_PINNING/result_time.svg" alt="Time" style="width: 450px;"/> </td>
 <td> <img src=".github/benchmark/TITANIC_PINNING/speedup.svg" alt="SpeedUp" style="width: 450px;"/> </td>
 </tr></table>
 
@@ -580,7 +580,7 @@ Following are reported the results obtained by running the mandelbrot set benchm
 - **Configuration**: PPL with pinning and dynamic scheduling enabled
 
 <table><tr>
-<td> <img src=".github/benchmark/AMPERE_PINNING_MS/time.svg" alt="Time" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/AMPERE_PINNING_MS/result_time.svg" alt="Time" style="width: 450px;"/> </td>
 <td> <img src=".github/benchmark/AMPERE_PINNING_MS/speedup.svg" alt="SpeedUp" style="width: 450px;"/> </td>
 </tr></table>
 
@@ -594,7 +594,7 @@ Following are reported the results obtained by running the mandelbrot set benchm
 - **Configuration**: PPL with pinning and dynamic scheduling enabled
 
 <table><tr>
-<td> <img src=".github/benchmark/TITANIC_PINNING_MS/time.svg" alt="Time" style="width: 450px;"/> </td>
+<td> <img src=".github/benchmark/TITANIC_PINNING_MS/result_time.svg" alt="Time" style="width: 450px;"/> </td>
 <td> <img src=".github/benchmark/TITANIC_PINNING_MS/speedup.svg" alt="SpeedUp" style="width: 450px;"/> </td>
 </tr></table>
 
