@@ -543,6 +543,7 @@ cargo bench
 
 ### Image-Processing Results
 Following are reported the results obtained by running the image-processing benchmark.
+Both benchmarks were implemented using the Pipeline interface (`ppl`) and the Threadpool interface (`ppl-tp`).
 
 #### Ampere Altra (ARM)
 - **Processor**: 2x Ampere Altra 80 Cores @ 3.0GHz
