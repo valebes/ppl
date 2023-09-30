@@ -67,7 +67,7 @@ PPL empowers your Rust programs by unlocking the immense potential of parallelis
 
 ## Installation
 
-Parallelo Parallel Library (PPL) is currently available only on GitHub. 
+Parallelo Parallel Library (PPL) is currently available on both GitHub and Crates.io. 
 
 Please make sure you have Rust and Cargo installed on your system before proceeding. If you don't have them installed, you can get them from the official Rust website: [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install)
 
