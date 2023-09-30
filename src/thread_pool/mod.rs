@@ -220,7 +220,11 @@ impl ThreadPool {
         }
     }
 
-    /// Create a new thread pool using all the threads availables.
+    /// Create a new thread pool.
+    /// If the environment variable `PPL_MAX_CORES` is set, the capacity of the thread
+    /// pool is set to that value. Otherwise, the number of logical threads available 
+    /// on the host machine is used instead.
+    /// 
     ///
     /// # Examples
     ///
@@ -230,7 +234,9 @@ impl ThreadPool {
     /// let mut pool = ThreadPool::new();
     /// ```
     pub fn new() -> Self {
-        Self::with_capacity(num_cpus::get())
+        let orchestrator = get_global_orchestrator();
+        let num_threads = orchestrator.get_configuration().get_max_cores();
+        Self::build(num_threads, orchestrator)
     }
 
     /// Create a new thread pool with `num_threads` threads.
@@ -548,3 +554,4 @@ impl<'pool, 'scope> Scope<'pool, 'scope> {
         self.pool.execute(task);
     }
 }
+
