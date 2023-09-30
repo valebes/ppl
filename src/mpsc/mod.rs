@@ -7,8 +7,8 @@
 //! - [`channel::Sender<T>`]: defines the sender side of a channel.
 //!
 //! The structs are:
-//! - [`channel::InputChannel<T>`]: defines the receiver side of a channel.
-//! - [`channel::OutputChannel<T>`]: defines the sender side of a channel.
+//! - [`channel::ReceiverChannel<T>`]: defines the receiver side of a channel.
+//! - [`channel::SenderChannel<T>`]: defines the sender side of a channel.
 //!
 //! The channel implementations available are:
 //! - **crossbeam**: uses the crossbeam channel.
