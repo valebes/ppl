@@ -12,7 +12,11 @@
   <a href="https://opensource.org/license/apache-2-0/">
     <img src="https://img.shields.io/github/license/valebes/ppl?style=for-the-badge">
   </a>
-  
+
+  <a href="https://crates.io/crates/ppl">
+    <img alt="Crates.io" src="https://img.shields.io/crates/v/ppl?style=for-the-badge">
+  </a>
+
    <a href="https://codecov.io/gh/valebes/ppl">
     <img alt="Codecov" src="https://img.shields.io/codecov/c/github/valebes/ppl?style=for-the-badge">
   </a>
