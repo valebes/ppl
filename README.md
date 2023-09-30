@@ -3,7 +3,6 @@
 </p>
 
 <hr/>
-
 <p align="center">
   <a href="https://github.com/valebes/pspp/actions/workflows/rust.yml">
     <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/valebes/ppl/rust.yml?style=for-the-badge">
@@ -15,6 +14,10 @@
 
   <a href="https://crates.io/crates/ppl">
     <img alt="Crates.io" src="https://img.shields.io/crates/v/ppl?style=for-the-badge">
+  </a>
+
+  <a href="https://docs.rs/ppl/latest/ppl/">
+    <img alt="Docs.rs" src="https://img.shields.io/docsrs/ppl?style=for-the-badge">
   </a>
 
    <a href="https://codecov.io/gh/valebes/ppl">
