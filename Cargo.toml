@@ -2,7 +2,7 @@
 edition = "2021"
 name = "ppl"
 description = "A structured parallel programming library for Rust."
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Valerio Besozzi"]
 license = "MIT OR Apache-2.0"
 
@@ -39,7 +39,7 @@ rust-spp = {git = "https://github.com/GMAP/rust-ssp.git"}
 num_cpus = "1.16.0"
 serial_test = "2.0.0"
 scopeguard = "1.2.0"
-image = "0.24.6"
+image = "0.24.7"
 num-complex = "0.4.4"
 
 [[bench]]
