@@ -1,5 +1,5 @@
-//! Parallelo Structured Parallel Processing is a simple parallel processing
-//! library written in Rust.
+//! Parallelo Parallel Library (PPL) is a structured parallel programming
+//! framework written in Rust.
 //!
 #![warn(missing_docs)]
 #![feature(unsized_fn_params)]
