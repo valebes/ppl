@@ -540,6 +540,12 @@ The benchmarks are available in the *benches/* directory. To run the benchmarks,
 cargo bench
 ```
 
+In order to generate the data set for the Image-Processing benchmark, do the following:
+```bash
+cd benches/benchmarks/img/images
+./generate_input.sh
+```
+
 ### Available Benchmarks
 - **Image Processing**: A benchmark that is based on the Image-Processing benchmark found in [RustStreamBench](https://github.com/GMAP/RustStreamBench/). You can find the benchmark source code here [here](https://github.com/GMAP/RustStreamBench/tree/main/image-processing).
 
