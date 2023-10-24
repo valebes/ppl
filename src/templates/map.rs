@@ -75,6 +75,8 @@ where
     /// Panics if n_replicas is 0.
     /// # Remarks
     /// The replicas are created by cloning the Map node.
+    /// This mean that 4 replicas of a Map node with 2 workers each
+    /// will result in the usage of 8 threads. 
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
@@ -155,6 +157,10 @@ where
     /// * `f` - Function to apply to each element of the input.
     /// # Panics
     /// Panics if n_replicas is 0.
+    /// # Remarks
+    /// The replicas are created by cloning the OrderedMap node.
+    /// This mean that 4 replicas of an Ordered Map node with 2 workers each
+    /// will result in the usage of 8 threads. 
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
@@ -240,6 +246,10 @@ where
     /// * `f` - Function to apply to each element of the input.
     /// # Panics
     /// Panics if n_replicas is 0.
+    /// # Remarks
+    /// The replicas are created by cloning the Reduce node.
+    /// This mean that 4 replicas of a Reduce node with 2 workers each
+    /// will result in the usage of 8 threads. 
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
@@ -325,6 +335,10 @@ where
     /// * `f` - Function to apply to each element of the input.
     /// # Panics
     /// Panics if n_replicas is 0.
+    /// # Remarks
+    /// The replicas are created by cloning the OrderedReduce node.
+    /// This mean that 4 replicas of an OrderedReduce node with 2 workers each
+    /// will result in the usage of 8 threads. 
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
@@ -426,6 +440,10 @@ where
     /// * `f_reduce` - Function to apply to the output of the Map.
     /// # Panics
     /// Panics if n_replicas is 0.
+    /// # Remarks
+    /// The replicas are created by cloning the MapReduce node.
+    /// This mean that 4 replicas of a MapReduce node with 2 workers each
+    /// will result in the usage of 8 threads. 
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         f_map: FMap,
@@ -534,6 +552,10 @@ where
     /// * `f_reduce` - Function to apply to the output of the Map.
     /// # Panics
     /// Panics if n_replicas is 0.
+    /// # Remarks
+    /// The replicas are created by cloning the OrderedMapReduce node.
+    /// This mean that 4 replicas of an OrderedMapReduce node with 2 workers each
+    /// will result in the usage of 8 threads. 
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
