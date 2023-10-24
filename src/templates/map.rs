@@ -169,6 +169,9 @@ where
     /// vector.
     /// In this case, using the OrderedMap template, it is possible
     /// to mantain the order of the input in the output.
+    /// Moreover, using the `build_with_replicas` method,
+    /// we can create a stage consisting of four map operator,
+    /// each one composed by 2 worker.
     /// 
     /// ```
     /// use ppl::{prelude::*, templates::misc::{SourceIter, OrderedSinkVec}, templates::map::OrderedMap};
@@ -684,7 +687,77 @@ fn simple_map() {
 
 #[test]
 #[serial]
+fn simple_map_replicated() {
+    let mut counter = 1.0;
+    let numbers: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+    let mut vector = Vec::new();
+
+    for _i in 0..1000 {
+        vector.push(numbers.clone());
+    }
+
+    
+    let pipe = pipeline![
+        SourceIter::build(vector.into_iter()),
+        Map::build_with_replicas(4, 2, |el: f64| square(el)),
+        SinkVec::build()
+    ];
+
+    let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+
+    for vec in res {
+        for el in vec {
+            assert_eq!(el.sqrt(), counter);
+            counter += 1.0;
+        }
+        counter = 1.0;
+    }
+
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
+}
+
+#[test]
+#[serial]
 fn simple_ordered_map() {
+    let mut counter = 1.0;
+    let mut vector = Vec::new();
+
+    for _i in 0..1000{
+        let mut numbers = Vec::new();
+        for _i in 0..10 {
+            numbers.push(counter);
+            counter += 1.0;
+        }
+        vector.push(numbers);
+    }
+
+    
+    let pipe = pipeline![
+        SourceIter::build(vector.into_iter()),
+        OrderedMap::build(4, |el: f64| square(el)),
+        OrderedSinkVec::build()
+    ];
+
+    let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+
+    counter = 1.0;
+    for vec in res {
+        for el in vec {
+            assert_eq!(el.sqrt(), counter);
+            counter += 1.0;
+        }
+    }
+
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
+}
+
+#[test]
+#[serial]
+fn simple_ordered_map_replicated() {
     let mut counter = 1.0;
     let mut vector = Vec::new();
 
