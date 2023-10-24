@@ -161,6 +161,41 @@ where
     /// The replicas are created by cloning the OrderedMap node.
     /// This mean that 4 replicas of an Ordered Map node with 2 workers each
     /// will result in the usage of 8 threads. 
+    /// 
+    /// # Examples
+    /// 
+    /// Given a vector of vectors, each one containing a set of numbers, 
+    /// compute the square value of each number contained in each
+    /// vector.
+    /// In this case, using the OrderedMap template, it is possible
+    /// to mantain the order of the input in the output.
+    /// 
+    /// ```
+    /// use ppl::{prelude::*, templates::misc::{SourceIter, OrderedSinkVec}, templates::map::OrderedMap};
+    /// let mut counter = 1.0;
+    /// let mut vector = Vec::new();
+    /// 
+    /// // Create a vector of vectors, each one containing a set of numbers.
+    /// for _i in 0..1000{
+    ///    let mut numbers = Vec::new();
+    ///    for _i in 0..10 {
+    ///        numbers.push(counter);
+    ///        counter += 1.0;
+    ///    }
+    ///   vector.push(numbers);
+    /// }
+    /// 
+    /// // Instantiate the pipeline.
+    /// let pipe = pipeline![
+    ///     SourceIter::build(vector.into_iter()),
+    ///     OrderedMap::build_with_replicas(4, 2, |el: f64| el * el),
+    ///     OrderedSinkVec::build()
+    /// ];
+    /// 
+    /// // Start the pipeline and collect the results.
+    /// let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+    /// ```
+
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
@@ -604,8 +639,8 @@ where
 mod test {
 use serial_test::serial;
 
-use crate::{prelude::*, templates::misc::{SourceIter, SinkVec}};
-use super::Map;
+use crate::{prelude::*, templates::misc::{SourceIter, SinkVec, OrderedSinkVec}};
+use super::{Map, OrderedMap};
 
 
 
@@ -640,6 +675,43 @@ fn simple_map() {
             counter += 1.0;
         }
         counter = 1.0;
+    }
+
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
+}
+
+#[test]
+#[serial]
+fn simple_ordered_map() {
+    let mut counter = 1.0;
+    let mut vector = Vec::new();
+
+    for _i in 0..1000{
+        let mut numbers = Vec::new();
+        for _i in 0..10 {
+            numbers.push(counter);
+            counter += 1.0;
+        }
+        vector.push(numbers);
+    }
+
+    
+    let pipe = pipeline![
+        SourceIter::build(vector.into_iter()),
+        OrderedMap::build_with_replicas(4, 2, |el: f64| square(el)),
+        OrderedSinkVec::build()
+    ];
+
+    let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+
+    counter = 1.0;
+    for vec in res {
+        for el in vec {
+            assert_eq!(el.sqrt(), counter);
+            counter += 1.0;
+        }
     }
 
     unsafe {
