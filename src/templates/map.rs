@@ -26,6 +26,33 @@ where
     /// # Arguments
     /// * `n_worker` - Number of worker threads.
     /// * `f` - Function to apply to each element of the input.
+    /// 
+    /// # Examples
+    /// 
+    /// Given a vector of vectors, each one containing a set of numbers, 
+    /// compute the square value of each number contained in each
+    /// vector.
+    /// 
+    /// ```
+    /// use ppl::{prelude::*, templates::misc::{SourceIter, SinkVec}, templates::map::Map};
+    /// 
+    /// let mut counter = 1.0;
+    /// let numbers: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+    /// let mut vector = Vec::new();
+    ///
+    /// // Create the vector of vectors.
+    /// for _i in 0..1000 {
+    ///     vector.push(numbers.clone());
+    /// }
+    /// // Instantiate a new Pipeline with a Map operator.
+    /// let pipe = pipeline![
+    ///     SourceIter::build(vector.into_iter()),
+    ///     Map::build(4, |el: f64| el * el),
+    ///     SinkVec::build()
+    /// ];
+    /// // Start the pipeline and collect the results.
+    /// let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+    /// ```
     pub fn build<TInIter, TOutIter>(n_worker: usize, f: F) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = TIn>,
@@ -549,4 +576,52 @@ where
     fn number_of_replicas(&self) -> usize {
         self.replicas
     }
+}
+
+#[cfg(test)]
+mod test {
+use serial_test::serial;
+
+use crate::{prelude::*, templates::misc::{SourceIter, SinkVec}};
+use super::Map;
+
+
+
+
+fn square(x: f64) -> f64 {
+    x * x
+}
+
+#[test]
+#[serial]
+fn simple_map() {
+    let mut counter = 1.0;
+    let numbers: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+    let mut vector = Vec::new();
+
+    for _i in 0..1000 {
+        vector.push(numbers.clone());
+    }
+
+    
+    let pipe = pipeline![
+        SourceIter::build(vector.into_iter()),
+        Map::build(4, |el: f64| square(el)),
+        SinkVec::build()
+    ];
+
+    let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+
+    for vec in res {
+        for el in vec {
+            assert_eq!(el.sqrt(), counter);
+            counter += 1.0;
+        }
+        counter = 1.0;
+    }
+
+    unsafe {
+        Orchestrator::delete_global_orchestrator();
+    }
+}
 }

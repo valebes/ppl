@@ -203,7 +203,6 @@ fn test_simple_map() {
     let mut counter = 1.0;
     let mut numbers: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
 
-    // Transform the vec of integers into a vec of strings
     let res: Vec<f64> = pool.par_map(&mut numbers, |el| square(*el)).collect();
 
     for el in res {
