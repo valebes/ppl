@@ -150,6 +150,23 @@ fn test_par_map_reduce() {
 
 #[test]
 #[serial]
+fn test_par_reduce() {
+    let mut pool = ThreadPool::new();
+
+    let mut vec = Vec::new();
+    for i in 0..100 {
+        vec.push((i % 10, i));
+    }
+
+    let res: Vec<(i32, i32)> = pool
+        .par_reduce(vec, |k, v| -> (i32, i32) { (k, v.iter().sum()) })
+        .collect();
+
+    assert_eq!(res.len(), 10);
+}
+
+#[test]
+#[serial]
 fn test_par_map_reduce_seq() {
     let mut vec = Vec::new();
     let mut tp = ThreadPool::new();
