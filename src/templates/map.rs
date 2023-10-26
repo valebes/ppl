@@ -36,7 +36,6 @@ where
     /// ```
     /// use ppl::{prelude::*, templates::misc::{SourceIter, SinkVec}, templates::map::Map};
     ///
-    /// let mut counter = 1.0;
     /// let numbers: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
     /// let mut vector = Vec::new();
     ///
@@ -721,6 +720,9 @@ where
     fn number_of_replicas(&self) -> usize {
         self.replicas
     }
+    fn is_ordered(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
@@ -731,7 +733,8 @@ mod test {
     use crate::{
         prelude::*,
         templates::{
-            map::OrderedReduce,
+            map::{OrderedReduce, OrderedMapReduce},
+            map::MapReduce,
             misc::{OrderedSinkVec, SinkVec, SourceIter},
         },
     };
@@ -946,6 +949,95 @@ mod test {
             assert_eq!(vec.len(), 1);
             for el in vec {
                 assert_eq!(el, (check, 55));
+            }
+        }
+
+        unsafe {
+            Orchestrator::delete_global_orchestrator();
+        }
+    }
+
+
+    #[test]
+    #[serial]
+    fn summation_of_squares() {
+        let mut counter = 1.0;
+        let mut set = Vec::new();
+
+        for i in 0..100000 {
+            let mut vector = Vec::new();
+            for _i in 0..10 {
+                vector.push((i, counter));
+                counter += 1.0;
+            }
+            counter = 1.0;
+            set.push(vector);
+        }
+
+        let pipe = pipeline![
+            SourceIter::build(set.into_iter()),
+            MapReduce::build(8, 
+            |el: (usize, f64)| -> (usize, f64) {
+                (el.0, el.1 * el.1)
+            },
+            |i, vec| {
+                (i, vec.iter().sum())
+            }),
+            SinkVec::build()
+        ];
+
+        let res: Vec<Vec<(usize, f64)>> = pipe.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 100000);
+
+        for vec in res {
+            assert_eq!(vec.len(), 1);
+            for el in vec {
+                assert_eq!(el.1, 385.00);
+            }
+        }
+
+        unsafe {
+            Orchestrator::delete_global_orchestrator();
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn summation_of_squares_ordered() {
+        let mut counter = 1.0;
+        let mut set = Vec::new();
+
+        for i in 0..100 {
+            let mut vector = Vec::new();
+            for _i in 0..10 {
+                vector.push((i, counter));
+                counter += 1.0;
+            }
+            counter = 1.0;
+            set.push(vector);
+        }
+
+        let pipe = pipeline![
+            SourceIter::build(set.into_iter()),
+            OrderedMapReduce::build(8, 
+            |el: (usize, f64)| -> (usize, f64) {
+                (el.0, el.1 * el.1)
+            },
+            |i, vec| {
+                (i, vec.iter().sum())
+            }),
+            OrderedSinkVec::build()
+        ];
+
+        let res: Vec<Vec<(usize, f64)>> = pipe.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 100);
+
+        for (check, vec) in res.into_iter().enumerate() {
+            assert_eq!(vec.len(), 1);
+            for el in vec {
+                assert_eq!(el, (check, 385.00));
             }
         }
 
