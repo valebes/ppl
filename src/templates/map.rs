@@ -427,7 +427,6 @@ where
     /// In this example we want mantain the order of the input in the output.
     ///
     /// ```
-    ///
     /// use ppl::{prelude::*, templates::misc::{SourceIter, OrderedSinkVec}, templates::map::OrderedReduce};
     ///
     /// // Create the vector of the elements that will be emitted by the Source node.
@@ -536,6 +535,43 @@ where
     /// * `n_worker` - Number of worker threads.
     /// * `f_map` - Function to apply to each element of the input.
     /// * `f_reduce` - Function to apply to the output of the Map.
+    /// 
+    /// # Examples
+    /// 
+    /// Given a vector of vectors, each one containing a set of numbers,
+    /// compute for each vector the square value of each of its elements.
+    /// Furthermore, compute for each vector the summation of all its elements.
+    /// 
+    /// ```
+    /// use ppl::{prelude::*, templates::misc::{SourceIter, SinkVec}, templates::map::MapReduce};
+    /// 
+    /// let mut counter = 1.0;
+    /// let mut set = Vec::new();
+    ///
+    /// for i in 0..100000 {
+    ///     let mut vector = Vec::new();
+    ///     for _i in 0..10 {
+    ///         vector.push((i, counter));
+    ///         counter += 1.0;
+    ///     }
+    ///     counter = 1.0;
+    ///     set.push(vector);
+    /// }
+    /// // Instantiate a new pipeline.
+    /// let pipe = pipeline![
+    ///     SourceIter::build(set.into_iter()),
+    ///     MapReduce::build(8, 
+    ///     |el: (usize, f64)| -> (usize, f64) {
+    ///         (el.0, el.1 * el.1)
+    ///    },
+    ///     |i, vec| {
+    ///         (i, vec.iter().sum())
+    ///     }),
+    ///     SinkVec::build()
+    /// ];
+    ///
+    /// let res: Vec<Vec<(usize, f64)>> = pipe.start_and_wait_end().unwrap();
+    /// ```
     pub fn build<TInIter, TOutIter>(
         n_worker: usize,
         f_map: FMap,
@@ -678,6 +714,52 @@ where
     /// The replicas are created by cloning the OrderedMapReduce node.
     /// This mean that 4 replicas of an OrderedMapReduce node with 2 workers each
     /// will result in the usage of 8 threads.
+    /// 
+    /// # Examples
+    /// 
+    /// Given a vector of vectors, each one containing a set of numbers,
+    /// compute for each vector the square value of each of its elements.
+    /// Furthermore, compute for each vector the summation of all its elements.
+    /// In this example we want mantain the order of the input in the output.
+    /// ```
+    /// use ppl::{prelude::*, templates::misc::{SourceIter, OrderedSinkVec}, templates::map::OrderedMapReduce};
+    /// 
+    /// let mut counter = 1.0;
+    /// let mut set = Vec::new();
+    ///
+    /// for i in 0..100000 {
+    ///     let mut vector = Vec::new();
+    ///     for _i in 0..10 {
+    ///         vector.push((i, counter));
+    ///         counter += 1.0;
+    ///     }
+    ///     counter = 1.0;
+    ///     set.push(vector);
+    /// }
+    /// // Instantiate a new pipeline.
+    /// let pipe = pipeline![
+    ///     SourceIter::build(set.into_iter()),
+    ///     OrderedMapReduce::build_with_replicas(2, 8, 
+    ///     |el: (usize, f64)| -> (usize, f64) {
+    ///         (el.0, el.1 * el.1)
+    ///    },
+    ///     |i, vec| {
+    ///         (i, vec.iter().sum())
+    ///     }),
+    ///     OrderedSinkVec::build()
+    /// ];
+    ///
+    /// let res: Vec<Vec<(usize, f64)>> = pipe.start_and_wait_end().unwrap();
+    /// 
+    /// // We check here also if the order of the input was preserved
+    /// // in the output.
+    /// for (check, vec) in res.into_iter().enumerate() {
+    ///     assert_eq!(vec.len(), 1);
+    ///     for el in vec {
+    ///         assert_eq!(el, (check, 385.00));
+    ///     }
+    /// }
+    /// ```
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
@@ -1008,7 +1090,7 @@ mod test {
         let mut counter = 1.0;
         let mut set = Vec::new();
 
-        for i in 0..100 {
+        for i in 0..100000 {
             let mut vector = Vec::new();
             for _i in 0..10 {
                 vector.push((i, counter));
@@ -1020,7 +1102,7 @@ mod test {
 
         let pipe = pipeline![
             SourceIter::build(set.into_iter()),
-            OrderedMapReduce::build(8, 
+            OrderedMapReduce::build_with_replicas(2, 4, 
             |el: (usize, f64)| -> (usize, f64) {
                 (el.0, el.1 * el.1)
             },
@@ -1032,7 +1114,7 @@ mod test {
 
         let res: Vec<Vec<(usize, f64)>> = pipe.start_and_wait_end().unwrap();
 
-        assert_eq!(res.len(), 100);
+        assert_eq!(res.len(), 100000);
 
         for (check, vec) in res.into_iter().enumerate() {
             assert_eq!(vec.len(), 1);
