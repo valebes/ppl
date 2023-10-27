@@ -442,6 +442,9 @@ where
                                 // If the node is not ordered, then i can send the messages to the next node
                                 // without any order.
                                 loop {
+                                    if tmp.is_empty() {
+                                        break;
+                                    }
                                     let msg = Message {
                                         op: Task::New(tmp.pop_front().unwrap()),
                                         order: 0,
@@ -449,9 +452,6 @@ where
                                     let err = self.next_node.send(msg, counter);
                                     if err.is_err() {
                                         panic!("Error: {}", err.unwrap_err());
-                                    }
-                                    if tmp.is_empty() {
-                                        break;
                                     }
                                 }
                             }

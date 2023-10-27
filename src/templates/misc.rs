@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, collections::VecDeque};
 
 use crate::pipeline::node::{In, InOut, Out};
 
@@ -76,7 +76,8 @@ where
 #[derive(Clone)]
 pub struct Splitter<T> {
     chunk_size: usize,
-    data: Vec<T>,
+    n_replicas: usize,
+    data: VecDeque<T>,
 }
 impl<T> Splitter<T>
 where
@@ -87,7 +88,18 @@ where
     pub fn build(chunk_size: usize) -> impl InOut<Vec<T>, Vec<T>> {
         Self {
             chunk_size,
-            data: Vec::new(),
+            n_replicas: 1,
+            data: VecDeque::new(),
+        }
+    }
+
+    /// Creates a new splitter node with 'n_replicas' replicas of the same node.
+    /// The node will terminate when the upstream terminates.
+    pub fn build_with_replicas(chunk_size: usize, n_replicas: usize) -> impl InOut<Vec<T>, Vec<T>> {
+        Self {
+            chunk_size,
+            n_replicas,
+            data: VecDeque::new(),
         }
     }
 }
@@ -99,13 +111,18 @@ where
         self.data.extend(input);
         None
     }
+    fn number_of_replicas(&self) -> usize {
+        self.n_replicas
+    }
     fn is_producer(&self) -> bool {
         true
     }
     fn produce(&mut self) -> Option<Vec<T>> {
         if self.data.len() >= self.chunk_size {
             let mut chunk = Vec::new();
-            std::mem::swap(&mut chunk, &mut self.data);
+            for _i in 0..self.chunk_size {
+                chunk.push(self.data.pop_front().unwrap())
+            }
             Some(chunk)
         } else {
             None
@@ -121,7 +138,8 @@ where
 #[derive(Clone)]
 pub struct Aggregator<T> {
     chunk_size: usize,
-    data: Vec<T>,
+    n_replicas: usize,
+    data: VecDeque<T>,
 }
 impl<T> Aggregator<T>
 where
@@ -132,7 +150,18 @@ where
     pub fn build(chunk_size: usize) -> impl InOut<T, Vec<T>> {
         Self {
             chunk_size,
-            data: Vec::new(),
+            n_replicas: 1,
+            data: VecDeque::new(),
+        }
+    }
+
+    /// Creates a new aggregator nod with 'n_replicas' replicas of the same node.
+    /// The node will terminate when the upstream terminates.
+    pub fn build_with_replicas(chunk_size: usize, n_replicas: usize) -> impl InOut<T, Vec<T>> {
+        Self {
+            chunk_size,
+            n_replicas,
+            data: VecDeque::new(),
         }
     }
 }
@@ -141,22 +170,21 @@ where
     T: Send + 'static + Clone,
 {
     fn run(&mut self, input: T) -> Option<Vec<T>> {
-        self.data.push(input);
-        if self.data.len() >= self.chunk_size {
-            let mut chunk = Vec::new();
-            std::mem::swap(&mut chunk, &mut self.data);
-            Some(chunk)
-        } else {
-            None
-        }
+        self.data.push_back(input);
+        None
+    }
+    fn number_of_replicas(&self) -> usize {
+        self.n_replicas
     }
     fn is_producer(&self) -> bool {
         true
     }
     fn produce(&mut self) -> Option<Vec<T>> {
-        if !self.data.is_empty() {
+        if self.data.len() >= self.chunk_size {
             let mut chunk = Vec::new();
-            std::mem::swap(&mut chunk, &mut self.data);
+            for _i in 0..self.chunk_size {
+                chunk.push(self.data.pop_front().unwrap())
+            }
             Some(chunk)
         } else {
             None
@@ -342,18 +370,18 @@ where
     }
 }
 
+
 /// OrderedSplitter.
 ///
 /// This node receives a vector, split it into chunks of size `chunk_size`
 /// and send each chunk to the next node.
-/// This is a ordered version of Splitter.
 /// The node will terminate when the upstream terminates.
-/// The node will produce data in the same order as it is received from the upstream.
+/// This node mantains the order of the input in the output.
 #[derive(Clone)]
 pub struct OrderedSplitter<T> {
     chunk_size: usize,
     n_replicas: usize,
-    data: Vec<T>,
+    data: VecDeque<T>,
 }
 impl<T> OrderedSplitter<T>
 where
@@ -361,22 +389,21 @@ where
 {
     /// Creates a new splitter node.
     /// The node will terminate when the upstream terminates.
-    /// The node will produce data in the same order as it is received from the upstream.
     pub fn build(chunk_size: usize) -> impl InOut<Vec<T>, Vec<T>> {
         Self {
             chunk_size,
             n_replicas: 1,
-            data: Vec::new(),
+            data: VecDeque::new(),
         }
     }
+
     /// Creates a new splitter node with 'n_replicas' replicas of the same node.
     /// The node will terminate when the upstream terminates.
-    /// The node will produce data in the same order as it is received from the upstream.
     pub fn build_with_replicas(chunk_size: usize, n_replicas: usize) -> impl InOut<Vec<T>, Vec<T>> {
         Self {
             chunk_size,
             n_replicas,
-            data: Vec::new(),
+            data: VecDeque::new(),
         }
     }
 }
@@ -388,16 +415,18 @@ where
         self.data.extend(input);
         None
     }
-    fn is_producer(&self) -> bool {
-        true
-    }
     fn number_of_replicas(&self) -> usize {
         self.n_replicas
+    }
+    fn is_producer(&self) -> bool {
+        true
     }
     fn produce(&mut self) -> Option<Vec<T>> {
         if self.data.len() >= self.chunk_size {
             let mut chunk = Vec::new();
-            std::mem::swap(&mut chunk, &mut self.data);
+            for _i in 0..self.chunk_size {
+                chunk.push(self.data.pop_front().unwrap())
+            }
             Some(chunk)
         } else {
             None
@@ -408,78 +437,6 @@ where
     }
 }
 
-/// OrderedAggregator.
-///
-/// This node receives elements and accumulates them into a vector.
-/// When the vector reaches the size `chunk_size` it send the vector
-/// with the elements accumulated to the next node.
-/// This is a ordered version of Aggregator.
-/// The node will terminate when the upstream terminates.
-/// The node will produce data in the same order as it is received from the upstream.
-#[derive(Clone)]
-pub struct OrderedAggregator<T> {
-    chunk_size: usize,
-    n_replicas: usize,
-    data: Vec<T>,
-}
-impl<T> OrderedAggregator<T>
-where
-    T: Send + 'static + Clone,
-{
-    /// Creates a new aggregator node.
-    /// The node will terminate when the upstream terminates.
-    /// The node will produce data in the same order as it is received from the upstream.
-    pub fn build(chunk_size: usize) -> impl InOut<T, Vec<T>> {
-        Self {
-            chunk_size,
-            n_replicas: 1,
-            data: Vec::new(),
-        }
-    }
-    /// Creates a new aggregator nod with 'n_replicas' replicas of the same node.
-    /// The node will terminate when the upstream terminates.
-    /// The node will produce data in the same order as it is received from the upstream.
-    pub fn build_with_replicas(chunk_size: usize, n_replicas: usize) -> impl InOut<T, Vec<T>> {
-        Self {
-            chunk_size,
-            n_replicas,
-            data: Vec::new(),
-        }
-    }
-}
-impl<T> InOut<T, Vec<T>> for OrderedAggregator<T>
-where
-    T: Send + 'static + Clone,
-{
-    fn run(&mut self, input: T) -> Option<Vec<T>> {
-        self.data.push(input);
-        if self.data.len() >= self.chunk_size {
-            let mut chunk = Vec::new();
-            std::mem::swap(&mut chunk, &mut self.data);
-            Some(chunk)
-        } else {
-            None
-        }
-    }
-    fn is_producer(&self) -> bool {
-        true
-    }
-    fn produce(&mut self) -> Option<Vec<T>> {
-        if !self.data.is_empty() {
-            let mut chunk = Vec::new();
-            std::mem::swap(&mut chunk, &mut self.data);
-            Some(chunk)
-        } else {
-            None
-        }
-    }
-    fn number_of_replicas(&self) -> usize {
-        self.n_replicas
-    }
-    fn is_ordered(&self) -> bool {
-        true
-    }
-}
 
 /// OrderedSequential.
 ///
@@ -620,5 +577,152 @@ where
     }
     fn number_of_replicas(&self) -> usize {
         self.n_replicas
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use serial_test::serial;
+    use crate::{
+        prelude::*,
+        templates::misc::{SinkVec, SourceIter, Sequential, OrderedSinkVec, OrderedSequential, Parallel, OrderedParallel, OrderedSplitter},
+    };
+
+    use super::{Splitter, Aggregator};
+
+    #[test]
+    #[serial]
+    fn simple_pipeline() {
+        let p = pipeline![
+            SourceIter::build(1..21),
+            Sequential::build(|el| { el /*println!("Hello, received: {}", el); */ }),
+            SinkVec::build()
+        ];
+
+        let res = p.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 20)
+    }
+
+    #[test]
+    #[serial]
+    fn simple_pipeline_ordered() {
+        let p = pipeline![
+            SourceIter::build(1..21),
+            OrderedSequential::build(|el| { el /*println!("Hello, received: {}", el); */ }),
+            OrderedSinkVec::build()
+        ];
+
+        let res = p.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 20);
+
+        let mut counter = 1;
+        for el in res {
+            assert_eq!(el, counter);
+            counter += 1;        }
+    }
+
+    #[test]
+    #[serial]
+    fn simple_farm() {
+        let p = pipeline![
+            SourceIter::build(1..21),
+            Parallel::build(8, |el| { el /*println!("Hello, received: {}", el); */ }),
+            SinkVec::build()
+        ];
+
+        let res = p.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 20)
+    }
+
+    #[test]
+    #[serial]
+    fn simple_farm_ordered() {
+        let p = pipeline![
+            SourceIter::build(1..21),
+            OrderedParallel::build(8, |el| { el /*println!("Hello, received: {}", el); */ }),
+            OrderedSinkVec::build()
+        ];
+
+        let res = p.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 20);
+
+        let mut counter = 1;
+        for el in res {
+            assert_eq!(el, counter);
+            counter += 1;        }
+    }
+
+    #[test]
+    #[serial]
+    fn splitter() {
+        let mut counter = 1;
+        let mut set = Vec::new();
+
+        for i in 0..1000 {
+            let mut vector = Vec::new();
+            for _i in 0..20 {
+                vector.push((i, counter));
+                counter += 1;
+            }
+            counter = 1;
+            set.push(vector);
+        }
+
+        let p = pipeline![
+            SourceIter::build(set.into_iter()),
+            Splitter::build(2),
+            Splitter::build(20000),
+            SinkVec::build()
+        ];
+
+        let mut res = p.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 1);
+
+        let vec = res.pop().unwrap();
+        
+        assert_eq!(vec.len(), 20000)
+    }
+
+    #[test]
+    #[serial]
+    fn splitter_ordered() {
+        let mut counter = 1;
+        let mut set = Vec::new();
+
+        for _i in 0..1000 {
+            let mut vector = Vec::new();
+            for _i in 0..20 {
+                vector.push(counter);
+                counter += 1;
+            }
+            set.push(vector);
+        }
+
+        let p = pipeline![
+            SourceIter::build(set.into_iter()),
+            OrderedSplitter::build_with_replicas(2, 2),
+            OrderedSplitter::build_with_replicas(4, 1),
+            OrderedSplitter::build(20000),
+            OrderedSinkVec::build()
+        ];
+
+        let mut res = p.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 1);
+
+        let vec = res.pop().unwrap();
+        
+        assert_eq!(vec.len(), 20000);
+
+        counter = 1;
+        for el in vec {
+            assert_eq!(el, counter);
+            counter += 1;
+        }
     }
 }
