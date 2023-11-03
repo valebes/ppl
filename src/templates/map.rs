@@ -535,16 +535,16 @@ where
     /// * `n_worker` - Number of worker threads.
     /// * `f_map` - Function to apply to each element of the input.
     /// * `f_reduce` - Function to apply to the output of the Map.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// Given a vector of vectors, each one containing a set of numbers,
     /// compute for each vector the square value of each of its elements.
     /// Furthermore, compute for each vector the summation of all its elements.
-    /// 
+    ///
     /// ```
     /// use ppl::{prelude::*, templates::misc::{SourceIter, SinkVec}, templates::map::MapReduce};
-    /// 
+    ///
     /// let mut counter = 1.0;
     /// let mut set = Vec::new();
     ///
@@ -560,7 +560,7 @@ where
     /// // Instantiate a new pipeline.
     /// let pipe = pipeline![
     ///     SourceIter::build(set.into_iter()),
-    ///     MapReduce::build(8, 
+    ///     MapReduce::build(8,
     ///     |el: (usize, f64)| -> (usize, f64) {
     ///         (el.0, el.1 * el.1)
     ///    },
@@ -714,16 +714,16 @@ where
     /// The replicas are created by cloning the OrderedMapReduce node.
     /// This mean that 4 replicas of an OrderedMapReduce node with 2 workers each
     /// will result in the usage of 8 threads.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// Given a vector of vectors, each one containing a set of numbers,
     /// compute for each vector the square value of each of its elements.
     /// Furthermore, compute for each vector the summation of all its elements.
     /// In this example we want mantain the order of the input in the output.
     /// ```
     /// use ppl::{prelude::*, templates::misc::{SourceIter, OrderedSinkVec}, templates::map::OrderedMapReduce};
-    /// 
+    ///
     /// let mut counter = 1.0;
     /// let mut set = Vec::new();
     ///
@@ -739,7 +739,7 @@ where
     /// // Instantiate a new pipeline.
     /// let pipe = pipeline![
     ///     SourceIter::build(set.into_iter()),
-    ///     OrderedMapReduce::build_with_replicas(2, 8, 
+    ///     OrderedMapReduce::build_with_replicas(2, 8,
     ///     |el: (usize, f64)| -> (usize, f64) {
     ///         (el.0, el.1 * el.1)
     ///    },
@@ -750,7 +750,7 @@ where
     /// ];
     ///
     /// let res: Vec<Vec<(usize, f64)>> = pipe.start_and_wait_end().unwrap();
-    /// 
+    ///
     /// // We check here also if the order of the input was preserved
     /// // in the output.
     /// for (check, vec) in res.into_iter().enumerate() {
@@ -815,8 +815,8 @@ mod test {
     use crate::{
         prelude::*,
         templates::{
-            map::{OrderedReduce, OrderedMapReduce},
             map::MapReduce,
+            map::{OrderedMapReduce, OrderedReduce},
             misc::{OrderedSinkVec, SinkVec, SourceIter},
         },
     };
@@ -1039,7 +1039,6 @@ mod test {
         }
     }
 
-
     #[test]
     #[serial]
     fn summation_of_squares() {
@@ -1058,13 +1057,11 @@ mod test {
 
         let pipe = pipeline![
             SourceIter::build(set.into_iter()),
-            MapReduce::build(8, 
-            |el: (usize, f64)| -> (usize, f64) {
-                (el.0, el.1 * el.1)
-            },
-            |i, vec| {
-                (i, vec.iter().sum())
-            }),
+            MapReduce::build(
+                8,
+                |el: (usize, f64)| -> (usize, f64) { (el.0, el.1 * el.1) },
+                |i, vec| { (i, vec.iter().sum()) }
+            ),
             SinkVec::build()
         ];
 
@@ -1102,13 +1099,12 @@ mod test {
 
         let pipe = pipeline![
             SourceIter::build(set.into_iter()),
-            OrderedMapReduce::build_with_replicas(2, 4, 
-            |el: (usize, f64)| -> (usize, f64) {
-                (el.0, el.1 * el.1)
-            },
-            |i, vec| {
-                (i, vec.iter().sum())
-            }),
+            OrderedMapReduce::build_with_replicas(
+                2,
+                4,
+                |el: (usize, f64)| -> (usize, f64) { (el.0, el.1 * el.1) },
+                |i, vec| { (i, vec.iter().sum()) }
+            ),
             OrderedSinkVec::build()
         ];
 
