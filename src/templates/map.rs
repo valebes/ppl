@@ -646,7 +646,7 @@ where
     }
 }
 
-/// Ordered Map Reduce
+/// Ordered MapReduce
 ///
 /// Nodes of this type are composed of a Map and a Reduce.
 /// The Map is applied to each element of the input, and the Reduce is applied to the output of the Map.

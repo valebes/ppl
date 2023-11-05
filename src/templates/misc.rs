@@ -55,9 +55,6 @@ where
 /// SinkVec.
 ///
 /// Sink node that accumulates data into a vector.
-/// The sink will terminate when the upstream terminates.
-/// The sink will produce as result a vector containing all the data received
-/// from the upstream.
 pub struct SinkVec<T> {
     data: Vec<T>,
 }
@@ -108,7 +105,6 @@ where
 ///
 /// This node receives a vector, split it into chunks of size `chunk_size`
 /// and send each chunk to the next node.
-/// The node will terminate when the upstream terminates.
 #[derive(Clone)]
 pub struct Splitter<T> {
     chunk_size: usize,
@@ -188,7 +184,6 @@ where
 ///
 /// This node receives elements and accumulates them into a vector.
 /// When the vector reaches the size `chunk_size` it send the vector with the elements accumulated to the next node.
-/// The node will terminate when the upstream terminates.
 #[derive(Clone)]
 pub struct Aggregator<T> {
     chunk_size: usize,
@@ -199,7 +194,7 @@ impl<T> Aggregator<T>
 where
     T: Send + 'static + Clone,
 {
-    /// Creates a new aggregator node
+    /// Creates a new aggregator node.
     /// The node will terminate when the upstream terminates.
     ///
     /// # Examples
@@ -225,7 +220,7 @@ where
         }
     }
 
-    /// Creates a new aggregator nod with 'n_replicas' replicas of the same node.
+    /// Creates a new aggregator node with 'n_replicas' replicas of the same node.
     /// The node will terminate when the upstream terminates.
     pub fn build_with_replicas(n_replicas: usize, chunk_size: usize) -> impl InOut<T, Vec<T>> {
         Self {
@@ -348,7 +343,6 @@ where
 /// Filter.
 ///
 /// This node receives elements and filters them according to the given predicate.
-/// The node will terminate when the upstream terminates.
 #[derive(Clone)]
 pub struct Filter<T, F>
 where
@@ -421,8 +415,7 @@ where
 /// OrderedSinkVec.
 ///
 /// Sink node that accumulates data into a vector.
-/// This is a ordered version of SinkVec.
-/// The sink will terminate when the upstream terminates.
+/// This is an ordered version of [`SinkVec`].
 /// The sink will produce a vector containing all the data received in the same order
 /// as it was received from the upstream.
 pub struct OrderedSinkVec<T> {
@@ -432,11 +425,8 @@ impl<T> OrderedSinkVec<T>
 where
     T: Send + 'static,
 {
-    /// Creates a new sink that accumulates data into a vector.
-    /// This is a ordered version of SinkVec.
+    /// Creates a new ordered sink that accumulates data into a vector.
     /// The sink will terminate when the upstream terminates.
-    /// The sink will produce a vector containing all the data received in the same order
-    /// as it was received from the upstream.
     pub fn build() -> impl In<T, Vec<T>> {
         Self { data: Vec::new() }
     }
@@ -460,7 +450,7 @@ where
 ///
 /// This node receives a vector, split it into chunks of size `chunk_size`
 /// and send each chunk to the next node.
-/// The node will terminate when the upstream terminates.
+/// This is an ordered versione of [`Splitter`].
 /// This node mantains the order of the input in the output.
 #[derive(Clone)]
 pub struct OrderedSplitter<T> {
@@ -526,7 +516,7 @@ where
 ///
 /// This node receives elements and accumulates them into a vector.
 /// When the vector reaches the size `chunk_size` it send the vector with the elements accumulated to the next node.
-/// The node will terminate when the upstream terminates.
+/// This is an ordered version of [`Aggregator`].
 /// This node mantains the order of the input in the output.
 #[derive(Clone)]
 pub struct OrderedAggregator<T> {
@@ -591,8 +581,7 @@ where
 /// OrderedSequential.
 ///
 /// This node receives elements and applies a function to each element.
-/// This is a ordered version of Sequential.
-/// The node will terminate when the upstream terminates.
+/// This is an ordered version of [`Sequential`].
 /// The node will produce data in the same order as it is received from the upstream.
 #[derive(Clone)]
 pub struct OrderedSequential<T, U, F> {
@@ -607,7 +596,6 @@ where
 {
     /// Creates a new sequential node.
     /// The node will terminate when the upstream terminates.
-    /// The node will produce data in the same order as it is received from the upstream.
     pub fn build(f: F) -> impl InOut<T, U> {
         Self {
             f,
@@ -632,8 +620,7 @@ where
 /// OrderedParallel.
 ///
 /// This node receives elements and applies a function to each element.
-/// This is a ordered version of Parallel.
-/// The node will terminate when the upstream terminates.
+/// This is an ordered version of [`Parallel`].
 /// The node will produce data in the same order as it is received from the upstream.
 #[derive(Clone)]
 pub struct OrderedParallel<T, U, F> {
@@ -649,7 +636,6 @@ where
 {
     /// Creates a new parallel node.
     /// The node will terminate when the upstream terminates.
-    /// The node will produce data in the same order as it is received from the upstream.
     pub fn build(n_replicas: usize, f: F) -> impl InOut<T, U> {
         Self {
             f,
@@ -678,8 +664,7 @@ where
 /// OrderedFilter.
 ///
 /// This node receives elements and filters them according to a predicate.
-/// This is a ordered version of Filter.
-/// The node will terminate when the upstream terminates.
+/// This is an ordered version of [`Filter`].
 #[derive(Clone)]
 pub struct OrderedFilter<T, F> {
     f: F,
