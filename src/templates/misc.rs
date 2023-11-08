@@ -19,6 +19,10 @@ where
 {
     /// Creates a new source from any type that implements the `Iterator` trait.
     /// The source will terminate when the iterator is exhausted.
+    /// 
+    /// # Arguments
+    /// * `iterator` - Type that implements the [`Iterator`] trait
+    /// and represents the stream of data we want emit.
     ///
     /// # Examples
     ///
@@ -63,8 +67,8 @@ where
     T: Send + 'static,
 {
     /// Creates a new sink that accumulates data into a vector.
-    /// The sink will terminate when the upstream terminates.
-    /// The sink will produce a vector containing all the data received.
+    /// The sink will terminate when the stream terminates, producing
+    /// a vector containing all the data received.
     ///    
     /// # Examples
     ///
@@ -116,8 +120,10 @@ where
     T: Send + 'static + Clone,
 {
     /// Creates a new splitter node.
-    /// The node will terminate when the upstream terminates.
     ///
+    /// # Arguments
+    /// * `chunk_size` - Number of elements for each chunk.
+    /// 
     /// # Examples
     /// Given a stream of numbers, we create a pipeline with a splitter that
     /// create vectors of two elements each.
@@ -144,7 +150,10 @@ where
     }
 
     /// Creates a new splitter node with 'n_replicas' replicas of the same node.
-    /// The node will terminate when the upstream terminates.
+    ///     
+    /// # Arguments
+    /// * `n_replicas` - Number of replicas.
+    /// * `chunk_size` - Number of elements for each chunk.
     pub fn build_with_replicas(n_replicas: usize, chunk_size: usize) -> impl InOut<Vec<T>, Vec<T>> {
         Self {
             chunk_size,
@@ -195,7 +204,9 @@ where
     T: Send + 'static + Clone,
 {
     /// Creates a new aggregator node.
-    /// The node will terminate when the upstream terminates.
+    /// 
+    /// # Arguments
+    /// * `chunk_size` - Number of elements for each chunk.
     ///
     /// # Examples
     /// Given a stream of numbers, we use an [`Aggregator`] template to
@@ -221,7 +232,10 @@ where
     }
 
     /// Creates a new aggregator node with 'n_replicas' replicas of the same node.
-    /// The node will terminate when the upstream terminates.
+    /// 
+    /// # Arguments
+    /// * `n_replicas` - Number of replicas.
+    /// * `chunk_size` - Number of elements for each chunk.
     pub fn build_with_replicas(n_replicas: usize, chunk_size: usize) -> impl InOut<T, Vec<T>> {
         Self {
             chunk_size,
@@ -259,7 +273,7 @@ where
 
 /// Sequential node.
 ///
-/// Given a function that defines the logic of the stage, this method will create a stage with one replica.
+/// Given a function that defines the logic of the node, this method will create a node with one replica.
 #[derive(Clone)]
 pub struct Sequential<T, U, F>
 where
@@ -277,7 +291,10 @@ where
     F: FnMut(T) -> U + Send + 'static + Clone,
 {
     /// Creates a new sequential node.
-    /// The node will terminate when the upstream terminates.
+    /// 
+    /// # Arguments
+    /// * `f` - Function name or lambda function that specify the logic
+    /// of this node.
     pub fn build(f: F) -> impl InOut<T, U> {
         Self {
             f,
@@ -298,7 +315,7 @@ where
 
 /// Parallel node.
 ///
-/// Given a function that defines the logic of the stage, this method will create 'n_replicas' replicas of that stage.
+/// Given a function that defines the logic of the node, this method will create 'n_replicas' replicas of that node.
 #[derive(Clone)]
 pub struct Parallel<T, U, F>
 where
@@ -316,8 +333,12 @@ where
     U: Send + 'static + Clone,
     F: FnMut(T) -> U + Send + 'static + Clone,
 {
-    /// Creates a new parallel node
-    /// The node will terminate when the upstream terminates.
+    /// Creates a new parallel node.
+    /// 
+    /// # Arguments
+    /// * `n_replicas` - Number of replicas.
+    /// * `f` - Function name or lambda function that specify the logic
+    /// of this node.
     pub fn build(n_replicas: usize, f: F) -> impl InOut<T, U> {
         Self {
             n_replicas,
@@ -359,7 +380,10 @@ where
     F: FnMut(&T) -> bool + Send + 'static + Clone,
 {
     /// Creates a new filter node.
-    /// The node will terminate when the upstream terminates.
+    /// 
+    /// # Arguments
+    /// * `f` - Function name or lambda function that represent the predicate
+    /// function we want to apply.
     ///
     /// # Examples
     /// Given a set of numbers from 0 to 199, we use a [`Filter`]
@@ -384,7 +408,11 @@ where
         }
     }
     /// Creates a new filter node with 'n_replicas' replicas of the same node.
-    /// The node will terminate when the upstream terminates.
+    ///     
+    /// # Arguments
+    /// * `n_replicas` - Number of replicas.
+    /// * `f` - Function name or lambda function that represent the predicate
+    /// function we want to apply.
     pub fn build_with_replicas(n_replicas: usize, f: F) -> impl InOut<T, T> {
         Self {
             f,
@@ -417,7 +445,7 @@ where
 /// Sink node that accumulates data into a vector.
 /// This is an ordered version of [`SinkVec`].
 /// The sink will produce a vector containing all the data received in the same order
-/// as it was received from the upstream.
+/// as it was received.
 pub struct OrderedSinkVec<T> {
     data: Vec<T>,
 }
@@ -425,8 +453,9 @@ impl<T> OrderedSinkVec<T>
 where
     T: Send + 'static,
 {
-    /// Creates a new ordered sink that accumulates data into a vector.
-    /// The sink will terminate when the upstream terminates.
+    /// Creates a new sink that accumulates data into a vector.
+    /// The sink will terminate when the stream terminates, producing
+    /// a vector containing all the data received.
     pub fn build() -> impl In<T, Vec<T>> {
         Self { data: Vec::new() }
     }
@@ -463,7 +492,8 @@ where
     T: Send + 'static + Clone,
 {
     /// Creates a new ordered splitter node.
-    /// The node will terminate when the upstream terminates.
+    /// # Arguments
+    /// * `chunk_size` - Number of elements for each chunk.
     pub fn build(chunk_size: usize) -> impl InOut<Vec<T>, Vec<T>> {
         Self {
             chunk_size,
@@ -473,7 +503,9 @@ where
     }
 
     /// Creates a new ordered splitter node with 'n_replicas' replicas of the same node.
-    /// The node will terminate when the upstream terminates.
+    /// # Arguments
+    /// * `n_replicas` - Number of replicas.
+    /// * `chunk_size` - Number of elements for each chunk.
     pub fn build_with_replicas(n_replicas: usize, chunk_size: usize) -> impl InOut<Vec<T>, Vec<T>> {
         Self {
             chunk_size,
@@ -529,7 +561,9 @@ where
     T: Send + 'static + Clone,
 {
     /// Creates a new ordered aggregator node
-    /// The node will terminate when the upstream terminates.
+    /// 
+    /// # Arguments
+    /// * `chunk_size` - Number of elements for each chunk.
     pub fn build(chunk_size: usize) -> impl InOut<T, Vec<T>> {
         Self {
             chunk_size,
@@ -539,7 +573,9 @@ where
     }
 
     /// Creates a new ordered aggregator nod with 'n_replicas' replicas of the same node.
-    /// The node will terminate when the upstream terminates.
+    /// # Arguments
+    /// * `n_replicas` - Number of replicas.
+    /// * `chunk_size` - Number of elements for each chunk.
     pub fn build_with_replicas(n_replicas: usize, chunk_size: usize) -> impl InOut<T, Vec<T>> {
         Self {
             chunk_size,
@@ -595,7 +631,9 @@ where
     F: FnMut(T) -> U + Send + 'static + Clone,
 {
     /// Creates a new sequential node.
-    /// The node will terminate when the upstream terminates.
+    /// # Arguments
+    /// * `f` - Function name or lambda function that specify the logic
+    /// of this node.
     pub fn build(f: F) -> impl InOut<T, U> {
         Self {
             f,
@@ -635,7 +673,10 @@ where
     F: FnMut(T) -> U + Send + 'static + Clone,
 {
     /// Creates a new parallel node.
-    /// The node will terminate when the upstream terminates.
+    /// # Arguments
+    /// * `n_replicas` - Number of replicas.
+    /// * `f` - Function name or lambda function that specify the logic
+    /// of this node.
     pub fn build(n_replicas: usize, f: F) -> impl InOut<T, U> {
         Self {
             f,
@@ -677,7 +718,9 @@ where
     F: FnMut(&T) -> bool + Send + 'static + Clone,
 {
     /// Creates a new filter node.
-    /// The node will terminate when the upstream terminates.
+    /// # Arguments
+    /// * `f` - Function name or lambda function that represent the predicate
+    /// function we want to apply.
     pub fn build(f: F) -> impl InOut<T, T> {
         Self {
             f,
@@ -686,7 +729,10 @@ where
         }
     }
     /// Creates a new filter node.
-    /// The node will terminate when the upstream terminates.
+    /// # Arguments
+    /// * `n_replicas` - Number of replicas.
+    /// * `f` - Function name or lambda function that represent the predicate
+    /// function we want to apply.
     pub fn build_with_replicas(n_replicas: usize, f: F) -> impl InOut<T, T> {
         Self {
             f,
