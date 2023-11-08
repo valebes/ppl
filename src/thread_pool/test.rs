@@ -150,6 +150,23 @@ fn test_par_map_reduce() {
 
 #[test]
 #[serial]
+fn test_par_reduce() {
+    let mut pool = ThreadPool::new();
+
+    let mut vec = Vec::new();
+    for i in 0..100 {
+        vec.push((i % 10, i));
+    }
+
+    let res: Vec<(i32, i32)> = pool
+        .par_reduce(vec, |k, v| -> (i32, i32) { (k, v.iter().sum()) })
+        .collect();
+
+    assert_eq!(res.len(), 10);
+}
+
+#[test]
+#[serial]
 fn test_par_map_reduce_seq() {
     let mut vec = Vec::new();
     let mut tp = ThreadPool::new();
@@ -203,7 +220,6 @@ fn test_simple_map() {
     let mut counter = 1.0;
     let mut numbers: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
 
-    // Transform the vec of integers into a vec of strings
     let res: Vec<f64> = pool.par_map(&mut numbers, |el| square(*el)).collect();
 
     for el in res {
