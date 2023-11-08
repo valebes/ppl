@@ -222,9 +222,9 @@ impl ThreadPool {
 
     /// Create a new thread pool.
     /// If the environment variable `PPL_MAX_CORES` is set, the capacity of the thread
-    /// pool is set to that value. Otherwise, the number of logical threads available 
+    /// pool is set to that value. Otherwise, the number of logical threads available
     /// on the host machine is used instead.
-    /// 
+    ///
     ///
     /// # Examples
     ///
@@ -554,4 +554,3 @@ impl<'pool, 'scope> Scope<'pool, 'scope> {
         self.pool.execute(task);
     }
 }
-

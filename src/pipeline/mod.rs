@@ -110,7 +110,7 @@ where
 macro_rules! propagate {
     ($s1:expr) => {
         {
-            let mut block = InNode::new(Box::new($s1), get_global_orchestrator());
+            let block = InNode::new(Box::new($s1), get_global_orchestrator());
             block
         }
     };
@@ -118,7 +118,7 @@ macro_rules! propagate {
     ($s1:expr $(, $tail:expr)*) => {
         {
             let node = ($s1);
-            let mut block = InOutNode::new(Box::new(node),
+            let block = InOutNode::new(Box::new(node),
                 propagate!($($tail),*),
                 get_global_orchestrator());
             block
@@ -168,10 +168,10 @@ macro_rules! pipeline {
     ($s1:expr $(, $tail:expr)*) => {
         {
             let orchestrator = get_global_orchestrator();
-            let mut block = OutNode::new(Box::new($s1),
+            let block = OutNode::new(Box::new($s1),
                 propagate!($($tail),*), orchestrator);
 
-            let mut pipeline = Pipeline::new(block);
+            let pipeline = Pipeline::new(block);
             pipeline
         }
     };

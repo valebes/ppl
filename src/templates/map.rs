@@ -26,6 +26,32 @@ where
     /// # Arguments
     /// * `n_worker` - Number of worker threads.
     /// * `f` - Function to apply to each element of the input.
+    ///
+    /// # Examples
+    ///
+    /// Given a vector of vectors, each one containing a set of numbers,
+    /// compute the square value of each number contained in each
+    /// vector.
+    ///
+    /// ```
+    /// use ppl::{prelude::*, templates::misc::{SourceIter, SinkVec}, templates::map::Map};
+    ///
+    /// let numbers: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+    /// let mut vector = Vec::new();
+    ///
+    /// // Create the vector of vectors.
+    /// for _i in 0..1000 {
+    ///     vector.push(numbers.clone());
+    /// }
+    /// // Instantiate a new Pipeline with a Map operator.
+    /// let pipe = pipeline![
+    ///     SourceIter::build(vector.into_iter()),
+    ///     Map::build(4, |el: f64| el * el),
+    ///     SinkVec::build()
+    /// ];
+    /// // Start the pipeline and collect the results.
+    /// let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+    /// ```
     pub fn build<TInIter, TOutIter>(n_worker: usize, f: F) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = TIn>,
@@ -48,6 +74,8 @@ where
     /// Panics if n_replicas is 0.
     /// # Remarks
     /// The replicas are created by cloning the Map node.
+    /// This mean that 4 replicas of a Map node with 2 workers each
+    /// will result in the usage of 8 threads.
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
@@ -128,6 +156,47 @@ where
     /// * `f` - Function to apply to each element of the input.
     /// # Panics
     /// Panics if n_replicas is 0.
+    /// # Remarks
+    /// The replicas are created by cloning the OrderedMap node.
+    /// This mean that 4 replicas of an Ordered Map node with 2 workers each
+    /// will result in the usage of 8 threads.
+    ///
+    /// # Examples
+    ///
+    /// Given a vector of vectors, each one containing a set of numbers,
+    /// compute the square value of each number contained in each
+    /// vector.
+    /// In this case, using the OrderedMap template, it is possible
+    /// to mantain the order of the input in the output.
+    /// Moreover, using the `build_with_replicas` method,
+    /// we can create a stage consisting of four map operator,
+    /// each one composed by 2 worker.
+    ///
+    /// ```
+    /// use ppl::{prelude::*, templates::misc::{SourceIter, OrderedSinkVec}, templates::map::OrderedMap};
+    /// let mut counter = 1.0;
+    /// let mut vector = Vec::new();
+    ///
+    /// // Create a vector of vectors, each one containing a set of numbers.
+    /// for _i in 0..1000{
+    ///    let mut numbers = Vec::new();
+    ///    for _i in 0..10 {
+    ///        numbers.push(counter);
+    ///        counter += 1.0;
+    ///    }
+    ///   vector.push(numbers);
+    /// }
+    ///
+    /// // Instantiate the pipeline.
+    /// let pipe = pipeline![
+    ///     SourceIter::build(vector.into_iter()),
+    ///     OrderedMap::build_with_replicas(4, 2, |el: f64| el * el),
+    ///     OrderedSinkVec::build()
+    /// ];
+    ///
+    /// // Start the pipeline and collect the results.
+    /// let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+    /// ```
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
@@ -193,6 +262,48 @@ where
     /// # Arguments
     /// * `n_worker` - Number of worker threads.
     /// * `f` - Function to apply to each element of the input.
+    ///
+    /// # Examples
+    ///
+    /// Given a collection of vectors of integers, for each vector
+    /// compute the summation of its elements.
+    /// As this reduce function works by grouping by key,
+    /// the input of the reduce function must be a vector of tuple (key, value).
+    ///
+    /// ```
+    ///
+    /// use ppl::{prelude::*, templates::misc::{SourceIter, SinkVec}, templates::map::Reduce};
+    ///
+    /// // Create the vector of the elements that will be emitted by the Source node.
+    ///  // vec![(key,value)]
+    /// let vector = vec![
+    ///     vec![(0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0 ,10)],
+    ///     vec![(0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0 ,10)],
+    ///     vec![(0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0 ,10)],
+    /// ];
+    ///
+    /// // Instantiate a new pipeline.
+    /// let pipe = pipeline![
+    ///     SourceIter::build(vector.into_iter()),
+    ///     Reduce::build(4, |i, vec| -> (i32, i32) {
+    ///         (i, vec.iter().sum())
+    ///     }),
+    ///     SinkVec::build()
+    /// ];
+    ///
+    /// // Start the pipeline and wait for the results.
+    /// let res: Vec<Vec<(i32, i32)>> = pipe.start_and_wait_end().unwrap();
+    ///
+    /// // Collect a results for each vector emitted by the Source. In our case we had 3 vectors.
+    /// assert_eq!(res.len(), 3);
+    ///
+    /// // As for each vector emitted we had only one key, we obtain only one result tuple
+    /// // for vector.
+    /// for vec in res {
+    ///    for el in vec {
+    ///         assert_eq!(el.1, 55);
+    ///     }
+    /// }
     pub fn build<TInIter, TOutIter>(n_worker: usize, f: F) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = (TKey, TIn)>,
@@ -213,6 +324,10 @@ where
     /// * `f` - Function to apply to each element of the input.
     /// # Panics
     /// Panics if n_replicas is 0.
+    /// # Remarks
+    /// The replicas are created by cloning the Reduce node.
+    /// This mean that 4 replicas of a Reduce node with 2 workers each
+    /// will result in the usage of 8 threads.
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
@@ -298,6 +413,53 @@ where
     /// * `f` - Function to apply to each element of the input.
     /// # Panics
     /// Panics if n_replicas is 0.
+    /// # Remarks
+    /// The replicas are created by cloning the OrderedReduce node.
+    /// This mean that 4 replicas of an OrderedReduce node with 2 workers each
+    /// will result in the usage of 8 threads.
+    ///
+    /// # Examples
+    ///
+    /// Given a collection of vectors of integers, for each vector
+    /// compute the summation of its elements.
+    /// As this reduce function works by grouping by key,
+    /// the input of the reduce function must be a vector of tuple (key, value).
+    /// In this example we want mantain the order of the input in the output.
+    ///
+    /// ```
+    /// use ppl::{prelude::*, templates::misc::{SourceIter, OrderedSinkVec}, templates::map::OrderedReduce};
+    ///
+    /// // Create the vector of the elements that will be emitted by the Source node.
+    ///  // vec![(key,value)]
+    /// let vector = vec![
+    ///     vec![(0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0 ,10)],
+    ///     vec![(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1 ,10)],
+    ///     vec![(2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9), (2 ,10)],
+    /// ];
+    ///
+    /// // Instantiate a new pipeline.
+    /// let pipe = pipeline![
+    ///     SourceIter::build(vector.into_iter()),
+    ///     OrderedReduce::build_with_replicas(2, 4, |i, vec| -> (usize, i32) {
+    ///         (i, vec.iter().sum())
+    ///     }),
+    ///     OrderedSinkVec::build()
+    /// ];
+    ///
+    /// // Start the pipeline and wait for the results.
+    /// let res: Vec<Vec<(usize, i32)>> = pipe.start_and_wait_end().unwrap();
+    ///
+    /// // Collect a results for each vector emitted by the Source. In our case we had 3 vectors.
+    /// assert_eq!(res.len(), 3);
+    ///
+    /// // As for each vector emitted we had only one key, we obtain only one result tuple
+    /// // for vector. Moreover, we check here also if the order of the input was preserved
+    /// // in the output.
+    /// for (check, vec) in res.into_iter().enumerate() {
+    ///     for el in vec {
+    ///         assert_eq!(el, (check, 55));
+    ///     }
+    /// }
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
@@ -373,6 +535,43 @@ where
     /// * `n_worker` - Number of worker threads.
     /// * `f_map` - Function to apply to each element of the input.
     /// * `f_reduce` - Function to apply to the output of the Map.
+    ///
+    /// # Examples
+    ///
+    /// Given a vector of vectors, each one containing a set of numbers,
+    /// compute for each vector the square value of each of its elements.
+    /// Furthermore, compute for each vector the summation of all its elements.
+    ///
+    /// ```
+    /// use ppl::{prelude::*, templates::misc::{SourceIter, SinkVec}, templates::map::MapReduce};
+    ///
+    /// let mut counter = 1.0;
+    /// let mut set = Vec::new();
+    ///
+    /// for i in 0..100000 {
+    ///     let mut vector = Vec::new();
+    ///     for _i in 0..10 {
+    ///         vector.push((i, counter));
+    ///         counter += 1.0;
+    ///     }
+    ///     counter = 1.0;
+    ///     set.push(vector);
+    /// }
+    /// // Instantiate a new pipeline.
+    /// let pipe = pipeline![
+    ///     SourceIter::build(set.into_iter()),
+    ///     MapReduce::build(8,
+    ///     |el: (usize, f64)| -> (usize, f64) {
+    ///         (el.0, el.1 * el.1)
+    ///    },
+    ///     |i, vec| {
+    ///         (i, vec.iter().sum())
+    ///     }),
+    ///     SinkVec::build()
+    /// ];
+    ///
+    /// let res: Vec<Vec<(usize, f64)>> = pipe.start_and_wait_end().unwrap();
+    /// ```
     pub fn build<TInIter, TOutIter>(
         n_worker: usize,
         f_map: FMap,
@@ -399,6 +598,10 @@ where
     /// * `f_reduce` - Function to apply to the output of the Map.
     /// # Panics
     /// Panics if n_replicas is 0.
+    /// # Remarks
+    /// The replicas are created by cloning the MapReduce node.
+    /// This mean that 4 replicas of a MapReduce node with 2 workers each
+    /// will result in the usage of 8 threads.
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         f_map: FMap,
@@ -443,7 +646,7 @@ where
     }
 }
 
-/// Ordered Map Reduce
+/// Ordered MapReduce
 ///
 /// Nodes of this type are composed of a Map and a Reduce.
 /// The Map is applied to each element of the input, and the Reduce is applied to the output of the Map.
@@ -507,6 +710,56 @@ where
     /// * `f_reduce` - Function to apply to the output of the Map.
     /// # Panics
     /// Panics if n_replicas is 0.
+    /// # Remarks
+    /// The replicas are created by cloning the OrderedMapReduce node.
+    /// This mean that 4 replicas of an OrderedMapReduce node with 2 workers each
+    /// will result in the usage of 8 threads.
+    ///
+    /// # Examples
+    ///
+    /// Given a vector of vectors, each one containing a set of numbers,
+    /// compute for each vector the square value of each of its elements.
+    /// Furthermore, compute for each vector the summation of all its elements.
+    /// In this example we want mantain the order of the input in the output.
+    /// ```
+    /// use ppl::{prelude::*, templates::misc::{SourceIter, OrderedSinkVec}, templates::map::OrderedMapReduce};
+    ///
+    /// let mut counter = 1.0;
+    /// let mut set = Vec::new();
+    ///
+    /// for i in 0..100000 {
+    ///     let mut vector = Vec::new();
+    ///     for _i in 0..10 {
+    ///         vector.push((i, counter));
+    ///         counter += 1.0;
+    ///     }
+    ///     counter = 1.0;
+    ///     set.push(vector);
+    /// }
+    /// // Instantiate a new pipeline.
+    /// let pipe = pipeline![
+    ///     SourceIter::build(set.into_iter()),
+    ///     OrderedMapReduce::build_with_replicas(2, 8,
+    ///     |el: (usize, f64)| -> (usize, f64) {
+    ///         (el.0, el.1 * el.1)
+    ///    },
+    ///     |i, vec| {
+    ///         (i, vec.iter().sum())
+    ///     }),
+    ///     OrderedSinkVec::build()
+    /// ];
+    ///
+    /// let res: Vec<Vec<(usize, f64)>> = pipe.start_and_wait_end().unwrap();
+    ///
+    /// // We check here also if the order of the input was preserved
+    /// // in the output.
+    /// for (check, vec) in res.into_iter().enumerate() {
+    ///     assert_eq!(vec.len(), 1);
+    ///     for el in vec {
+    ///         assert_eq!(el, (check, 385.00));
+    ///     }
+    /// }
+    /// ```
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
         n_replicas: usize,
@@ -548,5 +801,326 @@ where
     }
     fn number_of_replicas(&self) -> usize {
         self.replicas
+    }
+    fn is_ordered(&self) -> bool {
+        true
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use serial_test::serial;
+
+    use super::{Map, OrderedMap, Reduce};
+    use crate::{
+        prelude::*,
+        templates::{
+            map::MapReduce,
+            map::{OrderedMapReduce, OrderedReduce},
+            misc::{OrderedSinkVec, SinkVec, SourceIter},
+        },
+    };
+
+    fn square(x: f64) -> f64 {
+        x * x
+    }
+
+    #[test]
+    #[serial]
+    fn simple_map() {
+        let mut counter = 1.0;
+        let numbers: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+        let mut vector = Vec::new();
+
+        for _i in 0..1000 {
+            vector.push(numbers.clone());
+        }
+
+        let pipe = pipeline![
+            SourceIter::build(vector.into_iter()),
+            Map::build(4, |el: f64| square(el)),
+            SinkVec::build()
+        ];
+
+        let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+
+        for vec in res {
+            for el in vec {
+                assert_eq!(el.sqrt(), counter);
+                counter += 1.0;
+            }
+            counter = 1.0;
+        }
+
+        unsafe {
+            Orchestrator::delete_global_orchestrator();
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn simple_map_replicated() {
+        let mut counter = 1.0;
+        let numbers: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+        let mut vector = Vec::new();
+
+        for _i in 0..1000 {
+            vector.push(numbers.clone());
+        }
+
+        let pipe = pipeline![
+            SourceIter::build(vector.into_iter()),
+            Map::build_with_replicas(4, 2, |el: f64| square(el)),
+            SinkVec::build()
+        ];
+
+        let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+
+        for vec in res {
+            for el in vec {
+                assert_eq!(el.sqrt(), counter);
+                counter += 1.0;
+            }
+            counter = 1.0;
+        }
+
+        unsafe {
+            Orchestrator::delete_global_orchestrator();
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn simple_ordered_map() {
+        let mut counter = 1.0;
+        let mut vector = Vec::new();
+
+        for _i in 0..1000 {
+            let mut numbers = Vec::new();
+            for _i in 0..10 {
+                numbers.push(counter);
+                counter += 1.0;
+            }
+            vector.push(numbers);
+        }
+
+        let pipe = pipeline![
+            SourceIter::build(vector.into_iter()),
+            OrderedMap::build(4, |el: f64| square(el)),
+            OrderedSinkVec::build()
+        ];
+
+        let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+
+        counter = 1.0;
+        for vec in res {
+            for el in vec {
+                assert_eq!(el.sqrt(), counter);
+                counter += 1.0;
+            }
+        }
+
+        unsafe {
+            Orchestrator::delete_global_orchestrator();
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn simple_ordered_map_replicated() {
+        let mut counter = 1.0;
+        let mut vector = Vec::new();
+
+        for _i in 0..1000 {
+            let mut numbers = Vec::new();
+            for _i in 0..10 {
+                numbers.push(counter);
+                counter += 1.0;
+            }
+            vector.push(numbers);
+        }
+
+        let pipe = pipeline![
+            SourceIter::build(vector.into_iter()),
+            OrderedMap::build_with_replicas(4, 2, |el: f64| square(el)),
+            OrderedSinkVec::build()
+        ];
+
+        let res: Vec<Vec<f64>> = pipe.start_and_wait_end().unwrap();
+
+        counter = 1.0;
+        for vec in res {
+            for el in vec {
+                assert_eq!(el.sqrt(), counter);
+                counter += 1.0;
+            }
+        }
+
+        unsafe {
+            Orchestrator::delete_global_orchestrator();
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn summation() {
+        let mut counter = 1;
+        let mut set = Vec::new();
+
+        for i in 0..1000 {
+            let mut vector = Vec::new();
+            for _i in 0..10 {
+                vector.push((i, counter));
+                counter += 1;
+            }
+            counter = 1;
+            set.push(vector);
+        }
+
+        let pipe = pipeline![
+            SourceIter::build(set.into_iter()),
+            Reduce::build(4, |i, vec| -> (i32, i32) { (i, vec.iter().sum()) }),
+            SinkVec::build()
+        ];
+
+        let res: Vec<Vec<(i32, i32)>> = pipe.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 1000);
+
+        for vec in res {
+            assert_eq!(vec.len(), 1);
+            for el in vec {
+                assert_eq!(el.1, 55);
+            }
+        }
+
+        unsafe {
+            Orchestrator::delete_global_orchestrator();
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn summation_ordered() {
+        let mut counter = 1;
+        let mut set = Vec::new();
+
+        for i in 0..1000 {
+            let mut vector = Vec::new();
+            for _i in 0..10 {
+                vector.push((i, counter));
+                counter += 1;
+            }
+            counter = 1;
+            set.push(vector);
+        }
+
+        let pipe = pipeline![
+            SourceIter::build(set.into_iter()),
+            OrderedReduce::build_with_replicas(2, 4, |i, vec| -> (usize, i32) {
+                (i, vec.iter().sum())
+            }),
+            OrderedSinkVec::build()
+        ];
+
+        let res: Vec<Vec<(usize, i32)>> = pipe.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 1000);
+
+        for (check, vec) in res.into_iter().enumerate() {
+            assert_eq!(vec.len(), 1);
+            for el in vec {
+                assert_eq!(el, (check, 55));
+            }
+        }
+
+        unsafe {
+            Orchestrator::delete_global_orchestrator();
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn summation_of_squares() {
+        let mut counter = 1.0;
+        let mut set = Vec::new();
+
+        for i in 0..100000 {
+            let mut vector = Vec::new();
+            for _i in 0..10 {
+                vector.push((i, counter));
+                counter += 1.0;
+            }
+            counter = 1.0;
+            set.push(vector);
+        }
+
+        let pipe = pipeline![
+            SourceIter::build(set.into_iter()),
+            MapReduce::build(
+                8,
+                |el: (usize, f64)| -> (usize, f64) { (el.0, el.1 * el.1) },
+                |i, vec| { (i, vec.iter().sum()) }
+            ),
+            SinkVec::build()
+        ];
+
+        let res: Vec<Vec<(usize, f64)>> = pipe.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 100000);
+
+        for vec in res {
+            assert_eq!(vec.len(), 1);
+            for el in vec {
+                assert_eq!(el.1, 385.00);
+            }
+        }
+
+        unsafe {
+            Orchestrator::delete_global_orchestrator();
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn summation_of_squares_ordered() {
+        let mut counter = 1.0;
+        let mut set = Vec::new();
+
+        for i in 0..100000 {
+            let mut vector = Vec::new();
+            for _i in 0..10 {
+                vector.push((i, counter));
+                counter += 1.0;
+            }
+            counter = 1.0;
+            set.push(vector);
+        }
+
+        let pipe = pipeline![
+            SourceIter::build(set.into_iter()),
+            OrderedMapReduce::build_with_replicas(
+                2,
+                4,
+                |el: (usize, f64)| -> (usize, f64) { (el.0, el.1 * el.1) },
+                |i, vec| { (i, vec.iter().sum()) }
+            ),
+            OrderedSinkVec::build()
+        ];
+
+        let res: Vec<Vec<(usize, f64)>> = pipe.start_and_wait_end().unwrap();
+
+        assert_eq!(res.len(), 100000);
+
+        for (check, vec) in res.into_iter().enumerate() {
+            assert_eq!(vec.len(), 1);
+            for el in vec {
+                assert_eq!(el, (check, 385.00));
+            }
+        }
+
+        unsafe {
+            Orchestrator::delete_global_orchestrator();
+        }
     }
 }
