@@ -357,7 +357,7 @@ where
     F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
 {
     fn run(&mut self, input: TInIter) -> Option<TOutIter> {
-        let res: TOutIter = self.threadpool.par_reduce(input, self.f).collect();
+        let res: TOutIter = self.threadpool.par_reduce_by_key(input, self.f).collect();
         Some(res)
     }
     fn number_of_replicas(&self) -> usize {
@@ -489,7 +489,7 @@ where
     F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
 {
     fn run(&mut self, input: TInIter) -> Option<TOutIter> {
-        let res: TOutIter = self.threadpool.par_reduce(input, self.f).collect();
+        let res: TOutIter = self.threadpool.par_reduce_by_key(input, self.f).collect();
         Some(res)
     }
     fn number_of_replicas(&self) -> usize {

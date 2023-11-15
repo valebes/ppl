@@ -159,10 +159,25 @@ fn test_par_reduce() {
     }
 
     let res: Vec<(i32, i32)> = pool
-        .par_reduce(vec, |k, v| -> (i32, i32) { (k, v.iter().sum()) })
+        .par_reduce_by_key(vec, |k, v| -> (i32, i32) { (k, v.iter().sum()) })
         .collect();
 
     assert_eq!(res.len(), 10);
+}
+
+#[test]
+#[serial]
+fn test_new_reduce() {
+    let mut pool = ThreadPool::new();
+
+    let mut vec = Vec::new();
+    for _i in 0..130 {
+        vec.push(1);
+    }
+
+    let res = pool.par_reduce(vec, |a, b| a + b);
+
+    assert_eq!(res, 130);
 }
 
 #[test]
@@ -178,7 +193,7 @@ fn test_par_map_reduce_seq() {
     }
 
     let res = tp.par_map(vec, |el| -> (i32, i32) { (el, 1) });
-    let res = tp.par_reduce(res, |k, v| (k, v.iter().sum::<i32>()));
+    let res = tp.par_reduce_by_key(res, |k, v| (k, v.iter().sum::<i32>()));
 
     let mut check = true;
     for (k, v) in res {
