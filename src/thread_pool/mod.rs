@@ -426,23 +426,33 @@ impl ThreadPool {
     ///     }).collect();
     /// assert_eq!(res.len(), 10);
     /// ```
-    pub fn par_map_reduce<Iter, F, K, V, R, Reduce>(
+    pub fn par_map_reduce<Iter, F, K, V, Reduce>(
         &mut self,
         iter: Iter,
         f: F,
         reduce: Reduce,
-    ) -> impl Iterator<Item = (K, R)>
+    ) -> impl Iterator<Item = (K, V)>
     where
         F: FnOnce(Iter::Item) -> (K, V) + Send + Copy,
         <Iter as IntoIterator>::Item: Send,
         K: Send + Ord + 'static,
         V: Send + 'static,
-        R: Send + 'static,
-        Reduce: FnOnce(K, Vec<V>) -> (K, R) + Send + Copy,
+        Reduce: FnOnce(V, V) -> V + Send + Copy + Sync,
         Iter: IntoIterator,
     {
         let map = self.par_map(iter, f);
-        self.par_reduce_by_key(map, reduce)
+
+        // Shuffle by grouping the elements by key.
+        let mut ordered_map = BTreeMap::new();
+        for (k, v) in map {
+            ordered_map.entry(k).or_insert_with(Vec::new).push(v);
+        }
+        let mut res = Vec::new();
+        for el in ordered_map {
+            res.push((el.0, self.par_reduce(el.1, reduce)));
+        }
+
+        res.into_iter()
     }
 
     /// Reduces in parallel the elements of an iterator `iter` by the function `f`.
@@ -509,12 +519,12 @@ impl ThreadPool {
         while data.len() != 1 {
             let mut tmp = Vec::new();
             let mut num_proc = self.num_workers;
-    
+
             while data.len() < 2 * num_proc {
                 num_proc -= 1;
             }
             let mut counter = 0;
-    
+
             while !data.is_empty() {
                 counter %= num_proc;
                 tmp.push((counter, data.pop().unwrap()));
@@ -522,16 +532,15 @@ impl ThreadPool {
             }
 
             data = self
-            .par_reduce_by_key(tmp, |k, v| {
-                (k, v.into_iter().reduce(|a, b| f(a, b)).unwrap())
-            })
-            .collect::<Vec<(usize, V)>>()
-            .into_iter()
-            .map(|(_a, b)| b)
-            .collect();
+                .par_reduce_by_key(tmp, |k, v| {
+                    (k, v.into_iter().reduce(|a, b| f(a, b)).unwrap())
+                })
+                .collect::<Vec<(usize, V)>>()
+                .into_iter()
+                .map(|(_a, b)| b)
+                .collect();
         }
         data.pop().unwrap()
-
     }
 
     /// Create a new scope to execute jobs on other threads.

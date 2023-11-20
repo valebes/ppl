@@ -128,11 +128,7 @@ fn test_par_map_reduce() {
         }
     }
 
-    let res = tp.par_map_reduce(
-        vec,
-        |el| -> (i32, i32) { (el, 1) },
-        |k, v| (k, v.iter().sum::<i32>()),
-    );
+    let res = tp.par_map_reduce(vec, |el| -> (i32, i32) { (el, 1) }, |a, b| a + b);
 
     let mut check = true;
     for (k, v) in res {

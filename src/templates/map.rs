@@ -505,30 +505,27 @@ where
 /// Nodes of this type are composed of a Map and a Reduce.
 /// The Map is applied to each element of the input, and the Reduce is applied to the output of the Map.
 #[derive(Clone)]
-pub struct MapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
+pub struct MapReduce<TIn, TMapOut, TKey, FMap, FReduce>
 where
     TIn: Send,
     TMapOut: Send,
     TKey: Send,
-    TReduce: Send,
     FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
-    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
+    FReduce: FnOnce(TMapOut, TMapOut) -> TMapOut,
 {
     threadpool: ThreadPool,
     replicas: usize,
     f_map: FMap,
     f_reduce: FReduce,
-    phantom: PhantomData<(TIn, TMapOut, TKey, TReduce)>,
+    phantom: PhantomData<(TIn, TMapOut, TKey)>,
 }
-impl<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
-    MapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
+impl<TIn, TMapOut, TKey, FMap, FReduce> MapReduce<TIn, TMapOut, TKey, FMap, FReduce>
 where
     TIn: Send + Clone + 'static,
     TMapOut: Send + Clone + 'static,
     TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static,
     FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
-    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
+    FReduce: FnOnce(TMapOut, TMapOut) -> TMapOut + Send + Copy + Sync,
 {
     /// Create a new MapReduce node.
     /// # Arguments
@@ -579,7 +576,7 @@ where
     ) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = TIn>,
-        TOutIter: FromIterator<(TKey, TReduce)>,
+        TOutIter: FromIterator<(TKey, TMapOut)>,
     {
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
@@ -610,7 +607,7 @@ where
     ) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = TIn>,
-        TOutIter: FromIterator<(TKey, TReduce)>,
+        TOutIter: FromIterator<(TKey, TMapOut)>,
     {
         assert!(n_replicas > 0);
         Self {
@@ -622,17 +619,16 @@ where
         }
     }
 }
-impl<TIn, TMapOut, TInIter, TKey, TReduce, TOutIter, FMap, FReduce> InOut<TInIter, TOutIter>
-    for MapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
+impl<TIn, TMapOut, TInIter, TKey, TOutIter, FMap, FReduce> InOut<TInIter, TOutIter>
+    for MapReduce<TIn, TMapOut, TKey, FMap, FReduce>
 where
     TIn: Send + Clone + 'static,
     TMapOut: Send + Clone + 'static,
     TInIter: IntoIterator<Item = TIn>,
     TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static,
-    TOutIter: FromIterator<(TKey, TReduce)>,
+    TOutIter: FromIterator<(TKey, TMapOut)>,
     FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
-    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
+    FReduce: FnOnce(TMapOut, TMapOut) -> TMapOut + Send + Copy + Sync,
 {
     fn run(&mut self, input: TInIter) -> Option<TOutIter> {
         let res: TOutIter = self
@@ -654,30 +650,27 @@ where
 /// This node is slower than MapReduce but preserves the order of the input.
 /// This node is useful when the order of the input is important.
 #[derive(Clone)]
-pub struct OrderedMapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
+pub struct OrderedMapReduce<TIn, TMapOut, TKey, FMap, FReduce>
 where
     TIn: Send,
     TMapOut: Send,
     TKey: Send,
-    TReduce: Send,
     FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
-    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
+    FReduce: FnOnce(TMapOut, TMapOut) -> TMapOut + Send + Copy,
 {
     threadpool: ThreadPool,
     replicas: usize,
     f_map: FMap,
     f_reduce: FReduce,
-    phantom: PhantomData<(TIn, TMapOut, TKey, TReduce)>,
+    phantom: PhantomData<(TIn, TMapOut, TKey)>,
 }
-impl<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
-    OrderedMapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
+impl<TIn, TMapOut, TKey, FMap, FReduce> OrderedMapReduce<TIn, TMapOut, TKey, FMap, FReduce>
 where
     TIn: Send + Clone + 'static,
     TMapOut: Send + Clone + 'static,
     TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static,
     FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
-    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
+    FReduce: FnOnce(TMapOut, TMapOut) -> TMapOut + Send + Copy + Sync,
 {
     /// Create a new OrderedMapReduce node.
     /// # Arguments
@@ -691,7 +684,7 @@ where
     ) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = TIn>,
-        TOutIter: FromIterator<(TKey, TReduce)>,
+        TOutIter: FromIterator<(TKey, TMapOut)>,
     {
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
@@ -768,7 +761,7 @@ where
     ) -> impl InOut<TInIter, TOutIter>
     where
         TInIter: IntoIterator<Item = TIn>,
-        TOutIter: FromIterator<(TKey, TReduce)>,
+        TOutIter: FromIterator<(TKey, TMapOut)>,
     {
         assert!(n_replicas > 0);
         Self {
@@ -780,17 +773,16 @@ where
         }
     }
 }
-impl<TIn, TMapOut, TInIter, TKey, TReduce, TOutIter, FMap, FReduce> InOut<TInIter, TOutIter>
-    for OrderedMapReduce<TIn, TMapOut, TKey, TReduce, FMap, FReduce>
+impl<TIn, TMapOut, TInIter, TKey, TOutIter, FMap, FReduce> InOut<TInIter, TOutIter>
+    for OrderedMapReduce<TIn, TMapOut, TKey, FMap, FReduce>
 where
     TIn: Send + Clone + 'static,
     TMapOut: Send + Clone + 'static,
     TInIter: IntoIterator<Item = TIn>,
     TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static,
-    TOutIter: FromIterator<(TKey, TReduce)>,
+    TOutIter: FromIterator<(TKey, TMapOut)>,
     FMap: FnOnce(TIn) -> (TKey, TMapOut) + Send + Copy,
-    FReduce: FnOnce(TKey, Vec<TMapOut>) -> (TKey, TReduce) + Send + Copy,
+    FReduce: FnOnce(TMapOut, TMapOut) -> TMapOut + Send + Copy + Sync,
 {
     fn run(&mut self, input: TInIter) -> Option<TOutIter> {
         let res: TOutIter = self
@@ -1060,7 +1052,7 @@ mod test {
             MapReduce::build(
                 8,
                 |el: (usize, f64)| -> (usize, f64) { (el.0, el.1 * el.1) },
-                |i, vec| { (i, vec.iter().sum()) }
+                |a, b| { a + b }
             ),
             SinkVec::build()
         ];
@@ -1103,7 +1095,7 @@ mod test {
                 2,
                 4,
                 |el: (usize, f64)| -> (usize, f64) { (el.0, el.1 * el.1) },
-                |i, vec| { (i, vec.iter().sum()) }
+                |a, b| { a + b }
             ),
             OrderedSinkVec::build()
         ];

@@ -100,13 +100,9 @@ pub fn ppl_combined_map_reduce(dataset: &str, threads: usize) {
         MapReduce::build_with_replicas(
             threads / 2,
             |str| -> (String, usize) { (str, 1) }, // Map function
-            |str, count| {
+            |a, b| {
                 // Reduce
-                let mut sum = 0;
-                for c in count {
-                    sum += c;
-                }
-                (str, sum)
+                a + b
             },
             2
         ),
@@ -153,13 +149,7 @@ pub fn ppl_map(dataset: &str, threads: usize) {
             })
             .collect::<Vec<String>>(),
         |str| -> (String, usize) { (str, 1) },
-        |str, count| {
-            let mut sum = 0;
-            for c in count {
-                sum += c;
-            }
-            (str, sum)
-        },
+        |a, b| a + b,
     );
 
     let mut total_words = 0;
