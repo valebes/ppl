@@ -561,8 +561,8 @@ where
     ///     |el: (usize, f64)| -> (usize, f64) {
     ///         (el.0, el.1 * el.1)
     ///    },
-    ///     |i, vec| {
-    ///         (i, vec.iter().sum())
+    ///     |a, b| {
+    ///         a + b
     ///     }),
     ///     SinkVec::build()
     /// ];
@@ -736,8 +736,8 @@ where
     ///     |el: (usize, f64)| -> (usize, f64) {
     ///         (el.0, el.1 * el.1)
     ///    },
-    ///     |i, vec| {
-    ///         (i, vec.iter().sum())
+    ///     |a, b| {
+    ///         a + b
     ///     }),
     ///     OrderedSinkVec::build()
     /// ];

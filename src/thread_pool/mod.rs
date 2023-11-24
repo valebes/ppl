@@ -400,10 +400,8 @@ impl ThreadPool {
     /// The function `f` must return a tuple of two elements, the first one
     /// is the key and the second one is the value.
     /// The results are grouped by key and reduced by the function `reduce`.
-    /// The function `reduce` must take two arguments, the first one is the
-    /// key and the second one is a vector of values.
-    /// The function `reduce` must return a tuple of two elements, the first one
-    /// is the key and the second one is the value.
+    /// The function `reduce` must take two arguments.
+    /// The function `reduce` must return a value of the same type of the input one.
     /// This method return an iterator of tuples of two elements, the first one
     /// is the key and the second one is the value.
     ///
@@ -421,8 +419,8 @@ impl ThreadPool {
     ///
     /// let res: Vec<(i32, i32)> = pool.par_map_reduce(&mut vec, |el| -> (i32, i32) {
     ///           (*el % 10, *el)
-    ///      }, |k, v| -> (i32, i32) {
-    ///          (k, v.iter().sum())
+    ///      }, |a, b| -> i32 {
+    ///          a + b
     ///     }).collect();
     /// assert_eq!(res.len(), 10);
     /// ```
@@ -455,6 +453,7 @@ impl ThreadPool {
         res.into_iter()
     }
 
+    /// Parallel Reduce by Key
     /// Reduces in parallel the elements of an iterator `iter` by the function `f`.
     /// The function `f` must take two arguments, the first one is the
     /// key and the second one is a vector of values.
@@ -505,8 +504,27 @@ impl ThreadPool {
         self.par_map(ordered_map, move |(k, v)| f(k, v))
     }
 
-    /// Reduce
+    /// Parallel Reduce
+    /// Reduces in parallel the elements of the iterator `iter`.
+    /// The function `reduce` must take two arguments and
+    /// must return a value of the same type of the input one.
     ///
+    /// # Examples
+    /// ```
+    /// use ppl::thread_pool::ThreadPool;
+    ///
+    /// let mut pool = ThreadPool::new();
+    ///
+    /// let mut vec = Vec::new();
+    ///
+    /// for _i in 0..10 {
+    ///   vec.push(1);
+    /// }
+    ///
+    /// let res = pool.par_reduce(vec, |a, b| -> i32 {
+    ///          a + b
+    ///    });
+    /// assert_eq!(res, 10);
     pub fn par_reduce<Iter, V, F>(&mut self, iter: Iter, f: F) -> V
     where
         <Iter as IntoIterator>::Item: Send,

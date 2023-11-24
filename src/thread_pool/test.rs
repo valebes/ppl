@@ -146,7 +146,7 @@ fn test_par_map_reduce() {
 
 #[test]
 #[serial]
-fn test_par_reduce() {
+fn test_par_reduce_by_key() {
     let mut pool = ThreadPool::new();
 
     let mut vec = Vec::new();
@@ -163,7 +163,7 @@ fn test_par_reduce() {
 
 #[test]
 #[serial]
-fn test_new_reduce() {
+fn test_par_reduce() {
     let mut pool = ThreadPool::new();
 
     let mut vec = Vec::new();
