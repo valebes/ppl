@@ -237,26 +237,23 @@ where
 
 /// Reduce
 ///
-/// In this Reduce, the elements are grouped by key and then reduced.
+/// Takes in input a type that implements the [`Iterator`] trait
+/// and applies a reduce function.
 #[derive(Clone)]
-pub struct Reduce<TIn, TKey, TReduce, F>
+pub struct Reduce<TIn, F>
 where
     TIn: Send,
-    TKey: Send,
-    TReduce: Send,
-    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
+    F: FnOnce(TIn, TIn) -> TIn + Send + Copy + Sync,
 {
     threadpool: ThreadPool,
     replicas: usize,
     f: F,
-    phantom: PhantomData<(TIn, TKey, TReduce)>,
+    phantom: PhantomData<TIn>,
 }
-impl<TIn, TKey, TReduce, F> Reduce<TIn, TKey, TReduce, F>
+impl<TIn, F> Reduce<TIn, F>
 where
     TIn: Send + Clone + 'static,
-    TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static,
-    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
+    F: FnOnce(TIn, TIn) -> TIn + Send + Copy + Sync,
 {
     /// Create a new Reduce node.
     /// # Arguments
@@ -267,8 +264,6 @@ where
     ///
     /// Given a collection of vectors of integers, for each vector
     /// compute the summation of its elements.
-    /// As this reduce function works by grouping by key,
-    /// the input of the reduce function must be a vector of tuple (key, value).
     ///
     /// ```
     ///
@@ -277,37 +272,34 @@ where
     /// // Create the vector of the elements that will be emitted by the Source node.
     ///  // vec![(key,value)]
     /// let vector = vec![
-    ///     vec![(0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0 ,10)],
-    ///     vec![(0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0 ,10)],
-    ///     vec![(0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0 ,10)],
+    ///     vec![1; 10],
+    ///     vec![1; 10],
+    ///     vec![1; 10],
     /// ];
     ///
     /// // Instantiate a new pipeline.
     /// let pipe = pipeline![
     ///     SourceIter::build(vector.into_iter()),
-    ///     Reduce::build(4, |i, vec| -> (i32, i32) {
-    ///         (i, vec.iter().sum())
+    ///     Reduce::build(4, |a, b| -> i32 {
+    ///         a + b
     ///     }),
     ///     SinkVec::build()
     /// ];
     ///
     /// // Start the pipeline and wait for the results.
-    /// let res: Vec<Vec<(i32, i32)>> = pipe.start_and_wait_end().unwrap();
+    /// let res: Vec<i32> = pipe.start_and_wait_end().unwrap();
     ///
     /// // Collect a results for each vector emitted by the Source. In our case we had 3 vectors.
     /// assert_eq!(res.len(), 3);
     ///
     /// // As for each vector emitted we had only one key, we obtain only one result tuple
     /// // for vector.
-    /// for vec in res {
-    ///    for el in vec {
-    ///         assert_eq!(el.1, 55);
-    ///     }
+    /// for el in res {
+    ///     assert_eq!(el, 10);
     /// }
-    pub fn build<TInIter, TOutIter>(n_worker: usize, f: F) -> impl InOut<TInIter, TOutIter>
+    pub fn build<TInIter>(n_worker: usize, f: F) -> impl InOut<TInIter, TIn>
     where
-        TInIter: IntoIterator<Item = (TKey, TIn)>,
-        TOutIter: FromIterator<(TKey, TReduce)>,
+        TInIter: IntoIterator<Item = TIn>,
     {
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
@@ -328,14 +320,13 @@ where
     /// The replicas are created by cloning the Reduce node.
     /// This mean that 4 replicas of a Reduce node with 2 workers each
     /// will result in the usage of 8 threads.
-    pub fn build_with_replicas<TInIter, TOutIter>(
+    pub fn build_with_replicas<TInIter>(
         n_worker: usize,
         n_replicas: usize,
         f: F,
-    ) -> impl InOut<TInIter, TOutIter>
+    ) -> impl InOut<TInIter, TIn>
     where
-        TInIter: IntoIterator<Item = (TKey, TIn)>,
-        TOutIter: FromIterator<(TKey, TReduce)>,
+        TInIter: IntoIterator<Item = TIn>,
     {
         assert!(n_replicas > 0);
         Self {
@@ -346,18 +337,14 @@ where
         }
     }
 }
-impl<TIn, TInIter, TKey, TReduce, TOutIter, F> InOut<TInIter, TOutIter>
-    for Reduce<TIn, TKey, TReduce, F>
+impl<TIn, TInIter, F> InOut<TInIter, TIn> for Reduce<TIn, F>
 where
     TIn: Send + Clone + 'static,
-    TInIter: IntoIterator<Item = (TKey, TIn)>,
-    TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static,
-    TOutIter: FromIterator<(TKey, TReduce)>,
-    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
+    TInIter: IntoIterator<Item = TIn>,
+    F: FnOnce(TIn, TIn) -> TIn + Send + Copy + Sync,
 {
-    fn run(&mut self, input: TInIter) -> Option<TOutIter> {
-        let res: TOutIter = self.threadpool.par_reduce_by_key(input, self.f).collect();
+    fn run(&mut self, input: TInIter) -> Option<TIn> {
+        let res: TIn = self.threadpool.par_reduce(input, self.f);
         Some(res)
     }
     fn number_of_replicas(&self) -> usize {
@@ -370,33 +357,28 @@ where
 /// In this Reduce, the elements are processed in the same order as they are received.
 /// The order of the output is the same as the order of the input.
 #[derive(Clone)]
-pub struct OrderedReduce<TIn, TKey, TReduce, F>
+pub struct OrderedReduce<TIn, F>
 where
     TIn: Send,
-    TKey: Send,
-    TReduce: Send,
-    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
+    F: FnOnce(TIn, TIn) -> TIn + Send + Copy + Sync,
 {
     threadpool: ThreadPool,
     replicas: usize,
     f: F,
-    phantom: PhantomData<(TIn, TKey, TReduce)>,
+    phantom: PhantomData<TIn>,
 }
-impl<TIn, TKey, TReduce, F> OrderedReduce<TIn, TKey, TReduce, F>
+impl<TIn, F> OrderedReduce<TIn, F>
 where
     TIn: Send + Clone + 'static,
-    TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static,
-    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
+    F: FnOnce(TIn, TIn) -> TIn + Send + Copy + Sync,
 {
     /// Create a new OrderedReduce node.
     /// # Arguments
     /// * `n_worker` - Number of worker threads.
     /// * `f` - Function to apply to each element of the input.
-    pub fn build<TInIter, TOutIter>(n_worker: usize, f: F) -> impl InOut<TInIter, TOutIter>
+    pub fn build<TInIter>(n_worker: usize, f: F) -> impl InOut<TInIter, TIn>
     where
-        TInIter: IntoIterator<Item = (TKey, TIn)>,
-        TOutIter: FromIterator<(TKey, TReduce)>,
+        TInIter: IntoIterator<Item = TIn>,
     {
         Self {
             threadpool: ThreadPool::with_capacity(n_worker),
@@ -422,9 +404,7 @@ where
     ///
     /// Given a collection of vectors of integers, for each vector
     /// compute the summation of its elements.
-    /// As this reduce function works by grouping by key,
-    /// the input of the reduce function must be a vector of tuple (key, value).
-    /// In this example we want mantain the order of the input in the output.
+    /// In this example we mantain the order of the input in the output.
     ///
     /// ```
     /// use ppl::{prelude::*, templates::misc::{SourceIter, OrderedSinkVec}, templates::map::OrderedReduce};
@@ -432,42 +412,35 @@ where
     /// // Create the vector of the elements that will be emitted by the Source node.
     ///  // vec![(key,value)]
     /// let vector = vec![
-    ///     vec![(0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9), (0 ,10)],
-    ///     vec![(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1 ,10)],
-    ///     vec![(2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9), (2 ,10)],
+    ///     vec![1; 10],
+    ///     vec![1; 100],
+    ///     vec![1; 1000],
     /// ];
     ///
     /// // Instantiate a new pipeline.
     /// let pipe = pipeline![
     ///     SourceIter::build(vector.into_iter()),
-    ///     OrderedReduce::build_with_replicas(2, 4, |i, vec| -> (usize, i32) {
-    ///         (i, vec.iter().sum())
+    ///     OrderedReduce::build_with_replicas(2, 4, |a, b| -> i32 {
+    ///         a + b
     ///     }),
     ///     OrderedSinkVec::build()
     /// ];
     ///
     /// // Start the pipeline and wait for the results.
-    /// let res: Vec<Vec<(usize, i32)>> = pipe.start_and_wait_end().unwrap();
+    /// let res: Vec<i32> = pipe.start_and_wait_end().unwrap();
     ///
     /// // Collect a results for each vector emitted by the Source. In our case we had 3 vectors.
     /// assert_eq!(res.len(), 3);
-    ///
-    /// // As for each vector emitted we had only one key, we obtain only one result tuple
-    /// // for vector. Moreover, we check here also if the order of the input was preserved
-    /// // in the output.
-    /// for (check, vec) in res.into_iter().enumerate() {
-    ///     for el in vec {
-    ///         assert_eq!(el, (check, 55));
-    ///     }
-    /// }
-    pub fn build_with_replicas<TInIter, TOutIter>(
+    /// assert_eq!(res[0], 10);
+    /// assert_eq!(res[1], 100);
+    /// assert_eq!(res[2], 1000);
+    pub fn build_with_replicas<TInIter>(
         n_worker: usize,
         n_replicas: usize,
         f: F,
-    ) -> impl InOut<TInIter, TOutIter>
+    ) -> impl InOut<TInIter, TIn>
     where
-        TInIter: IntoIterator<Item = (TKey, TIn)>,
-        TOutIter: FromIterator<(TKey, TReduce)>,
+        TInIter: IntoIterator<Item = TIn>,
     {
         assert!(n_replicas > 0);
         Self {
@@ -478,18 +451,14 @@ where
         }
     }
 }
-impl<TIn, TInIter, TKey, TReduce, TOutIter, F> InOut<TInIter, TOutIter>
-    for OrderedReduce<TIn, TKey, TReduce, F>
+impl<TIn, TInIter, F> InOut<TInIter, TIn> for OrderedReduce<TIn, F>
 where
     TIn: Send + Clone + 'static,
-    TInIter: IntoIterator<Item = (TKey, TIn)>,
-    TKey: Send + Clone + 'static + Ord,
-    TReduce: Send + Clone + 'static,
-    TOutIter: FromIterator<(TKey, TReduce)>,
-    F: FnOnce(TKey, Vec<TIn>) -> (TKey, TReduce) + Send + Copy,
+    TInIter: IntoIterator<Item = TIn>,
+    F: FnOnce(TIn, TIn) -> TIn + Send + Copy + Sync,
 {
-    fn run(&mut self, input: TInIter) -> Option<TOutIter> {
-        let res: TOutIter = self.threadpool.par_reduce_by_key(input, self.f).collect();
+    fn run(&mut self, input: TInIter) -> Option<TIn> {
+        let res: TIn = self.threadpool.par_reduce(input, self.f);
         Some(res)
     }
     fn number_of_replicas(&self) -> usize {
@@ -956,34 +925,28 @@ mod test {
     #[test]
     #[serial]
     fn summation() {
-        let mut counter = 1;
         let mut set = Vec::new();
 
-        for i in 0..1000 {
+        for _i in 0..1000 {
             let mut vector = Vec::new();
             for _i in 0..10 {
-                vector.push((i, counter));
-                counter += 1;
+                vector.push(1);
             }
-            counter = 1;
             set.push(vector);
         }
 
         let pipe = pipeline![
             SourceIter::build(set.into_iter()),
-            Reduce::build(4, |i, vec| -> (i32, i32) { (i, vec.iter().sum()) }),
+            Reduce::build(4, |a, b| -> i32 { a + b }),
             SinkVec::build()
         ];
 
-        let res: Vec<Vec<(i32, i32)>> = pipe.start_and_wait_end().unwrap();
+        let res: Vec<i32> = pipe.start_and_wait_end().unwrap();
 
         assert_eq!(res.len(), 1000);
 
-        for vec in res {
-            assert_eq!(vec.len(), 1);
-            for el in vec {
-                assert_eq!(el.1, 55);
-            }
+        for el in res {
+            assert_eq!(el, 10)
         }
 
         unsafe {
@@ -994,37 +957,19 @@ mod test {
     #[test]
     #[serial]
     fn summation_ordered() {
-        let mut counter = 1;
-        let mut set = Vec::new();
-
-        for i in 0..1000 {
-            let mut vector = Vec::new();
-            for _i in 0..10 {
-                vector.push((i, counter));
-                counter += 1;
-            }
-            counter = 1;
-            set.push(vector);
-        }
-
+        let set = vec![vec![1; 10], vec![1; 100], vec![1; 1000]];
         let pipe = pipeline![
             SourceIter::build(set.into_iter()),
-            OrderedReduce::build_with_replicas(2, 4, |i, vec| -> (usize, i32) {
-                (i, vec.iter().sum())
-            }),
+            OrderedReduce::build_with_replicas(2, 4, |a, b| -> i32 { a + b }),
             OrderedSinkVec::build()
         ];
 
-        let res: Vec<Vec<(usize, i32)>> = pipe.start_and_wait_end().unwrap();
+        let res: Vec<i32> = pipe.start_and_wait_end().unwrap();
 
-        assert_eq!(res.len(), 1000);
-
-        for (check, vec) in res.into_iter().enumerate() {
-            assert_eq!(vec.len(), 1);
-            for el in vec {
-                assert_eq!(el, (check, 55));
-            }
-        }
+        assert_eq!(res.len(), 3);
+        assert_eq!(res[0], 10);
+        assert_eq!(res[1], 100);
+        assert_eq!(res[2], 1000);
 
         unsafe {
             Orchestrator::delete_global_orchestrator();

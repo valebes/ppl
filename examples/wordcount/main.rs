@@ -35,7 +35,6 @@ fn main() {
         //"rayon" => rayon::rayon(dir_name, threads),
         //"std-threads" => std_threads::std_threads(dir_name, threads),
         "ppl" => {
-            timeit(|| ppl::ppl(dataset, threads));
             timeit(|| ppl::ppl_combined_map_reduce(dataset, threads));
             timeit(|| ppl::ppl_map(dataset, threads));
         }

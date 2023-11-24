@@ -8,10 +8,7 @@ use std::{
     usize,
 };
 
-use ppl::{
-    prelude::*,
-    templates::map::{Map, MapReduce, Reduce},
-};
+use ppl::{prelude::*, templates::map::MapReduce};
 
 struct Source {
     reader: BufReader<File>,
@@ -59,37 +56,6 @@ impl In<Vec<(String, usize)>, Vec<(String, usize)>> for Sink {
     }
 }
 
-pub fn ppl(dataset: &str, threads: usize) {
-    let file = File::open(dataset).expect("no such file");
-    let reader = BufReader::new(file);
-
-    let mut p = pipeline![
-        Source { reader },
-        Map::build::<Vec<String>, Vec<(String, usize)>>(threads / 2, |str| -> (String, usize) {
-            (str, 1)
-        }),
-        Reduce::build(threads / 2, |str, count| {
-            let mut sum = 0;
-            for c in count {
-                sum += c;
-            }
-            (str, sum)
-        }),
-        Sink {
-            counter: HashMap::new()
-        }
-    ];
-
-    p.start();
-    let res = p.wait_end();
-
-    let mut total_words = 0;
-    for (_key, value) in res.unwrap() {
-        total_words += value;
-    }
-    println!("[PIPELINE] Total words: {}", total_words);
-}
-
 // Version that use a node that combine map and reduce
 pub fn ppl_combined_map_reduce(dataset: &str, threads: usize) {
     let file = File::open(dataset).expect("no such file");
@@ -100,10 +66,7 @@ pub fn ppl_combined_map_reduce(dataset: &str, threads: usize) {
         MapReduce::build_with_replicas(
             threads / 2,
             |str| -> (String, usize) { (str, 1) }, // Map function
-            |a, b| {
-                // Reduce
-                a + b
-            },
+            |a, b| a + b,
             2
         ),
         Sink {
