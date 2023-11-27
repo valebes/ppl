@@ -241,6 +241,8 @@ impl ThreadPool {
 
     /// Create a new thread pool with `num_threads` threads.
     ///
+    /// # Arguments
+    /// * `num_threads` - Number of threads in the threadpool.
     /// # Examples
     ///
     /// ```
@@ -255,6 +257,9 @@ impl ThreadPool {
 
     /// Execute a function `task` on a thread in the thread pool.
     /// This method is non-blocking, so the developer must call `wait` to wait for the task to finish.
+    ///
+    /// # Arguments
+    /// * `task` - Function name or lambda function to execute in the threadpool.
     pub fn execute<F>(&self, task: F)
     where
         F: FnOnce() + Send + 'static,
@@ -279,6 +284,11 @@ impl ThreadPool {
     /// it distributes works of size `chunk_size` to the threads in the pool.
     /// The function `f` is applied to each element in the range.
     /// The range is split in chunks of size `chunk_size` and each chunk is assigned to a thread.
+    ///
+    /// # Arguments
+    /// * `range` - Range of indices.
+    /// * `chunk_size` - Size of each chunk.
+    /// * `f` - Function name or lambda function.
     pub fn par_for<F>(&mut self, range: Range<usize>, chunk_size: usize, mut f: F)
     where
         F: FnMut(usize) + Send + Copy,
@@ -307,6 +317,11 @@ impl ThreadPool {
 
     /// Applies in parallel the function `f` on a iterable object `iter`.
     ///
+    /// # Arguments
+    /// * `iter` - Type that implements the [`Iterator`] trait.
+    /// * `f` - Function name or lambda function that specify the
+    /// operation we want to apply to `iter` in parallel.
+    ///
     /// # Examples
     ///
     /// Increment of 1 all the elements in a vector concurrently:
@@ -332,7 +347,10 @@ impl ThreadPool {
 
     /// Applies in parallel the function `f` on a iterable object `iter`,
     /// producing a new iterator with the results.
-    ///
+    /// # Arguments
+    /// * `iter` - Type that implements the [`Iterator`] trait.
+    /// * `f` - Function name or lambda function that specify the
+    /// operation we want to apply to `iter` in parallel.
     /// # Examples
     ///
     /// Produce a vec of `String` from the elements of a vector `vec` concurrently:
@@ -405,6 +423,13 @@ impl ThreadPool {
     /// This method return an iterator of tuples of two elements, the first one
     /// is the key and the second one is the value.
     ///
+    /// # Arguments
+    /// * `iter` - Type that implements the [`Iterator`] trait.
+    /// * `f` - Function name or lambda function that specify the
+    /// operation we want to apply to `iter` in parallel.
+    /// * `reduce` - Function name or lambda function that specify the reduction function
+    /// we want to apply.
+    ///
     /// # Examples
     ///
     /// ```
@@ -464,6 +489,11 @@ impl ThreadPool {
     /// This method return an iterator of tuples of two elements, the first one
     /// is the key and the second one is the value obtained by the function `f`.
     ///
+    /// # Arguments
+    /// * `iter` - Type that implements the [`Iterator`] trait.
+    /// * `f` - Function name or lambda function that specify the
+    /// operation we want to apply to `iter` in parallel.
+    ///
     /// # Examples
     ///
     /// ```
@@ -509,6 +539,10 @@ impl ThreadPool {
     /// The function `reduce` must take two arguments and
     /// must return a value of the same type of the input one.
     ///
+    /// # Arguments
+    /// * `iter` - Type that implements the [`Iterator`] trait.
+    /// * `f` - Function name or lambda function that specify the reduction function
+    /// we want to apply.
     /// # Examples
     /// ```
     /// use ppl::thread_pool::ThreadPool;
