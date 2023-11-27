@@ -320,10 +320,10 @@ pub fn ppl(dataset: &str, threads: usize) {
        let mut p = pipeline![
         Source { reader },
         MapReduce::build_with_replicas(
-            threads / 2,
+            threads / 2, // Number of worker for each stage
             |str| -> (String, usize) { (str, 1) }, // Map function
-            |a, b| a + b,
-            2
+            |a, b| a + b, // Reduce function
+            2 // Number of replicas of this stage
         ),
         Sink {
             counter: HashMap::new()
@@ -374,8 +374,8 @@ pub fn ppl_map(dataset: &str, threads: usize) {
                     .collect::<String>()
             })
             .collect::<Vec<String>>(),
-        |str| -> (String, usize) { (str, 1) },
-        |a, b| a + b,
+        |str| -> (String, usize) { (str, 1) }, // Map function
+        |a, b| a + b, // Reduce function
     );
 }
 ```
