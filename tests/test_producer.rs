@@ -73,11 +73,7 @@ fn test_producer() {
     assert_eq!(res.len(), 5000);
 
     // Count the occurrences of each number.
-    let check = tp.par_map_reduce(
-        res,
-        |el| -> (usize, usize) { (el, 1) },
-        |k, v| -> (usize, usize) { (k, v.iter().sum()) },
-    );
+    let check = tp.par_map_reduce(res, |el| -> (usize, usize) { (el, 1) }, |a, b| a + b);
 
     // Check that the number of occurrences is correct.
     for (_, v) in check {

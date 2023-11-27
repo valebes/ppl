@@ -275,8 +275,8 @@ The pipeline approach in PPL provides an intuitive and flexible way to express c
 
 In the word counter example, the pipeline involves the following stages:
 - **Source**: Reads the dataset and emits lines of text.
-- **Map**: Converts each line of text into a list of words, where each word is paired with a count of 1.
-- **Reduce**: Aggregates the counts of words by summing them for each unique word.
+- **MapReduce**: The map function converts each line of text into a list of words, where each word is paired with a count of 1.
+Moreover, the reduce function aggregates the counts of words by summing them for each unique word.
 - **Sink**: Stores the final word counts in a hashmap.
 
 By breaking down the computation into stages and leveraging parallelism, PPL's pipeline approach allows for efficient distribution of work across multiple threads or cores, leading to faster execution.
@@ -285,7 +285,7 @@ Here's the Rust code for the word counter using the pipeline approach:
 
 ```rust
 use ppl::{
-    templates::map::{Map, Reduce},
+    templates::map::MapReduce,
     prelude::*,
 };
 
@@ -317,21 +317,17 @@ impl In<Vec<(String, usize)>, Vec<(String, usize)>> for Sink {
 pub fn ppl(dataset: &str, threads: usize) {
     // Initialization and configuration...
 
-    let mut p = pipeline![
+       let mut p = pipeline![
         Source { reader },
-        Map::build::<Vec<String>, Vec<(String, usize)>>(threads / 2, |str| -> (String, usize) {
-            (str, 1)
-        }),
-        Reduce::build(threads / 2, |str, count| {
-            let mut sum = 0;
-            for c in count {
-                sum += c;
-            }
-            (str, sum)
-        }),
+        MapReduce::build_with_replicas(
+            threads / 2,
+            |str| -> (String, usize) { (str, 1) }, // Map function
+            |a, b| a + b,
+            2
+        ),
         Sink {
-            counter: HashMap::new(),
-        },
+            counter: HashMap::new()
+        }
     ];
 
     p.start();
@@ -379,13 +375,7 @@ pub fn ppl_map(dataset: &str, threads: usize) {
             })
             .collect::<Vec<String>>(),
         |str| -> (String, usize) { (str, 1) },
-        |str, count| {
-            let mut sum = 0;
-            for c in count {
-                sum += c;
-            }
-            (str, sum)
-        },
+        |a, b| a + b,
     );
 }
 ```
