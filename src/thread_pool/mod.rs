@@ -241,6 +241,8 @@ impl ThreadPool {
 
     /// Create a new thread pool with `num_threads` threads.
     ///
+    /// # Arguments
+    /// * `num_threads` - Number of threads in the threadpool.
     /// # Examples
     ///
     /// ```
@@ -255,6 +257,9 @@ impl ThreadPool {
 
     /// Execute a function `task` on a thread in the thread pool.
     /// This method is non-blocking, so the developer must call `wait` to wait for the task to finish.
+    ///
+    /// # Arguments
+    /// * `task` - Function name or lambda function to execute in the threadpool.
     pub fn execute<F>(&self, task: F)
     where
         F: FnOnce() + Send + 'static,
@@ -279,6 +284,11 @@ impl ThreadPool {
     /// it distributes works of size `chunk_size` to the threads in the pool.
     /// The function `f` is applied to each element in the range.
     /// The range is split in chunks of size `chunk_size` and each chunk is assigned to a thread.
+    ///
+    /// # Arguments
+    /// * `range` - Range of indices.
+    /// * `chunk_size` - Size of each chunk.
+    /// * `f` - Function name or lambda function.
     pub fn par_for<F>(&mut self, range: Range<usize>, chunk_size: usize, mut f: F)
     where
         F: FnMut(usize) + Send + Copy,
@@ -307,6 +317,11 @@ impl ThreadPool {
 
     /// Applies in parallel the function `f` on a iterable object `iter`.
     ///
+    /// # Arguments
+    /// * `iter` - Type that implements the [`Iterator`] trait.
+    /// * `f` - Function name or lambda function that specify the
+    /// operation we want to apply to `iter` in parallel.
+    ///
     /// # Examples
     ///
     /// Increment of 1 all the elements in a vector concurrently:
@@ -332,7 +347,10 @@ impl ThreadPool {
 
     /// Applies in parallel the function `f` on a iterable object `iter`,
     /// producing a new iterator with the results.
-    ///
+    /// # Arguments
+    /// * `iter` - Type that implements the [`Iterator`] trait.
+    /// * `f` - Function name or lambda function that specify the
+    /// operation we want to apply to `iter` in parallel.
     /// # Examples
     ///
     /// Produce a vec of `String` from the elements of a vector `vec` concurrently:
@@ -371,7 +389,7 @@ impl ThreadPool {
                 });
             });
 
-            drop(arc_tx);
+            drop(arc_tx); // Refactoring?
 
             let mut disconnected = false;
 
@@ -400,12 +418,17 @@ impl ThreadPool {
     /// The function `f` must return a tuple of two elements, the first one
     /// is the key and the second one is the value.
     /// The results are grouped by key and reduced by the function `reduce`.
-    /// The function `reduce` must take two arguments, the first one is the
-    /// key and the second one is a vector of values.
-    /// The function `reduce` must return a tuple of two elements, the first one
-    /// is the key and the second one is the value.
+    /// The function `reduce` must take two arguments.
+    /// The function `reduce` must return a value of the same type of the input one.
     /// This method return an iterator of tuples of two elements, the first one
     /// is the key and the second one is the value.
+    ///
+    /// # Arguments
+    /// * `iter` - Type that implements the [`Iterator`] trait.
+    /// * `f` - Function name or lambda function that specify the
+    /// operation we want to apply to `iter` in parallel.
+    /// * `reduce` - Function name or lambda function that specify the reduction function
+    /// we want to apply.
     ///
     /// # Examples
     ///
@@ -421,30 +444,41 @@ impl ThreadPool {
     ///
     /// let res: Vec<(i32, i32)> = pool.par_map_reduce(&mut vec, |el| -> (i32, i32) {
     ///           (*el % 10, *el)
-    ///      }, |k, v| -> (i32, i32) {
-    ///          (k, v.iter().sum())
+    ///      }, |a, b| -> i32 {
+    ///          a + b
     ///     }).collect();
     /// assert_eq!(res.len(), 10);
     /// ```
-    pub fn par_map_reduce<Iter, F, K, V, R, Reduce>(
+    pub fn par_map_reduce<Iter, F, K, V, Reduce>(
         &mut self,
         iter: Iter,
         f: F,
         reduce: Reduce,
-    ) -> impl Iterator<Item = (K, R)>
+    ) -> impl Iterator<Item = (K, V)>
     where
         F: FnOnce(Iter::Item) -> (K, V) + Send + Copy,
         <Iter as IntoIterator>::Item: Send,
         K: Send + Ord + 'static,
         V: Send + 'static,
-        R: Send + 'static,
-        Reduce: FnOnce(K, Vec<V>) -> (K, R) + Send + Copy,
+        Reduce: FnOnce(V, V) -> V + Send + Copy + Sync,
         Iter: IntoIterator,
     {
         let map = self.par_map(iter, f);
-        self.par_reduce(map, reduce)
+
+        // Shuffle by grouping the elements by key.
+        let mut ordered_map = BTreeMap::new();
+        for (k, v) in map {
+            ordered_map.entry(k).or_insert_with(Vec::new).push(v);
+        }
+        let mut res = Vec::new();
+        for el in ordered_map {
+            res.push((el.0, self.par_reduce(el.1, reduce)));
+        }
+
+        res.into_iter()
     }
 
+    /// Parallel Reduce by Key
     /// Reduces in parallel the elements of an iterator `iter` by the function `f`.
     /// The function `f` must take two arguments, the first one is the
     /// key and the second one is a vector of values.
@@ -454,6 +488,11 @@ impl ThreadPool {
     /// reduces them by the function `f`.
     /// This method return an iterator of tuples of two elements, the first one
     /// is the key and the second one is the value obtained by the function `f`.
+    ///
+    /// # Arguments
+    /// * `iter` - Type that implements the [`Iterator`] trait.
+    /// * `f` - Function name or lambda function that specify the
+    /// operation we want to apply to `iter` in parallel.
     ///
     /// # Examples
     ///
@@ -468,12 +507,16 @@ impl ThreadPool {
     ///   vec.push((i % 10, i));
     /// }
     ///
-    /// let res: Vec<(i32, i32)> = pool.par_reduce(vec, |k, v| -> (i32, i32) {
+    /// let res: Vec<(i32, i32)> = pool.par_reduce_by_key(vec, |k, v| -> (i32, i32) {
     ///          (k, v.iter().sum())
     ///    }).collect();
     /// assert_eq!(res.len(), 10);
     /// ```
-    pub fn par_reduce<Iter, K, V, R, F>(&mut self, iter: Iter, f: F) -> impl Iterator<Item = (K, R)>
+    pub fn par_reduce_by_key<Iter, K, V, R, F>(
+        &mut self,
+        iter: Iter,
+        f: F,
+    ) -> impl Iterator<Item = (K, R)>
     where
         <Iter as IntoIterator>::Item: Send,
         K: Send + Ord + 'static,
@@ -489,6 +532,67 @@ impl ThreadPool {
         }
         // Reduce the elements by key.
         self.par_map(ordered_map, move |(k, v)| f(k, v))
+    }
+
+    /// Parallel Reduce
+    /// Reduces in parallel the elements of the iterator `iter`.
+    /// The function `reduce` must take two arguments and
+    /// must return a value of the same type of the input one.
+    ///
+    /// # Arguments
+    /// * `iter` - Type that implements the [`Iterator`] trait.
+    /// * `f` - Function name or lambda function that specify the reduction function
+    /// we want to apply.
+    /// # Examples
+    /// ```
+    /// use ppl::thread_pool::ThreadPool;
+    ///
+    /// let mut pool = ThreadPool::new();
+    ///
+    /// let mut vec = Vec::new();
+    ///
+    /// for _i in 0..10 {
+    ///   vec.push(1);
+    /// }
+    ///
+    /// let res = pool.par_reduce(vec, |a, b| -> i32 {
+    ///          a + b
+    ///    });
+    /// assert_eq!(res, 10);
+    pub fn par_reduce<Iter, V, F>(&mut self, iter: Iter, f: F) -> V
+    where
+        <Iter as IntoIterator>::Item: Send,
+        V: Send + 'static,
+        F: FnOnce(V, V) -> V + Send + Copy + Sync,
+        Iter: IntoIterator<Item = V>,
+    {
+        let mut data: Vec<V> = iter.into_iter().collect();
+
+        while data.len() != 1 {
+            let mut tmp = Vec::new();
+            let mut num_proc = self.num_workers;
+
+            while data.len() < 2 * num_proc {
+                num_proc -= 1;
+            }
+            let mut counter = 0;
+
+            while !data.is_empty() {
+                counter %= num_proc;
+                tmp.push((counter, data.pop().unwrap()));
+                counter += 1;
+            }
+
+            data = self
+                .par_reduce_by_key(tmp, |k, v| {
+                    (k, v.into_iter().reduce(|a, b| f(a, b)).unwrap())
+                })
+                .collect::<Vec<(usize, V)>>()
+                .into_iter()
+                .map(|(_a, b)| b)
+                .collect();
+        }
+        data.pop().unwrap()
     }
 
     /// Create a new scope to execute jobs on other threads.

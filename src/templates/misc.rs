@@ -19,7 +19,7 @@ where
 {
     /// Creates a new source from any type that implements the `Iterator` trait.
     /// The source will terminate when the iterator is exhausted.
-    /// 
+    ///
     /// # Arguments
     /// * `iterator` - Type that implements the [`Iterator`] trait
     /// and represents the stream of data we want emit.
@@ -123,7 +123,7 @@ where
     ///
     /// # Arguments
     /// * `chunk_size` - Number of elements for each chunk.
-    /// 
+    ///
     /// # Examples
     /// Given a stream of numbers, we create a pipeline with a splitter that
     /// create vectors of two elements each.
@@ -204,7 +204,7 @@ where
     T: Send + 'static + Clone,
 {
     /// Creates a new aggregator node.
-    /// 
+    ///
     /// # Arguments
     /// * `chunk_size` - Number of elements for each chunk.
     ///
@@ -232,7 +232,7 @@ where
     }
 
     /// Creates a new aggregator node with 'n_replicas' replicas of the same node.
-    /// 
+    ///
     /// # Arguments
     /// * `n_replicas` - Number of replicas.
     /// * `chunk_size` - Number of elements for each chunk.
@@ -291,7 +291,7 @@ where
     F: FnMut(T) -> U + Send + 'static + Clone,
 {
     /// Creates a new sequential node.
-    /// 
+    ///
     /// # Arguments
     /// * `f` - Function name or lambda function that specify the logic
     /// of this node.
@@ -334,7 +334,7 @@ where
     F: FnMut(T) -> U + Send + 'static + Clone,
 {
     /// Creates a new parallel node.
-    /// 
+    ///
     /// # Arguments
     /// * `n_replicas` - Number of replicas.
     /// * `f` - Function name or lambda function that specify the logic
@@ -380,7 +380,7 @@ where
     F: FnMut(&T) -> bool + Send + 'static + Clone,
 {
     /// Creates a new filter node.
-    /// 
+    ///
     /// # Arguments
     /// * `f` - Function name or lambda function that represent the predicate
     /// function we want to apply.
@@ -561,7 +561,7 @@ where
     T: Send + 'static + Clone,
 {
     /// Creates a new ordered aggregator node
-    /// 
+    ///
     /// # Arguments
     /// * `chunk_size` - Number of elements for each chunk.
     pub fn build(chunk_size: usize) -> impl InOut<T, Vec<T>> {
