@@ -38,7 +38,7 @@ crossbeam-channel = { version = "0.5.11"}
 env_logger = "0.10.1"
 rand = "0.8.5"
 raster = {git = "https://github.com/valebes/raster.git"}
-rayon = "1.8.0"
+rayon = "1.8.1"
 rust-spp = {git = "https://github.com/GMAP/rust-ssp.git"}
 num_cpus = "1.16.0"
 serial_test = "3.0.0"
