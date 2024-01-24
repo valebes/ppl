@@ -43,7 +43,7 @@ rust-spp = {git = "https://github.com/GMAP/rust-ssp.git"}
 num_cpus = "1.16.0"
 serial_test = "3.0.0"
 scopeguard = "1.2.0"
-image = "0.24.7"
+image = "0.24.8"
 num-complex = "0.4.4"
 
 [[bench]]
