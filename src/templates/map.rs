@@ -64,7 +64,6 @@ where
             phantom: PhantomData,
         }
     }
-
     /// Create a new Map node with n_replicas replicas.
     /// # Arguments
     /// * `n_worker` - Number of worker threads.
@@ -232,6 +231,115 @@ where
     }
     fn is_ordered(&self) -> bool {
         true
+    }
+}
+
+/// FlatMap
+#[derive(Clone)]
+pub struct FlatMap<TIn, TOut, F>
+where
+    TIn: Send + IntoIterator,
+    TOut: Send + Iterator,
+    F: FnOnce(TIn) -> TOut + Send + Copy,
+{
+    threadpool: ThreadPool,
+    replicas: usize,
+    f: F,
+    phantom: PhantomData<(TIn, TOut)>,
+}
+impl<TIn, TOut, F> FlatMap<TIn, TOut, F>
+where
+    TIn: Send + Clone + IntoIterator,
+    TOut: Send + Clone + Iterator + 'static,
+    F: FnOnce(TIn) -> TOut + Send + Copy,
+{
+    /// Create a new FlatMap node.
+    /// # Arguments
+    /// * `n_worker` - Number of worker threads.
+    /// * `f` - Function to apply to each element of the input.
+    ///
+    /// # Examples
+    ///
+    /// Given a vector of vectors, each one containing a set of numbers,
+    /// compute the square value of each number contained in each
+    /// vector.
+    ///
+    /// ```
+    /// use ppl::{prelude::*, templates::misc::{SourceIter, SinkVec}, templates::map::FlatMap};
+    ///
+    /// let a: Vec<Vec<u64>> = vec![vec![1, 2], vec![3, 4], vec![5, 6], vec![7, 8]];
+    /// let mut vector = Vec::new();
+    ///
+    /// // Create the vector of vectors.
+    /// for _i in 0..1000 {
+    ///     vector.push(a.clone());
+    /// }
+    /// // Instantiate a new Pipeline with a Map operator.
+    /// let pipe = pipeline![
+    ///     SourceIter::build(vector.into_iter()),
+    ///     FlatMap::build(4, |x: Vec<u64>| x.into_iter()),
+    ///     SinkVec::build()
+    /// ];
+    /// // Start the pipeline and collect the results.
+    /// let res: Vec<Vec<u64>> = pipe.start_and_wait_end().unwrap();
+    /// let check = res.pop().unwrap();
+    /// assert_eq!(&check, &[1, 2, 3, 4, 5, 6, 7, 8]);
+    /// ```
+    pub fn build<TInIter, TOutIter>(n_worker: usize, f: F) -> impl InOut<TInIter, TOutIter>
+    where
+        TInIter: IntoIterator<Item = TIn>,
+        TOutIter: FromIterator<<TOut as Iterator>::Item>,
+    {
+        Self {
+            threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: 1,
+            f,
+            phantom: PhantomData,
+        }
+    }
+    /// Create a new FlatMap node with n_replicas replicas.
+    /// # Arguments
+    /// * `n_worker` - Number of worker threads.
+    /// * `n_replicas` - Number of replicas.
+    /// * `f` - Function to apply to each element of the input.
+    /// # Panics
+    /// Panics if n_replicas is 0.
+    /// # Remarks
+    /// The replicas are created by cloning the Map node.
+    /// This mean that 4 replicas of a Map node with 2 workers each
+    /// will result in the usage of 8 threads.
+    pub fn build_with_replicas<TInIter, TOutIter>(
+        n_worker: usize,
+        n_replicas: usize,
+        f: F,
+    ) -> impl InOut<TInIter, TOutIter>
+    where
+        TInIter: IntoIterator<Item = TIn>,
+        TOutIter: FromIterator<<TOut as Iterator>::Item>,
+    {
+        assert!(n_replicas > 0);
+        Self {
+            threadpool: ThreadPool::with_capacity(n_worker),
+            replicas: n_replicas,
+            f,
+            phantom: PhantomData,
+        }
+    }
+}
+impl<TIn, TInIter, TOut, TOutIter, F> InOut<TInIter, TOutIter> for FlatMap<TIn, TOut, F>
+where
+    TIn: Send + Clone + IntoIterator,
+    TInIter: IntoIterator<Item = TIn>,
+    TOut: Send + Clone + Iterator + 'static,
+    TOutIter: FromIterator<<TOut as Iterator>::Item>,
+    F: FnOnce(TIn) -> TOut + Send + Copy,
+{
+    fn run(&mut self, input: TInIter) -> Option<TOutIter> {
+        let res: TOutIter = self.threadpool.par_map(input, self.f).flatten().collect();
+        Some(res)
+    }
+    fn number_of_replicas(&self) -> usize {
+        self.replicas
     }
 }
 
@@ -772,12 +880,10 @@ where
 mod test {
     use serial_test::serial;
 
-    use super::{Map, OrderedMap, Reduce};
     use crate::{
         prelude::*,
         templates::{
-            map::MapReduce,
-            map::{OrderedMapReduce, OrderedReduce},
+            map::{Map, OrderedMap, Reduce, FlatMap, MapReduce, OrderedMapReduce, OrderedReduce},
             misc::{OrderedSinkVec, SinkVec, SourceIter},
         },
     };
@@ -1059,5 +1165,26 @@ mod test {
         unsafe {
             Orchestrator::delete_global_orchestrator();
         }
+    }
+
+    #[test]
+    #[serial]
+    fn flat_map() {
+        let a: Vec<Vec<u64>> = vec![vec![1, 2], vec![3, 4], vec![5, 6], vec![7, 8]];
+        let mut vector = Vec::new();
+    // Create the vector of vectors.
+        for _i in 0..1000 {
+            vector.push(a.clone());
+        }
+    // Instantiate a new Pipeline with a FlatMap operator.
+        let pipe = pipeline![
+            SourceIter::build(vector.into_iter()),
+            FlatMap::build(4, |x: Vec<u64>| x.into_iter().map(|i| i + 1)),
+            SinkVec::build()
+        ];
+    // Start the pipeline and collect the results.
+        let mut res: Vec<Vec<u64>> = pipe.start_and_wait_end().unwrap();
+        let check = res.pop().unwrap();
+        assert_eq!(&check, &[2, 3, 4, 5, 6, 7, 8, 9]);
     }
 }
