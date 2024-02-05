@@ -281,7 +281,7 @@ where
     ///     SinkVec::build()
     /// ];
     /// // Start the pipeline and collect the results.
-    /// let res: Vec<Vec<u64>> = pipe.start_and_wait_end().unwrap();
+    /// let mut res: Vec<Vec<u64>> = pipe.start_and_wait_end().unwrap();
     /// let check = res.pop().unwrap();
     /// assert_eq!(&check, &[1, 2, 3, 4, 5, 6, 7, 8]);
     /// ```
