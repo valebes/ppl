@@ -260,9 +260,9 @@ where
     ///
     /// # Examples
     ///
-    /// Given a vector of vectors, each one containing a set of numbers,
-    /// compute the square value of each number contained in each
-    /// vector.
+    /// Given a stream of vector of vectors, each one containing a set of numbers,
+    /// produce an iterator that flattens these vectors back into one.
+    /// 
     ///
     /// ```
     /// use ppl::{prelude::*, templates::misc::{SourceIter, SinkVec}, templates::map::FlatMap};
@@ -274,7 +274,7 @@ where
     /// for _i in 0..1000 {
     ///     vector.push(a.clone());
     /// }
-    /// // Instantiate a new Pipeline with a Map operator.
+    /// // Instantiate a new Pipeline with a FlatMap operator.
     /// let pipe = pipeline![
     ///     SourceIter::build(vector.into_iter()),
     ///     FlatMap::build(4, |x: Vec<u64>| x.into_iter()),
@@ -306,7 +306,7 @@ where
     /// Panics if n_replicas is 0.
     /// # Remarks
     /// The replicas are created by cloning the Map node.
-    /// This mean that 4 replicas of a Map node with 2 workers each
+    /// This mean that 4 replicas of a FlatMap node with 2 workers each
     /// will result in the usage of 8 threads.
     pub fn build_with_replicas<TInIter, TOutIter>(
         n_worker: usize,
