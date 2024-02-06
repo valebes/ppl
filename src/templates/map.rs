@@ -1312,6 +1312,27 @@ mod test {
 
     #[test]
     #[serial]
+    fn flat_map_replicated() {
+        let a: Vec<Vec<u64>> = vec![vec![1, 2], vec![3, 4], vec![5, 6], vec![7, 8]];
+        let mut vector = Vec::new();
+        // Create the vector of vectors.
+        for _i in 0..1000 {
+            vector.push(a.clone());
+        }
+        // Instantiate a new Pipeline with a FlatMap operator.
+        let pipe = pipeline![
+            SourceIter::build(vector.into_iter()),
+            FlatMap::build_with_replicas(2, 4, |x: Vec<u64>| x.into_iter().map(|i| i + 1)),
+            SinkVec::build()
+        ];
+        // Start the pipeline and collect the results.
+        let mut res: Vec<Vec<u64>> = pipe.start_and_wait_end().unwrap();
+        let check = res.pop().unwrap();
+        assert_eq!(&check, &[2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    #[serial]
     fn ordered_flat_map() {
         let a: Vec<Vec<u64>> = vec![vec![1, 2], vec![3, 4], vec![5, 6], vec![7, 8]];
         let b: Vec<Vec<u64>> = vec![vec![8, 7], vec![6, 5], vec![4, 3], vec![2, 1]];
@@ -1324,7 +1345,34 @@ mod test {
         // Instantiate a new Pipeline with a FlatMap operator.
         let pipe = pipeline![
             SourceIter::build(vector.into_iter()),
-            OrderedFlatMap::build_with_replicas(1, 1, |x: Vec<u64>| x.into_iter()),
+            OrderedFlatMap::build(4, |x: Vec<u64>| x.into_iter()),
+            OrderedSinkVec::build()
+        ];
+        // Start the pipeline and collect the results.
+        let mut res: Vec<Vec<u64>> = pipe.start_and_wait_end().unwrap();
+        while !res.is_empty() {
+            let check_a = res.remove(0);
+            let check_b = res.remove(0);
+            assert_eq!(&check_a, &[1, 2, 3, 4, 5, 6, 7, 8]);
+            assert_eq!(&check_b, &[8, 7, 6, 5, 4, 3, 2, 1]);
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn ordered_flat_map_replicated() {
+        let a: Vec<Vec<u64>> = vec![vec![1, 2], vec![3, 4], vec![5, 6], vec![7, 8]];
+        let b: Vec<Vec<u64>> = vec![vec![8, 7], vec![6, 5], vec![4, 3], vec![2, 1]];
+        let mut vector = Vec::new();
+        // Create the vector of vectors.
+        for _i in 0..1000 {
+            vector.push(a.clone());
+            vector.push(b.clone());
+        }
+        // Instantiate a new Pipeline with a FlatMap operator.
+        let pipe = pipeline![
+            SourceIter::build(vector.into_iter()),
+            OrderedFlatMap::build_with_replicas(2, 4, |x: Vec<u64>| x.into_iter()),
             OrderedSinkVec::build()
         ];
         // Start the pipeline and collect the results.
