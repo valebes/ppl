@@ -2,7 +2,7 @@
 edition = "2021"
 name = "ppl"
 description = "A structured parallel programming library for Rust."
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Valerio Besozzi"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/valebes/ppl"
