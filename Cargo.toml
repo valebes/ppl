@@ -41,7 +41,7 @@ raster = {git = "https://github.com/valebes/raster.git"}
 rayon = "1.10.0"
 rust-spp = {git = "https://github.com/GMAP/rust-ssp.git"}
 num_cpus = "1.16.0"
-serial_test = "3.0.0"
+serial_test = "3.1.0"
 scopeguard = "1.2.0"
 image = "0.24.9"
 num-complex = "0.4.5"
