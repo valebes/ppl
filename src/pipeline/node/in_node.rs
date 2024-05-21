@@ -44,7 +44,7 @@ use super::Node;
 /// ```
 pub trait In<TIn, TCollected>
 where
-    TIn: 'static + Send,
+    TIn: Send,
 {
     /// This method is called each time the node receive an input.
     fn run(&mut self, input: TIn);
@@ -64,7 +64,7 @@ where
 impl<TIn, TCollected, F> In<TIn, TCollected> for F
 where
     F: FnMut(TIn) -> TCollected,
-    TIn: 'static + Send,
+    TIn: Send,
 {
     fn run(&mut self, input: TIn) {
         self(input);
@@ -102,7 +102,7 @@ where
                     self.send_pending();
                 } else {
                     let res = self.channel.send(Message::new(op, order));
-                    if res.is_err() {
+                    if res.is_err() { 
                         panic!("Error: Cannot send message!");
                     }
                     self.counter.fetch_add(1, Ordering::AcqRel);
