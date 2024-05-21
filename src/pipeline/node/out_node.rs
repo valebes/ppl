@@ -31,7 +31,7 @@ use super::Node;
 /// ```
 pub trait Out<TOut>
 where
-    TOut: 'static + Send,
+    TOut: Send,
 {
     /// This method is called by the rts until a None is returned.
     /// When None is returned, the node will terminate.
@@ -42,7 +42,7 @@ where
 impl<TOut, F> Out<TOut> for F
 where
     F: FnMut() -> Option<TOut>,
-    TOut: 'static + Send,
+    TOut: Send,
 {
     fn run(&mut self) -> Option<TOut> {
         self()
