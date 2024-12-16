@@ -24,7 +24,7 @@ debug = false
 [dependencies]
 core_affinity = "0.8.1"
 crossbeam-channel = { version = "0.5.13", optional = true }
-crossbeam-deque = "0.8.5"
+crossbeam-deque = "0.8.6"
 dyn-clone = "1.0.17"
 log = "0.4.22"
 num_cpus = "1.16.0"
