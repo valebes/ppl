@@ -22,6 +22,6 @@ jobs:
         uses:                   codecov/codecov-action@v4
         with:
           verbose: true # optional (default = false)
-          fail_ci_if_error:     true        env:
+          fail_ci_if_error:     true 
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
