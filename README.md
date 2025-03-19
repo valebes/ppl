@@ -491,6 +491,8 @@ To customize the configuration, set the desired environment variables before run
 
 Please note that changing these configuration options may have an impact on the performance and behavior of your parallel computations. Experiment with different settings to find the optimal configuration for your specific use case.
 
+Moreover, you can determine the mapping string for a specific machine by using the script available at [FastFlow Mapping String Script](https://github.com/fastflow/fastflow/blob/master/ff/mapping_string.sh). This script helps identify the optimal thread-to-core mapping for your system.
+
 ## Channel Backend
 
 Parallelo Parallel Library (PPL) provides flexibility in choosing the channel backend used for multi-producer, single-consumer communication in the framework. Depending on your requirements and preferences, you can select the desired channel backend at compile time using feature flags.
