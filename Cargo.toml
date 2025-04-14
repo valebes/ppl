@@ -23,7 +23,7 @@ debug = false
 
 [dependencies]
 core_affinity = "0.8.3"
-crossbeam-channel = { version = "0.5.14", optional = true }
+crossbeam-channel = { version = "0.5.15", optional = true }
 crossbeam-deque = "0.8.6"
 dyn-clone = "1.0.19"
 log = "0.4.26"
@@ -34,7 +34,7 @@ flume = { version = "0.11.1", optional = true }
 
 [dev-dependencies]
 criterion = {version = "0.5.1", features = ["html_reports"]}
-crossbeam-channel = { version = "0.5.14"}
+crossbeam-channel = { version = "0.5.15"}
 env_logger = "0.11.7"
 rand = "0.9.0"
 raster = {git = "https://github.com/valebes/raster.git"}
