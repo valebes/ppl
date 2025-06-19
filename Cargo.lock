@@ -714,9 +714,9 @@ dependencies = [
 
 [[package]]
 name = "kanal"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b13526b910349296b1d3537ae62d5f83def9b6d6974e26d62b80ee2bb1b4794"
+checksum = "9e3953adf0cd667798b396c2fa13552d6d9b3269d7dd1154c4c416442d1ff574"
 dependencies = [
  "futures-core",
  "lock_api",
